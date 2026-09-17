@@ -1,0 +1,198 @@
+  /* ===== Inflation Calculator — tool colors & layout ===== */
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+
+  .app {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 0;
+  }
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .header-titles h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
+  .subtitle { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+
+  .help-button {
+    flex: none;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 1.2rem; font-weight: 600;
+    cursor: pointer;
+  }
+  .help-button:hover { background: var(--panel-alt); }
+  .help-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .card {
+    margin-top: 1.25rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+
+  /* ---- Inputs ---- */
+  .inputs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .field label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+
+  input[type="text"], select {
+    width: 100%;
+    padding-block: 0.5rem;
+    padding-inline: 0.75rem;
+    font-size: 1rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background-color: var(--panel);
+    color: var(--text);
+  }
+  input[type="text"]:focus-visible, select:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 1px;
+  }
+  select {
+    padding-right: 2rem;            /* room for the base.css chevron (longhand!) */
+    min-width: 6.5rem;
+    cursor: pointer;
+  }
+
+  .amount-field .ct-field > input { font-size: 1.15rem; }
+
+  .years-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 0.75rem;
+  }
+  .swap-btn {
+    align-self: end;
+    height: var(--control-h);
+    width: 44px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--panel-alt);
+    color: var(--text);
+    font-size: 1.2rem;
+    cursor: pointer;
+  }
+  .swap-btn:hover { background: var(--border); }
+  .swap-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- Result ---- */
+  .error {
+    margin: 1rem 0 0;
+    color: var(--danger);
+    background: var(--danger-bg);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .result {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .result-label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.25rem; }
+  .result-value {
+    display: block;
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--accent);
+    word-break: break-word;
+    min-height: 1.1em;
+  }
+  .result .ct-field { max-width: max-content; padding-right: 0; }
+  .result .ct-field > .ct-copy-btn { position: static; height: auto; width: auto; padding: 0.25rem; margin-left: 0.35rem; vertical-align: middle; }
+
+  .sentence {
+    margin: 0.75rem 0 0;
+    font-size: 1.05rem;
+    color: var(--text);
+    min-height: 1.2em;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+  .stat {
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.85rem;
+  }
+  .stat-label { font-size: 0.8rem; color: var(--text-muted); }
+  .stat-value { font-size: 1.35rem; font-weight: 700; margin-top: 0.15rem; min-height: 1.2em; }
+
+  .trend {
+    margin-top: 1.25rem;
+    color: var(--accent);
+  }
+  .trend svg { display: block; width: 100%; height: 40px; }
+  .trend-caption { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+  .data-note {
+    margin-top: 1.25rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .data-note a { color: var(--accent); }
+
+  /* ---- Modal ---- */
+  .help-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem; z-index: 50;
+  }
+  .help-dialog {
+    position: relative;
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    max-width: 540px; width: 100%;
+    max-height: 85vh; overflow-y: auto;
+    padding: 1.5rem 1.5rem 1.25rem;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  }
+  .help-dialog h2 { margin-top: 0; padding-right: 2.5rem; }
+  .help-dialog ul { padding-left: 1.2rem; }
+  .help-dialog li { margin-bottom: 0.5rem; }
+  .help-note { color: var(--text-muted); font-size: 0.85rem; }
+
+  .modal-close-x {
+    position: absolute; top: .5rem; right: .5rem; width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center; padding: 0; border: 0;
+    border-radius: 8px; background: transparent; color: inherit; font-size: 1.6rem;
+    line-height: 1; cursor: pointer;
+  }
+  .modal-close-x:hover { background: rgba(127,127,127,.18); }
+  .modal-close-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- Wide screens: two-column input, roomier card ---- */
+  @media (min-width: 620px) {
+    .inputs { grid-template-columns: 1fr; }
+  }
+  @media (min-width: 720px) {
+    .app { max-width: 900px; }
+  }

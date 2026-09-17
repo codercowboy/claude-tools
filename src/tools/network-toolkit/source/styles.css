@@ -1,0 +1,301 @@
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 { font-size: 1.35rem; margin: 0 0 0.3rem; }
+  h2 { margin: 0; font-size: 1.15rem; }
+  h3 { margin: 0; }
+
+  .subtitle { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+
+  label { font-size: 0.9rem; font-weight: 600; }
+
+  input[type="text"],
+  input[type="number"] {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.55rem 0.7rem;
+    width: 100%;
+  }
+
+  /* Selects keep base.css's chevron: fill with background-COLOR (never the
+     `background` shorthand) and keep padding-right 2rem via longhands (never a
+     horizontal padding shorthand). The spelled-out unit names need real width. */
+  select {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding-block: 0.55rem;
+    padding-left: 0.7rem;
+    padding-right: 2rem;
+    width: 100%;
+    min-width: 15rem;
+  }
+
+  input:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+  button:hover:not(:disabled):not(.ctc-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  output:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header { display: flex; flex-direction: column; gap: 0.2rem; }
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .header-titles { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; line-height: 1;
+  }
+
+  /* ---------- Card panels ---------- */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.15rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .card-head { display: flex; flex-direction: column; gap: 0.25rem; }
+  .card-blurb { margin: 0; color: var(--text-muted); font-size: 0.85rem; line-height: 1.45; }
+  .sub-heading { font-size: 0.95rem; margin-top: 0.3rem; }
+  .hint { margin: 0; color: var(--text-muted); font-size: 0.8rem; line-height: 1.4; }
+
+  .field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .field.grow { flex: 1 1 auto; min-width: 0; }
+  .field-prefix { flex: 0 0 auto; width: 9rem; }
+
+  .controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+  }
+
+  .base-toggle { display: inline-flex; gap: 0.4rem; }
+  .base-toggle button { font-weight: 600; }
+  .base-toggle button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+  .base-toggle button[aria-pressed="true"]:hover:not(:disabled):not(.ctc-btn) {
+    background: var(--accent);
+  }
+
+  .transfer-inputs { display: flex; flex-direction: column; gap: 0.75rem; }
+
+  .source-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+  }
+
+  .actions-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+  .error {
+    margin: 0;
+    padding: 0.55rem 0.75rem;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- In-field copy button (controls.css supplies the base) ---------- */
+  .ct-field > input,
+  .ct-field > .out-value { padding-right: 2.6rem; }
+  .ct-copy-btn { font-size: 0.95rem; }
+
+  /* ---------- Output rows (label left, value field right) ---------- */
+  .out-rows { display: flex; flex-direction: column; gap: 0.5rem; }
+  .out-row {
+    display: grid;
+    grid-template-columns: minmax(8rem, 12rem) 1fr;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .out-row .out-label { font-weight: 600; font-size: 0.85rem; }
+  .out-row .out-note { color: var(--text-muted); font-size: 0.78rem; grid-column: 2; margin: 0; }
+
+  .out-value {
+    display: block;
+    min-height: var(--control-h, 44px);
+    padding: 0.6rem 0.7rem;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    user-select: text;
+    box-sizing: border-box;
+  }
+  .out-value--strong { font-size: 1rem; font-weight: 700; color: var(--accent); }
+  @media (prefers-color-scheme: dark) {
+    .out-value--strong { color: var(--accent); }
+  }
+
+  /* ---------- Card 1 — reference table ---------- */
+  .ref-block { display: flex; flex-direction: column; gap: 0.4rem; }
+  .ref-title { font-weight: 600; font-size: 0.9rem; }
+  .ref-scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+  .ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  .ref-table th, .ref-table td {
+    text-align: left;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .ref-table thead th {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .ref-table td:first-child { font-weight: 600; white-space: nowrap; }
+  .ref-table td:last-child {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .ref-table tbody tr:last-child td { border-bottom: 0; }
+
+  /* ---------- Card 3 — converter rows ---------- */
+  .conv-rows {
+    display: grid;
+    grid-template-columns: minmax(6rem, 8rem) 1fr;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+  }
+  .conv-row { display: contents; }
+  .conv-row > label { font-weight: 600; font-size: 0.85rem; }
+  .conv-row .ct-field > input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+  }
+
+  /* ---------- Help modal ---------- */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 34rem;
+    max-height: min(85vh, 700px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    padding: 1.25rem 3rem 1.1rem 1.4rem;
+  }
+  .modal-close-x {
+    position: absolute;
+    top: .5rem; right: .5rem;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; border: 0; border-radius: 8px;
+    background: transparent; color: inherit;
+    font-size: 1.6rem; line-height: 1; cursor: pointer;
+  }
+  .modal-close-x:hover:not(:disabled):not(.ctc-btn) { background: rgba(127, 127, 127, .18); }
+  .modal-close-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.2rem; }
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.5rem; }
+  .help-dialog code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: var(--panel-alt);
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+  }
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade { from { opacity: 0; } to { opacity: 1; } }
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 640px) {
+    .source-row .field { flex: 1 1 100%; }
+    .field-prefix { width: 100%; }
+    select { min-width: 0; }
+    .base-toggle { flex: 1 1 100%; }
+    .base-toggle button { flex: 1 1 0; }
+    .out-row { grid-template-columns: 1fr; }
+    .out-row .out-note { grid-column: 1; }
+    .conv-rows { grid-template-columns: 1fr; gap: 0.15rem 0; }
+    .conv-row > label { margin-top: 0.4rem; }
+  }

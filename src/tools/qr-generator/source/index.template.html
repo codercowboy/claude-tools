@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Code Generator</title>
+
+<meta property="og:title" content="QR Code Generator">
+<meta property="og:description" content="Generate a QR code from text or a URL — hand-rolled encoder, no library, download as PNG or SVG.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="claude-tools">
+<meta property="og:image" content="preview.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --text: #1a1d23;
+    --muted: #5b6270;
+    --border: #d8dce3;
+    --accent: #2563eb;
+    --accent-contrast: #ffffff;
+    --error-bg: #fdecec;
+    --error-border: #f4b4b4;
+    --error-text: #9c1c1c;
+    --warn-bg: #fff8e6;
+    --warn-border: #f0d385;
+    --warn-text: #7a5b00;
+    --radius: 10px;
+    --focus: 0 0 0 3px rgba(37, 99, 235, 0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --panel: #1d2027;
+      --text: #eceef2;
+      --muted: #9aa2b1;
+      --border: #333844;
+      --accent: #5b8def;
+      --accent-contrast: #0b0d10;
+      --error-bg: #3a1414;
+      --error-border: #6b2323;
+      --error-text: #ff9d9d;
+      --warn-bg: #362a06;
+      --warn-border: #6b5417;
+      --warn-text: #f0cf6b;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header-row">
+    <span class="header-spacer" aria-hidden="true"></span>
+    <div class="header-titles">
+      <h1>QR Code Generator</h1>
+      <p>Paste text or a URL — generates a scannable QR code entirely in your browser, no library.</p>
+    </div>
+    <button
+      type="button"
+      id="help-button"
+      class="help-button"
+      data-testid="help-button"
+      title="How it works"
+      aria-label="How it works"
+    >?</button>
+  </div>
+</header>
+
+<main class="app">
+  <section class="input-section" data-testid="input-section">
+    <h2>Content</h2>
+    <div class="field">
+      <label for="qr-input">Text or URL</label>
+      <!-- In-field copy on the editable input (revealed only when non-empty; the
+           app toggles [hidden] on input). Multiline wrapper pins the button to
+           the top-right of the textarea (see controls.css / conventions.md). -->
+      <div class="ct-field ct-field--multiline">
+        <textarea id="qr-input" data-testid="qr-input" placeholder="Type or paste text, or a URL…" aria-describedby="capacity-hint"></textarea>
+        <button type="button" class="ct-copy-btn" data-testid="qr-input-copy" title="Copy text" aria-label="Copy text" hidden>📋</button>
+      </div>
+      <div id="capacity-hint" data-testid="capacity-hint" aria-live="polite">Enter text or a URL above to generate a QR code.</div>
+    </div>
+  </section>
+
+  <section class="options-section" data-testid="options-section">
+    <h2>Options</h2>
+    <div class="field">
+      <label for="ec-level-select">Error correction level</label>
+      <select id="ec-level-select" data-testid="ec-level-select">
+        <option value="L">L — Low (~7% recovery)</option>
+        <option value="M">M — Medium (~15% recovery)</option>
+        <option value="Q">Q — Quartile (~25% recovery)</option>
+        <option value="H" selected>H — High (~30% recovery)</option>
+      </select>
+    </div>
+    <div class="options-grid">
+      <div class="field">
+        <label for="scale-input">Module scale (px)</label>
+        <input type="number" id="scale-input" data-testid="scale-input" min="1" max="40" value="8">
+      </div>
+      <div class="field">
+        <label for="quiet-zone-input">Quiet zone (modules)</label>
+        <input type="number" id="quiet-zone-input" data-testid="quiet-zone-input" min="0" max="20" value="4">
+      </div>
+      <div class="field">
+        <label for="fg-color-input">Foreground color</label>
+        <input type="color" id="fg-color-input" data-testid="fg-color-input" value="#000000">
+      </div>
+      <div class="field">
+        <label for="bg-color-input">Background color</label>
+        <input type="color" id="bg-color-input" data-testid="bg-color-input" value="#ffffff">
+      </div>
+    </div>
+    <div id="contrast-warning" data-testid="contrast-warning" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="output-section" data-testid="output-section">
+    <h2>Result</h2>
+    <div id="error-message" data-testid="error-message" role="alert"></div>
+    <div class="canvas-wrap">
+      <canvas id="qr-canvas" data-testid="qr-canvas" class="hidden" aria-label="QR code"></canvas>
+    </div>
+    <div id="qr-caption" data-testid="qr-caption"></div>
+    <div class="download-row">
+      <button type="button" id="download-png-btn" data-testid="download-png-btn" title="Download PNG" aria-label="Download PNG" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1v9m0 0 3-3m-3 3-3-3M2 12v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download PNG
+      </button>
+      <button type="button" id="download-svg-btn" data-testid="download-svg-btn" title="Download SVG" aria-label="Download SVG" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1v9m0 0 3-3m-3 3-3-3M2 12v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download SVG
+      </button>
+    </div>
+  </section>
+</main>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">How QR Code Generator works</h2>
+    <p>Type or paste text — or a URL — into the box above and a QR code is generated for you automatically, entirely in your browser. There's no library or server call involved: the encoder (error correction, masking, and all) is hand-rolled from the ISO/IEC 18004 spec.</p>
+    <ul>
+      <li><strong>Error correction level.</strong> Higher levels (Q, H) let the code keep scanning even if part of it gets damaged or obscured, at the cost of a denser code. <strong>H</strong> (~30% recovery) is the default.</li>
+      <li><strong>Module scale &amp; quiet zone.</strong> Scale sets how many pixels each square module renders at; quiet zone sets the blank border (in modules) most scanners expect around the code.</li>
+      <li><strong>Foreground &amp; background color.</strong> Customize the code's colors — a warning appears if the contrast between them gets too low to scan reliably.</li>
+      <li><strong>Download PNG or SVG.</strong> Save the generated code as a pixel PNG or a scalable SVG. Both files carry small embedded credit metadata (author "claude tools" and the project's GitHub URL) — the PNG via standard tEXt chunks, the SVG via an XML comment and a &lt;metadata&gt; block — the QR code's own pixels/geometry are never touched.</li>
+    </ul>
+    <p class="help-note">Your text and options are saved on this device, so they're still here next time you open QR Code Generator.</p>
+  </div>
+</div>
+
+<<ct:include footer.html>>
+
+<script>
+<<ct:include copy.js>>
+</script>
+<script>
+<<ct:include crc32.js>>
+</script>
+
+<script>
+<<ct:include util.js>>
+</script>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

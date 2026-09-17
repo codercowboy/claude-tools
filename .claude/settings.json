@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "claude-tpm@claude-tpm-market": true,
+    "jbc@jbc-market": true
+  },
+  "extraKnownMarketplaces": {
+    "jbc-market": {
+      "source": {
+        "source": "directory",
+        "path": "/Volumes/My Shared Files/claude/tools-workspace/claude-tools/node_modules/jason-code"
+      }
+    }
+  }
+}

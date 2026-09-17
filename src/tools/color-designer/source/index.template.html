@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Color Designer</title>
+<meta property="og:title"       content="Color Designer">
+<meta property="og:description" content="Generate five color schemes from color-theory harmonies. Seed your own colors or roll random, preview with a live demo, and copy out.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+<<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Color Designer</h1>
+        <p class="hint">Roll color-theory schemes, optionally seeded with your own colors.</p>
+      </div>
+      <button
+        id="helpButton"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <div class="top-row" data-testid="top-row">
+  <section class="roll-card" data-testid="roll-card">
+    <div class="control roll-control">
+      <button type="button" id="rollBtn" class="roll-btn btn-primary" data-testid="roll-btn">🎲&nbsp;&nbsp;Roll again</button>
+    </div>
+    <div class="control">
+      <label for="moodSelect">Mood</label>
+      <select id="moodSelect" data-testid="mood-select">
+        <option value="surprise" selected>Surprise me 🎲</option>
+        <optgroup label="Tone">
+          <option value="warm">Warm</option>
+          <option value="cool">Cool</option>
+          <option value="pastel">Soft pastels</option>
+          <option value="deep">Deep &amp; moody</option>
+          <option value="muted">Muted</option>
+          <option value="neon">Neon</option>
+        </optgroup>
+        <optgroup label="Theme">
+          <option value="ocean">Ocean</option>
+          <option value="sunset">Sunset</option>
+          <option value="ice">Ice</option>
+          <option value="forest">Forest</option>
+          <option value="earthy">Earthy</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="control">
+      <label>Roll history</label>
+      <div class="hist-cluster">
+        <button type="button" id="rollBackBtn" class="hist-btn" data-testid="roll-back-btn" title="Previous roll" aria-label="Previous roll" disabled>◀ Back</button>
+        <button type="button" id="rollForwardBtn" class="hist-btn" data-testid="roll-forward-btn" title="Next roll" aria-label="Next roll" disabled>Forward ▶</button>
+      </div>
+    </div>
+    <div class="control settings-control">
+      <button type="button" id="settingsBtn" class="settings-btn" data-testid="settings-btn" aria-haspopup="dialog" aria-expanded="false">⚙️&nbsp;&nbsp;Settings</button>
+    </div>
+    <p id="algorithmUsedLabel" class="algo-badge" data-testid="algorithm-used-label" hidden></p>
+    <p id="rollAnnounce" data-testid="roll-announce" role="status" aria-live="polite" class="sr-only"></p>
+  </section>
+
+  <section class="seeds-section" data-testid="seeds-section">
+    <label for="seedInput">Add a seed color (hex or rgba)</label>
+    <div class="seed-add-row">
+      <button type="button" id="seedPickerTrigger" class="seed-picker-trigger" data-testid="seed-picker-trigger"
+              aria-label="Pick a color" title="Pick a color" aria-haspopup="dialog" aria-expanded="false">
+        <span class="trigger-fill" data-testid="seed-picker-trigger-swatch"></span>
+        <span class="trigger-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M19.35 3.55a3.5 3.5 0 0 0-4.95 0l-2.1 2.1-1.06-1.06-1.42 1.42 1.06 1.06-8.4 8.4a1 1 0 0 0-.27.5L1 20.5a.75.75 0 0 0 .9.9l4.53-1.17a1 1 0 0 0 .5-.27l8.4-8.4 1.06 1.06 1.42-1.42-1.06-1.06 2.1-2.1a3.5 3.5 0 0 0 0-4.95Z"></path>
+          </svg>
+        </span>
+      </button>
+      <input type="text" id="seedInput" data-testid="seed-input" placeholder="#3366ff or rgba(51,102,255,1)" autocomplete="off">
+      <button type="button" id="seedAddBtn" data-testid="seed-add-btn">Add</button>
+    </div>
+    <div id="seedPicker" class="seed-picker-popup" data-testid="seed-picker-popup" role="dialog" aria-label="Color picker" hidden>
+      <div id="svSquare" class="sv-square" data-testid="seed-picker-sv-square" tabindex="0"
+           role="slider" aria-label="Saturation and value" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+        <div id="svThumb" class="sv-thumb" data-testid="seed-picker-sv-thumb"></div>
+      </div>
+      <div id="hueSlider" class="hue-slider" data-testid="seed-picker-hue-slider" tabindex="0"
+           role="slider" aria-label="Hue" aria-valuemin="0" aria-valuemax="360" aria-valuenow="0">
+        <div id="hueThumb" class="hue-thumb" data-testid="seed-picker-hue-thumb"></div>
+      </div>
+      <div id="alphaSlider" class="alpha-slider" data-testid="seed-picker-alpha-slider" tabindex="0"
+           role="slider" aria-label="Alpha" aria-valuemin="0" aria-valuemax="1" aria-valuenow="1">
+        <div id="alphaThumb" class="alpha-thumb" data-testid="seed-picker-alpha-thumb"></div>
+      </div>
+    </div>
+    <p id="seedError" class="seed-error" data-testid="seed-error" role="status" aria-live="polite"></p>
+    <ul class="seed-list" id="seedList" data-testid="seed-list"></ul>
+  </section>
+
+  </div>
+
+  <div class="cvd-badge" id="cvdBadge" data-testid="cvd-badge" role="status" aria-live="polite" hidden></div>
+
+  <div class="settings-overlay" data-testid="settings-overlay" hidden>
+    <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title" data-testid="settings-modal">
+      <button type="button" class="modal-close-x" data-testid="settings-close-x" aria-label="Close">&times;</button>
+      <h2 id="settings-title">Settings</h2>
+      <div class="settings-fields">
+        <div class="control">
+          <label for="countSelect">Colors per scheme</label>
+          <select id="countSelect" data-testid="count-select">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6" selected>6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="harmonySelect">Harmony</label>
+          <select id="harmonySelect" data-testid="harmony-select">
+            <option value="random" selected>Random</option>
+            <option value="complementary">Complementary</option>
+            <option value="analogous">Analogous</option>
+            <option value="triadic">Triadic</option>
+            <option value="splitComplementary">Split-complementary</option>
+            <option value="tetradic">Tetradic</option>
+            <option value="monochromatic">Monochromatic</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="cvdSelect">Colorblind preview</label>
+          <select id="cvdSelect" data-testid="cvd-select">
+            <option value="none" selected>Normal vision</option>
+            <option value="protanopia">Protanopia (red-blind)</option>
+            <option value="deuteranopia">Deuteranopia (green-blind)</option>
+            <option value="tritanopia">Tritanopia (blue-blind)</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="demoSpeedSelect">Demo speed</label>
+          <select id="demoSpeedSelect" data-testid="demo-speed">
+            <option value="slow">Slow</option>
+            <option value="normal" selected>Normal</option>
+            <option value="fast">Fast</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="rollSeedInput">Roll seed</label>
+          <input type="text" id="rollSeedInput" data-testid="roll-seed-input" placeholder="random" autocomplete="off" spellcheck="false" />
+        </div>
+      </div>
+      <div class="settings-tools">
+        <button type="button" id="shareLinkBtn" class="tool-btn" data-testid="share-link-btn" title="Copy a shareable link to this palette">🔗 Copy link</button>
+        <button type="button" id="savePaletteBtn" class="tool-btn" data-testid="save-palette-btn" title="Save the open scheme to your palette shelf">💾 Save palette</button>
+        <button type="button" id="restoreDefaultsBtn" class="tool-btn tool-btn-danger" data-testid="restore-defaults-btn" title="Clear seeds, saved palettes, pins, history and settings on this device">↺ Restore defaults</button>
+        <p id="toolAnnounce" data-testid="tool-announce" role="status" aria-live="polite" class="sr-only"></p>
+      </div>
+      <div class="settings-footer">
+        <button type="button" id="settingsCancelBtn" class="tool-btn" data-testid="settings-cancel-btn">Cancel</button>
+        <button type="button" id="settingsSaveBtn" class="btn-primary" data-testid="settings-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="saved-section" data-testid="saved-section" hidden>
+    <h2 class="saved-heading">Saved palettes</h2>
+    <div class="saved-shelf" id="savedShelf" data-testid="saved-shelf"></div>
+  </section>
+
+  <section class="schemes-section" data-testid="schemes-section">
+    <h2 class="sr-only">Schemes</h2>
+    <div class="schemes-list" id="schemesList" data-testid="schemes-list"></div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">How Color Designer works</h2>
+    <p>Pick a <strong>harmony</strong> from the dropdown — Complementary, Analogous, Triadic, Split-complementary, Tetradic, Monochromatic, or Random (which also picks the algorithm for you) — then tap <strong>Roll again&nbsp;&nbsp;🎲</strong> to generate five color schemes built from that color-theory harmony.</p>
+    <ul>
+      <li><strong>Set a mood.</strong> The <strong>Mood</strong> dropdown flavors the roll on top of the harmony — <em>Warm, Cool, Soft pastels, Deep &amp; moody, Muted, Neon</em>, or a theme like <em>Ocean, Sunset, Ice, Forest, Earthy</em>. It shifts the colors' territory and tone while the harmony still sets how they relate. <strong>Surprise me 🎲</strong> (the default) applies no mood at all — fully random, classic behavior.</li>
+      <li><strong>Seed your own colors.</strong> Type a hex or rgba() value into the "Add a seed color" box, or tap the swatch button next to it to open a visual color picker. You can also hover any generated swatch and tap its <strong>+</strong> to make it a seed. Seeds get woven into future rolls near a matching hue — adding one wiggles the Roll button as a nudge, but never rerolls on its own.</li>
+      <li><strong>⚙️ Settings.</strong> The gear button opens a panel with <strong>Colors per scheme</strong> (how many colors each of the five schemes has, 2–10), <strong>Harmony</strong>, <strong>Colorblind preview</strong>, <strong>Demo speed</strong>, <strong>Roll seed</strong>, plus <strong>🔗 Copy link</strong> / <strong>💾 Save palette</strong> — and <strong>↺ Restore defaults</strong>, which wipes this device's seeds, saved palettes, pins, history and settings back to a clean slate.</li>
+      <li><strong>Pin the ones you love.</strong> Hover a swatch and tap the 🔒 (top-right) to pin it — pinned colors stay put through every re-roll while the rest change. Tap again to unpin.</li>
+      <li><strong>Go back and forward.</strong> The ◀ ▶ buttons beside Roll step through your recent rolls, so you can return to one you liked.</li>
+      <li><strong>Expand a scheme.</strong> Tap a scheme's swatch strip to open it and see a live demo preview, per-color RGBA/hex, plus tools for that scheme: a <strong>Contrast</strong> check (best readable text on each color, with WCAG AA/AAA grades), <strong>Export</strong> (CSS variables, SCSS, JSON, Tailwind, or plain lists — copy, download, or save a PNG), and an <strong>“explain this scheme”</strong> hue wheel.</li>
+      <li><strong>Reproduce &amp; share.</strong> Type a <strong>Roll seed</strong> to make rolls repeatable, and use <strong>🔗 Copy link</strong> to copy a URL that reopens this exact palette. <strong>💾 Save palette</strong> keeps the open scheme on a shelf you can reload later.</li>
+      <li><strong>Check accessibility.</strong> The <strong>Colorblind preview</strong> dropdown repaints the swatches as they'd look to someone with red-, green-, or blue-blindness (a preview only — your colors are unchanged).</li>
+      <li><strong>Copy out.</strong> Copy any single color's RGBA or hex value, or use "Copy all" to grab every color in a scheme at once.</li>
+    </ul>
+    <p class="help-note"><strong>Keyboard:</strong> <kbd>R</kbd> reroll · <kbd>1</kbd>–<kbd>5</kbd> open a scheme · <kbd>←</kbd>/<kbd>→</kbd> step the demo · <kbd>Esc</kbd> close a scheme · <kbd>?</kbd> this help.</p>
+    <p class="help-note">Your seeds, harmony, mood, colors-per-scheme, pins, roll seed, recent rolls, and saved palettes are stored on this device, so they're still here next time you open Color Designer.</p>
+  </div>
+</div>
+
+<<ct:include footer.html>>
+
+<script>
+<<ct:include confirm.js>>
+</script>
+
+<script>
+<<ct:include copy.js>>
+</script>
+<script>
+<<ct:include crc32.js>>
+</script>
+<script>
+<<ct:include util.js>>
+</script>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

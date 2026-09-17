@@ -1,0 +1,15 @@
+{
+  "a": 5,
+  "sandbox": {
+    "filesystem": {
+      "allowRead": [
+        "/Volumes/My Shared Files/claude/tools-workspace/claude-tools",
+        "/Volumes/My Shared Files/claude/tools-workspace/claude-tools/.."
+      ],
+      "allowWrite": [
+        "/Volumes/My Shared Files/claude/tools-workspace/claude-tools",
+        "/Volumes/My Shared Files/claude/tools-workspace/claude-tools/.."
+      ]
+    }
+  }
+}

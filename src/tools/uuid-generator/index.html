@@ -1,0 +1,1943 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UUID Generator</title>
+<meta property="og:title"       content="UUID Generator">
+<meta property="og:description" content="Generate UUID v4 / v7, ULID, nanoid, and random tokens in bulk — and inspect any UUID — entirely in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #6d3fed;
+    --accent-contrast: #ffffff;
+    --accent-soft: #efe9fd;
+    --ok: #1f7a3d;
+    --danger: #c4362a;
+    --focus: #6d3fed;
+    --radius: 8px;
+    /* ctConfirm accent (future-proofing; no confirm ships today) */
+    --ctc-accent: #6d3fed;
+    --ctc-accent-contrast: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #a488ff;
+      --accent-contrast: #14101f;
+      --accent-soft: #2a2340;
+      --ok: #5fd48a;
+      --danger: #ff6b60;
+      --focus: #a488ff;
+      --ctc-accent: #a488ff;
+      --ctc-accent-contrast: #14101f;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  /* ===== Begin ct-base ===== */
+/* claude-tools shared base styles — inlined by the build
+   near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
+   This is the single source of truth: edit here, run `npm run build`. See
+   docs/conventions.md § Build-assembled tools.
+   It sits near the TOP of the <style> block (after any reset) so a tool's own
+   later rules can still layer colors on top; for <select>, keep the tool's fill as
+   `background-color` (not the `background` shorthand, which would wipe the chevron). */
+html { touch-action: manipulation; } /* double-tap won't zoom the page; pinch-zoom + scroll still work. Gesture canvases keep their own touch-action:none. */
+[hidden] { display: none !important; } /* an author `display:` rule must never defeat the hidden attribute */
+.visually-hidden { /* screen-reader-only (kept in the a11y tree, unlike display:none) */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* iOS/Safari sizes a native <select> from font-size and ignores height/min-height
+   (renders ~half as tall as inputs). Opt out of the native control so the box model
+   applies, and supply our own chevron (appearance:none removes the native one). */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  font-size: 16px; /* >=16px also stops iOS zoom-on-focus */
+  padding-right: 2rem; /* room for the chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.6 6 6.4l5-4.8' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.72rem;
+}
+/* ===== end ct-base ===== */
+/* ===== Begin ct-controls ===== */
+/* claude-tools shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the ct:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See docs/conventions.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use ctCopy/ctFlash for behavior
+   (copy.js). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+    margin: 0 0 0.3rem;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  input[type="text"],
+  input[type="number"] {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.65rem;
+  }
+
+  /* Selects must preserve base.css's chevron room. Set padding with LONGHANDS
+     (never the `padding` shorthand, which sits at equal specificity after
+     base.css and silently resets padding-right, running the selected option
+     under the caret — docs/conventions.md § "select padding shorthand trap").
+     Keep the fill as background-color so base.css's chevron background-image
+     survives (the `background` shorthand would wipe it). */
+  select {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding-block: 0.5rem;
+    padding-left: 0.65rem;
+    padding-right: 2rem;
+  }
+
+  /* The token alphabet select carries the longest option text ("Hex (0-9a-f)").
+     width:auto + a min-width sizes it for that longest option so the value never
+     overflows onto the chevron. */
+  #tokenAlphabetSelect { width: auto; min-width: 11rem; }
+
+  input[type="number"] { width: 7rem; }
+  input[type="text"] { width: 100%; }
+
+  input:disabled, select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+
+  /* The :not(.ctc-btn) carve-out keeps a shared confirm dialog's accent "Yes"
+     button from being washed out on hover (docs/conventions.md hover-specificity
+     trap) — future-proofing even though this tool ships no confirm today. */
+  button:hover:not(:disabled):not(.ctc-btn):not(.ct-copy-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+
+  .app-header { display: flex; flex-direction: column; gap: 0.2rem; }
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* ---------- Segmented controls (mode + type) ---------- */
+
+  .segmented {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .segmented button {
+    flex: 1 1 auto;
+    padding: 0.6rem 0.9rem;
+    font-weight: 600;
+  }
+
+  .segmented button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .segmented button[aria-pressed="true"]:hover {
+    background: var(--accent);
+  }
+
+  .type-toggle button { flex: 1 1 0; }
+
+  /* ---------- Sections & controls ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  /* One inline row of controls: Generate first, then Count, then the
+     contextual option group. Wraps gracefully on narrow/mobile. */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.1rem;
+    padding: 1rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .option-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.4rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .field-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .field-inline label { white-space: nowrap; }
+
+  .checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .checkbox input { width: 1.1rem; height: 1.1rem; }
+
+  .hint { color: var(--text-muted); font-size: 0.8rem; margin: 0; }
+
+  .generate-btn {
+    flex: 0 0 auto;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+    font-weight: 700;
+    padding: 0.6rem 1.4rem;
+  }
+
+  .generate-btn:hover:not(:disabled):not(.ctc-btn) { background: var(--accent); filter: brightness(1.05); }
+
+  /* ---------- Results list ---------- */
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .results-count { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
+
+  .results-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .result-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem 0.45rem 0.7rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .result-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-user-select: all;
+    user-select: all;
+  }
+
+  .result-row button,
+  .copy-all-btn {
+    flex: 0 0 auto;
+    line-height: 1;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .empty-state {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 1rem;
+    text-align: center;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+  }
+
+  /* ---------- Inspect ---------- */
+
+  .inspect-result {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .inspect-status {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .inspect-status.valid { color: var(--ok); }
+  .inspect-status.invalid { color: var(--danger); }
+
+  /* The canonical form uses the shared in-field copy pattern: a .ct-field
+     wrapper (position:relative from controls.css) holds the value with the
+     .ct-copy-btn pinned inside at the right edge. */
+  .canonical-row {
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.65rem;
+  }
+
+  .canonical-value {
+    display: block;
+    min-width: 0;
+    padding-right: 2.6rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.95rem;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .breakdown {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+
+  .breakdown th,
+  .breakdown td {
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .breakdown th {
+    width: 38%;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .breakdown td {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    word-break: break-word;
+  }
+
+  .callout {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    color: var(--text);
+  }
+
+  /* ---------- Help modal ---------- */
+
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 32rem;
+    max-height: min(85vh, 660px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    padding: 1.25rem 3rem 1.1rem 1.4rem;
+  }
+
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .modal-close-x:hover:not(:disabled):not(.ctc-btn) {
+    background: rgba(127, 127, 127, .18);
+  }
+
+  .modal-close-x:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.2rem; }
+  .help-dialog h3 { margin: 0.9rem 0 0.3rem; font-size: 0.98rem; }
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.4rem; }
+
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 640px) {
+    .segmented button,
+    .generate-btn,
+    .copy-all-btn,
+    .result-row button {
+      min-height: 44px;
+    }
+
+    .type-toggle button { flex: 1 1 40%; }
+
+    input[type="number"] { width: 100%; }
+
+    .field-inline { width: 100%; }
+    .field-inline input[type="number"] { flex: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>UUID Generator</h1>
+        <p class="subtitle">UUID v4 &amp; v7, ULID, nanoid, and random tokens — generate in bulk or inspect one. All local, nothing leaves your browser.</p>
+      </div>
+      <button id="help-button" type="button" class="help-button" data-testid="help-button" title="How it works" aria-label="How it works">?</button>
+    </div>
+  </header>
+
+  <div class="segmented mode-toggle" data-testid="mode-toggle" role="group" aria-label="Mode">
+    <button type="button" id="modeGenerateBtn" data-testid="mode-generate-btn" aria-pressed="true">Generate</button>
+    <button type="button" id="modeInspectBtn" data-testid="mode-inspect-btn" aria-pressed="false">Inspect</button>
+  </div>
+
+  <!-- ======================= GENERATE ======================= -->
+  <section class="generate-section" data-testid="generate-section">
+    <div class="segmented type-toggle" data-testid="type-toggle" role="group" aria-label="ID type">
+      <button type="button" data-type="uuidv4" data-testid="type-uuidv4-btn" aria-pressed="true">UUID v4</button>
+      <button type="button" data-type="uuidv7" data-testid="type-uuidv7-btn" aria-pressed="false">UUID v7</button>
+      <button type="button" data-type="ulid" data-testid="type-ulid-btn" aria-pressed="false">ULID</button>
+      <button type="button" data-type="nanoid" data-testid="type-nanoid-btn" aria-pressed="false">nanoid</button>
+      <button type="button" data-type="token" data-testid="type-token-btn" aria-pressed="false">Token</button>
+    </div>
+
+    <div class="controls" data-testid="controls">
+      <!-- Generate leads the control row; the options follow inline. -->
+      <button type="button" class="generate-btn" id="generateBtn" data-testid="generate-btn">Generate</button>
+
+      <div class="field-inline">
+        <label for="countInput">Count</label>
+        <input type="number" id="countInput" data-testid="count-input" min="1" max="1000" step="1" value="10">
+      </div>
+
+      <!-- UUID v4/v7 format options -->
+      <div class="option-row" data-testid="opts-uuid">
+        <label class="checkbox"><input type="checkbox" id="uppercaseToggle" data-testid="uppercase-toggle"> Uppercase</label>
+        <label class="checkbox"><input type="checkbox" id="hyphensToggle" data-testid="hyphens-toggle" checked> Hyphens</label>
+        <div class="field-inline">
+          <label for="wrapSelect">Wrap</label>
+          <select id="wrapSelect" data-testid="wrap-select">
+            <option value="plain">Plain</option>
+            <option value="quoted">Quoted "…"</option>
+            <option value="braces">Braces {…}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- nanoid options -->
+      <div class="option-row" data-testid="opts-nanoid" hidden>
+        <div class="field-inline">
+          <label for="nanoidSizeInput">Length</label>
+          <input type="number" id="nanoidSizeInput" data-testid="nanoid-size-input" min="1" max="256" step="1" value="21">
+        </div>
+      </div>
+
+      <!-- token options -->
+      <div class="option-row" data-testid="opts-token" hidden>
+        <div class="field-inline">
+          <label for="tokenLengthInput">Length</label>
+          <input type="number" id="tokenLengthInput" data-testid="token-length-input" min="1" max="512" step="1" value="32">
+        </div>
+        <div class="field-inline">
+          <label for="tokenAlphabetSelect">Alphabet</label>
+          <select id="tokenAlphabetSelect" data-testid="token-alphabet-select">
+            <option value="hex">Hex (0-9a-f)</option>
+            <option value="base62">Base62</option>
+            <option value="base64url">Base64URL</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+        <label class="checkbox"><input type="checkbox" id="tokenUppercaseToggle" data-testid="token-uppercase-toggle"> Uppercase</label>
+        <div class="field" data-testid="custom-alphabet-field" hidden style="flex:1 1 100%;">
+          <label for="customAlphabetInput">Custom alphabet</label>
+          <input type="text" id="customAlphabetInput" data-testid="custom-alphabet-input" placeholder="e.g. ABCDEFGHJKMNPQRSTUVWXYZ23456789" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+    </div>
+
+    <div class="results-header">
+      <p class="results-count" data-testid="results-count" aria-live="polite"></p>
+      <button type="button" class="copy-all-btn" id="copyAllBtn" data-testid="copy-all-btn" title="Copy all to clipboard" aria-label="Copy all to clipboard">Copy all</button>
+    </div>
+
+    <ul class="results-list" id="resultsList" data-testid="results-list"></ul>
+  </section>
+
+  <!-- ======================= INSPECT ======================= -->
+  <section class="inspect-section" data-testid="inspect-section" hidden>
+    <div class="field">
+      <label for="inspectInput">Paste a UUID to inspect</label>
+      <input type="text" id="inspectInput" data-testid="inspect-input" placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="inspect-result" data-testid="inspect-result"></div>
+  </section>
+</div>
+
+<!-- ======================= HELP ======================= -->
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">About the UUID Generator</h2>
+    <p>Everything runs locally in your browser — nothing is ever sent anywhere. All randomness comes from <code>crypto.getRandomValues</code>, so this works identically opened from a file or served over plain HTTP on a LAN.</p>
+
+    <h3>Generate</h3>
+    <ul>
+      <li>Pick an <strong>ID type</strong> — <strong>UUID v4</strong> (random), <strong>UUID v7</strong> (time-ordered, sortable), <strong>ULID</strong> (time-sortable, Crockford base32), <strong>nanoid</strong> (compact, URL-safe), or a generic <strong>Token</strong>.</li>
+      <li>Set a <strong>Count</strong> (1–1000) and click <strong>Generate</strong> for a fresh batch.</li>
+      <li><strong>UUID options:</strong> Uppercase, Hyphens on/off, and a Wrap style (plain, quoted, or braces).</li>
+      <li><strong>nanoid / Token:</strong> set the Length; Tokens also choose an alphabet (Hex, Base62, Base64URL, or a Custom set).</li>
+      <li><strong>Copy</strong> any single value with its 📋 button, or <strong>Copy all</strong> to grab the whole list (one per line).</li>
+    </ul>
+
+    <h3>Inspect</h3>
+    <ul>
+      <li>Paste a UUID (hyphens, braces, or a <code>urn:uuid:</code> prefix are all fine) to see its <strong>version</strong>, <strong>variant</strong>, field breakdown, and validity.</li>
+      <li>For <strong>v1</strong> and <strong>v7</strong> UUIDs the embedded <strong>timestamp</strong> is decoded and shown.</li>
+    </ul>
+
+    <p class="help-note">Your selected type, count, and options are remembered on this device — the generated values themselves are not stored (they're throwaway; just click Generate again).</p>
+  </div>
+</div>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<script>
+/* ct-license — shared License modal.
+   Inlined on EVERY page via footer.html (the ct:include license.js token wrapped
+   in a script tag), so any tool that carries the footer gets it
+   for free. Opens on a click of any [data-ct-license] trigger (the footer link) or
+   via `window.ctLicense()`. Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (only audio-converter does today). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. */
+(function () {
+  if (window.__ctLicenseInit) return; // idempotent
+  window.__ctLicenseInit = true;
+
+  var REPO = 'https://github.com/codercowboy/claude-tools';
+  var MIT = [
+    'MIT License',
+    '',
+    'Copyright (c) 2026 Jason and Claude (Anthropic)',
+    '',
+    'Permission is hereby granted, free of charge, to any person obtaining a copy',
+    'of this software and associated documentation files (the "Software"), to deal',
+    'in the Software without restriction, including without limitation the rights',
+    'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+    'copies of the Software, and to permit persons to whom the Software is',
+    'furnished to do so, subject to the following conditions:',
+    '',
+    'The above copyright notice and this permission notice shall be included in all',
+    'copies or substantial portions of the Software.',
+    '',
+    'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+    'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+    'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+    'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+    'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+    'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+    'SOFTWARE.'
+  ].join('\n');
+
+  var overlay, dialog, prevFocus, styleEl;
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function injectStyles() {
+    if (styleEl) return;
+    styleEl = document.createElement('style');
+    styleEl.textContent =
+      '.ctl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+      '.ctl-overlay[hidden]{display:none!important;}' +
+      '@media (prefers-reduced-motion:no-preference){.ctl-overlay{animation:ctl-fade .15s ease;}@keyframes ctl-fade{from{opacity:0}to{opacity:1}}}' +
+      '.ctl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+      '.ctl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+      '.ctl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+      '.ctl-dialog a{color:LinkText;}' +
+      '.ctl-lead{margin:0 0 .8rem;}' +
+      '.ctl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+      '.ctl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.ctl-tp li{margin-bottom:.3rem;}' +
+      '.ctl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+      '.ctl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+      '.ctl-close:hover{background:rgba(127,127,127,.18);}' +
+      '.ctl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+    (document.head || document.documentElement).appendChild(styleEl);
+  }
+
+  function build() {
+    injectStyles();
+    overlay = document.createElement('div');
+    overlay.className = 'ctl-overlay';
+    overlay.hidden = true;
+    overlay.setAttribute('data-testid', 'license-overlay');
+    overlay.innerHTML =
+      '<div class="ctl-dialog" role="dialog" aria-modal="true" aria-labelledby="ctl-title" data-testid="license-modal">' +
+        '<button type="button" class="ctl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+        '<h2 id="ctl-title">License</h2>' +
+        '<div class="ctl-body"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    dialog = overlay.querySelector('.ctl-dialog');
+    overlay.querySelector('.ctl-close').addEventListener('click', close);
+    overlay.addEventListener('mousedown', function (e) {
+      if (e.target === overlay) { e.preventDefault(); close(); }
+    });
+  }
+
+  function renderBody() {
+    var html =
+      '<p class="ctl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+      '<a href="' + REPO + '" target="_blank" rel="noopener noreferrer">github.com/codercowboy/claude-tools</a></p>' +
+      '<pre class="ctl-text">' + esc(MIT) + '</pre>';
+    var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+    if (tp.length) {
+      html += '<h3>Bundled third-party libraries</h3><ul class="ctl-tp">';
+      tp.forEach(function (d) {
+        var label = esc(d.name || '') + (d.version ? ' ' + esc(d.version) : '');
+        var lic = d.license ? ' &mdash; ' + esc(d.license) : '';
+        var link = d.url ? ' &middot; <a href="' + esc(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+        html += '<li>' + label + lic + link + '</li>';
+      });
+      html += '</ul><p class="ctl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+    } else {
+      html += '<p class="ctl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+    }
+    overlay.querySelector('.ctl-body').innerHTML = html;
+  }
+
+  function focusables() {
+    return Array.prototype.slice
+      .call(dialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+      .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+  }
+
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    var f = focusables();
+    if (!f.length) return;
+    e.preventDefault();
+    var i = f.indexOf(document.activeElement);
+    var n = e.shiftKey ? i - 1 : i + 1;
+    if (n < 0) n = f.length - 1;
+    if (n >= f.length) n = 0;
+    f[n].focus();
+  }
+
+  function open() {
+    if (!overlay) build();
+    renderBody();
+    prevFocus = document.activeElement;
+    // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+    var host = document.fullscreenElement || document.body;
+    if (overlay.parentNode !== host) host.appendChild(overlay);
+    overlay.hidden = false;
+    document.addEventListener('keydown', onKey, true);
+    dialog.scrollTop = 0;
+    overlay.querySelector('.ctl-close').focus({ preventScroll: true });
+  }
+
+  function close() {
+    if (!overlay || overlay.hidden) return;
+    overlay.hidden = true;
+    document.removeEventListener('keydown', onKey, true);
+    if (overlay.parentNode !== document.body) document.body.appendChild(overlay);
+    if (prevFocus && typeof prevFocus.focus === 'function') { try { prevFocus.focus(); } catch (e) {} }
+    prevFocus = null;
+  }
+
+  window.ctLicense = open;
+
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); open(); }
+  });
+})();
+
+</script>
+<!---- end footer -->
+
+
+<script>
+// ===== Begin ctCopy =====
+/*
+ * ctCopy(text) -> Promise<boolean>
+ * ctFlash(el, opts?) -> void
+ * ---------------------------------------------------------------------------
+ * Tiny, dependency-free copy-to-clipboard helpers for claude-tools. Pasteable,
+ * not imported: drop this whole block (sentinels included) inside a <script>
+ * tag in a tool's single-file index.html, then:
+ *
+ *     btn.addEventListener('click', async () => {
+ *       if (!text) return;
+ *       const ok = await ctCopy(text);
+ *       if (!ok) return;
+ *       ctFlash(btn, { label: '✅', revertTo: '📋' });
+ *     });
+ *
+ * ctCopy(text):
+ * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
+ *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
+ *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
+ *   Clipboard API is unavailable or denied.
+ * - Always RESOLVES — never rejects/throws. Resolves `true` on success,
+ *   `false` if every copy path failed (denied permission, unsupported
+ *   browser, etc.) — callers check the boolean rather than try/catch.
+ *
+ * ctFlash(el, opts?):
+ * - Transient "copied" feedback on a button: swaps `el.textContent` to
+ *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
+ *   reverts and clears the timer.
+ * - Revert target: `opts.revertTo` if given (for icon-only buttons that
+ *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
+ *   current text — captured once and reused if `ctFlash` is called again on
+ *   the same element before the previous flash reverted (rapid re-clicks
+ *   don't lose the true original label).
+ * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
+ *   decorative scale pulse (see STYLING below) — no functional behavior
+ *   depends on it.
+ *
+ * STYLING:
+ * - The only visual injected is the optional `.ctc-flash` pulse animation,
+ *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
+ *   text swap + revert timing are unaffected either way).
+ * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
+ *   `ctFlash` call and no styles are injected.
+ *
+ * This is a shared component inlined by the build.
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * tools/include/copy.js
+ */
+(function () {
+  if (window.ctCopy && window.ctFlash) return; // idempotent if pasted more than once
+
+  window.ctCopy = function (text) {
+    text = String(text == null ? '' : text);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(
+        function () { return true; },
+        function () { return fallbackCopy(text); }
+      );
+    }
+    return Promise.resolve(fallbackCopy(text));
+  };
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  var STYLE_ID = 'ctc-copy-style';
+  function ensureStyles() {
+    if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+    if (document.getElementById(STYLE_ID)) return;
+    var style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = [
+      '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+      '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+      '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+      '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+    ].join('');
+    document.head.appendChild(style);
+  }
+
+  var flashTimeouts = new WeakMap();
+  window.ctFlash = function (el, opts) {
+    opts = opts || {};
+    var ms = opts.ms != null ? opts.ms : 1000;
+    var label = opts.label != null ? opts.label : '✅';
+
+    ensureStyles();
+    clearTimeout(flashTimeouts.get(el));
+
+    var original;
+    if (opts.revertTo != null) {
+      original = opts.revertTo;
+    } else if (el.dataset.ctcFlashOriginal != null) {
+      original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+    } else {
+      original = el.textContent;
+    }
+    el.dataset.ctcFlashOriginal = original;
+
+    el.textContent = label;
+    el.classList.remove('ctc-flash');
+    void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+    el.classList.add('ctc-flash');
+
+    var t = setTimeout(function () {
+      el.textContent = original;
+      el.classList.remove('ctc-flash');
+      delete el.dataset.ctcFlashOriginal;
+      flashTimeouts.delete(el);
+    }, ms);
+    flashTimeouts.set(el, t);
+  };
+})();
+// ===== end ctCopy =====
+
+</script>
+<script>
+// ===== Begin jbcUtil =====
+/*
+ * jbcUtil — tiny, dependency-free runtime helpers for single-file tools.
+ * ---------------------------------------------------------------------------
+ * Pasteable, not imported: drop this whole block (sentinels included) inside a
+ * <script> tag in a tool's single-file index.html, then reach for the helpers
+ * on the global `jbcUtil` object. Establish this BEFORE the module <script>
+ * that runs the tool so the global exists when the tool code executes.
+ *
+ * These are the browser/DOM-facing idioms every tool re-rolled by hand. They
+ * are deliberately runtime-only (they touch document / URL / setTimeout), so
+ * they live in this inlined <script> — not in a tool's pure, unit-tested
+ * source/logic.mjs. Pure algorithms (e.g. crc32) live in their own block.
+ *
+ * jbcUtil.downloadBlob(data, filename, mime?):
+ * - Triggers a file download. `data` may be a Blob, a string, or a Uint8Array
+ *   (anything the Blob constructor accepts). A Blob is used as-is; anything
+ *   else is wrapped in a Blob (with `mime` as its type when given).
+ * - Creates an object URL, clicks a temporary hidden <a download>, then revokes
+ *   the URL on a short timeout so the download has time to start.
+ *
+ * jbcUtil.debounce(fn, ms):
+ * - Returns a trailing-edge debounced wrapper: repeated calls reset the timer,
+ *   and `fn` runs once, `ms` after the last call, with the latest args and
+ *   `this`.
+ *
+ * jbcUtil.formatBytes(n):
+ * - Formats a byte count as a compact human string with NO space between the
+ *   number and unit. Under 1KB shows integer bytes with a lowercase "b"
+ *   (e.g. "678b"); KB/MB/GB show 2 decimals and TB shows 1; tiers are binary
+ *   (1024). Non-finite / missing input formats as "0b".
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+(function () {
+  if (window.jbcUtil) return; // idempotent if pasted more than once
+
+  function downloadBlob(data, filename, mime) {
+    var blob = (data instanceof Blob)
+      ? data
+      : new Blob([data], mime ? { type: mime } : undefined);
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename == null ? '' : String(filename);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      var self = this, args = arguments;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(self, args); }, ms);
+    };
+  }
+
+  function formatBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return Math.round(n) + 'b';
+    var units = ['KB', 'MB', 'GB', 'TB'];
+    var v = n / 1024, i = 0;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return v.toFixed(units[i] === 'TB' ? 1 : 2) + units[i];
+  }
+
+  window.jbcUtil = {
+    downloadBlob: downloadBlob,
+    debounce: debounce,
+    formatBytes: formatBytes
+  };
+})();
+// ===== end jbcUtil =====
+
+</script>
+
+<script type="module">
+  // =====================================================================
+  // 1. DOM references
+  // =====================================================================
+  const modeGenerateBtn = document.getElementById('modeGenerateBtn');
+  const modeInspectBtn = document.getElementById('modeInspectBtn');
+  const generateSectionEl = document.querySelector('.generate-section');
+  const inspectSectionEl = document.querySelector('.inspect-section');
+
+  const typeToggleEl = document.querySelector('[data-testid="type-toggle"]');
+  const typeButtons = Array.from(typeToggleEl.querySelectorAll('button[data-type]'));
+
+  const countInputEl = document.getElementById('countInput');
+
+  const optsUuidEl = document.querySelector('[data-testid="opts-uuid"]');
+  const uppercaseToggleEl = document.getElementById('uppercaseToggle');
+  const hyphensToggleEl = document.getElementById('hyphensToggle');
+  const wrapSelectEl = document.getElementById('wrapSelect');
+
+  const optsNanoidEl = document.querySelector('[data-testid="opts-nanoid"]');
+  const nanoidSizeInputEl = document.getElementById('nanoidSizeInput');
+
+  const optsTokenEl = document.querySelector('[data-testid="opts-token"]');
+  const tokenLengthInputEl = document.getElementById('tokenLengthInput');
+  const tokenAlphabetSelectEl = document.getElementById('tokenAlphabetSelect');
+  const tokenUppercaseToggleEl = document.getElementById('tokenUppercaseToggle');
+  const customAlphabetFieldEl = document.querySelector('[data-testid="custom-alphabet-field"]');
+  const customAlphabetInputEl = document.getElementById('customAlphabetInput');
+
+  const generateBtn = document.getElementById('generateBtn');
+  const resultsCountEl = document.querySelector('[data-testid="results-count"]');
+  const copyAllBtn = document.getElementById('copyAllBtn');
+  const resultsListEl = document.getElementById('resultsList');
+
+  const inspectInputEl = document.getElementById('inspectInput');
+  const inspectResultEl = document.querySelector('[data-testid="inspect-result"]');
+
+  const helpButtonEl = document.getElementById('help-button');
+  const helpOverlayEl = document.querySelector('[data-testid="help-overlay"]');
+  const helpDialogEl = document.querySelector('[data-testid="help-modal"]');
+  const helpCloseXBtn = helpDialogEl.querySelector('[data-testid="modal-close-x"]');
+
+  // =====================================================================
+  // 2. State & persistence  (docs/conventions.md § Persist UI state)
+  // Versioned key; try/catch everywhere; the generated VALUES are never
+  // persisted (throwaway/derived) — only the settings that shape them.
+  // =====================================================================
+  const state = {
+    mode: 'generate',      // 'generate' | 'inspect'
+    type: 'uuidv4',        // uuidv4 | uuidv7 | ulid | nanoid | token
+    count: 10,             // default bulk count for ALL id types
+    uppercase: false,
+    hyphens: true,
+    wrap: 'plain',         // plain | quoted | braces
+    nanoidSize: 21,
+    tokenLength: 32,
+    tokenAlphabet: 'hex',  // hex | base62 | base64url | custom
+    customAlphabet: '',
+    tokenUppercase: false,
+    inspectText: '',
+    values: [],            // NOT persisted
+  };
+
+  const STORAGE_KEY = 'uuid-generator:v1';
+  const HELP_SEEN_KEY = 'uuid-generator:help-seen:v1';
+
+  function hasSeenHelp() {
+    try { return localStorage.getItem(HELP_SEEN_KEY) === '1'; }
+    catch (err) { return true; }
+  }
+  function markHelpSeen() {
+    try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch (err) { /* ignore */ }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        mode: state.mode,
+        type: state.type,
+        count: state.count,
+        uppercase: state.uppercase,
+        hyphens: state.hyphens,
+        wrap: state.wrap,
+        nanoidSize: state.nanoidSize,
+        tokenLength: state.tokenLength,
+        tokenAlphabet: state.tokenAlphabet,
+        customAlphabet: state.customAlphabet,
+        tokenUppercase: state.tokenUppercase,
+        inspectText: state.inspectText,
+      }));
+    } catch (err) { /* best-effort */ }
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const p = JSON.parse(raw);
+      if (!p || typeof p !== 'object') return;
+      const TYPES = ['uuidv4', 'uuidv7', 'ulid', 'nanoid', 'token'];
+      const WRAPS = ['plain', 'quoted', 'braces'];
+      const ALPHAS = ['hex', 'base62', 'base64url', 'custom'];
+      if (p.mode === 'inspect') state.mode = 'inspect';
+      if (TYPES.includes(p.type)) state.type = p.type;
+      if (Number.isFinite(p.count)) state.count = clampInt(p.count, 1, 1000, 10);
+      state.uppercase = !!p.uppercase;
+      state.hyphens = p.hyphens !== false;
+      if (WRAPS.includes(p.wrap)) state.wrap = p.wrap;
+      if (Number.isFinite(p.nanoidSize)) state.nanoidSize = clampInt(p.nanoidSize, 1, 256, 21);
+      if (Number.isFinite(p.tokenLength)) state.tokenLength = clampInt(p.tokenLength, 1, 512, 32);
+      if (ALPHAS.includes(p.tokenAlphabet)) state.tokenAlphabet = p.tokenAlphabet;
+      if (typeof p.customAlphabet === 'string') state.customAlphabet = p.customAlphabet;
+      state.tokenUppercase = !!p.tokenUppercase;
+      if (typeof p.inspectText === 'string') state.inspectText = p.inspectText;
+    } catch (err) { /* start with defaults */ }
+  }
+
+  function clampInt(v, min, max, fallback) {
+    let n = Math.floor(Number(v));
+    if (!Number.isFinite(n)) return fallback;
+    if (n < min) n = min;
+    if (n > max) n = max;
+    return n;
+  }
+
+  // =====================================================================
+  // 3. Pure engine (DOM-free) — inlined by the build.
+  // =====================================================================
+  // ===== BEGIN PURE-LOGIC (DOM-free; unit-tested via tests/unit/*.test.mjs
+  // which import this file directly, and inlined into app.mjs by the build's
+  // ct:inline token — see docs/conventions.md Build-assembled tools).
+  //
+  // ⚠️ RANDOMNESS IS INJECTED. No function here touches `crypto`, `Date`,
+  // `document`, `window`, or `localStorage`. Every generator takes its random
+  // bytes (and time, where relevant) as arguments, so tests pass fixed bytes
+  // and assert exact outputs. The app layer (app.mjs) supplies bytes from
+  // `crypto.getRandomValues` — NEVER `crypto.randomUUID()` (secure-context-only,
+  // throws over plain LAN HTTP; see DESIGN.md). =====
+
+  // ---- Alphabets & tables ------------------------------------------------
+
+  // Crockford base32 — excludes I, L, O, U (ULID).
+  const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+  // The official nanoid default URL alphabet (64 chars, power of two → the
+  // per-char `% length` mapping below is exactly uniform for it).
+  const NANOID_ALPHABET =
+    'useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict';
+
+  const TOKEN_ALPHABETS = {
+    hex: '0123456789abcdef',
+    base62: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+    base64url: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_',
+  };
+
+  const VERSION_NAMES = {
+    1: 'Version 1 (time-based)',
+    2: 'Version 2 (DCE security)',
+    3: 'Version 3 (name-based, MD5)',
+    4: 'Version 4 (random)',
+    5: 'Version 5 (name-based, SHA-1)',
+    6: 'Version 6 (reordered time)',
+    7: 'Version 7 (time-ordered)',
+    8: 'Version 8 (custom)',
+  };
+
+  // ---- Shared helpers ----------------------------------------------------
+
+  function toByte(v) {
+    // Coerce an injected byte value to 0..255 (undefined → 0), so a short input
+    // array degrades predictably rather than emitting NaN.
+    return (Number(v) || 0) & 0xff;
+  }
+
+  function byteToHex(b) {
+    return toByte(b).toString(16).padStart(2, '0');
+  }
+
+  // 16 bytes → canonical lowercase hyphenated 8-4-4-4-12.
+  function formatUuidBytes(bytes) {
+    let hex = '';
+    for (let i = 0; i < 16; i++) hex += byteToHex(bytes[i]);
+    return (
+      hex.slice(0, 8) + '-' +
+      hex.slice(8, 12) + '-' +
+      hex.slice(12, 16) + '-' +
+      hex.slice(16, 20) + '-' +
+      hex.slice(20, 32)
+    );
+  }
+
+  // ---- UUID v4 (random) --------------------------------------------------
+
+  function uuidV4(bytes) {
+    const b = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) b[i] = toByte(bytes && bytes[i]);
+    b[6] = (b[6] & 0x0f) | 0x40; // version 4
+    b[8] = (b[8] & 0x3f) | 0x80; // RFC 4122 variant (10xx)
+    return formatUuidBytes(b);
+  }
+
+  // ---- UUID v7 (time-ordered, RFC 9562) ----------------------------------
+  // 48-bit big-endian unix_ts_ms | ver(4b)=7 | rand_a(12b) | var(2b)=10 |
+  // rand_b(62b). `time` is Unix ms; only the non-timestamp bytes are used for
+  // randomness. Timestamp is split high-16 / low-32 so all shifts stay within
+  // 32-bit range (ms epoch < 2^48 < 2^53, exact as a double).
+  function uuidV7(time, bytes) {
+    const b = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) b[i] = toByte(bytes && bytes[i]);
+    const ts = Math.max(0, Math.floor(Number(time) || 0));
+    const high = Math.floor(ts / 0x100000000); // top 16 bits of the 48
+    const low = ts % 0x100000000;              // low 32 bits
+    b[0] = (high >>> 8) & 0xff;
+    b[1] = high & 0xff;
+    b[2] = (low >>> 24) & 0xff;
+    b[3] = (low >>> 16) & 0xff;
+    b[4] = (low >>> 8) & 0xff;
+    b[5] = low & 0xff;
+    b[6] = (b[6] & 0x0f) | 0x70; // version 7
+    b[8] = (b[8] & 0x3f) | 0x80; // RFC 4122 variant (10xx)
+    return formatUuidBytes(b);
+  }
+
+  // ---- ULID --------------------------------------------------------------
+
+  // 48-bit ms timestamp → 10 Crockford chars (most-significant first).
+  function encodeTimeCrockford(time, len = 10) {
+    let t = Math.max(0, Math.floor(Number(time) || 0));
+    let out = '';
+    for (let i = 0; i < len; i++) {
+      const mod = t % 32;
+      out = CROCKFORD[mod] + out;
+      t = (t - mod) / 32;
+    }
+    return out;
+  }
+
+  // Big-endian bit stream → Crockford chars. The accumulator is flushed every
+  // time it holds >= 5 bits, so it never exceeds ~12 bits (stays well within a
+  // safe integer / 32-bit range) regardless of input length.
+  function bytesToCrockford(bytes, numChars) {
+    let bits = 0;
+    let value = 0;
+    let out = '';
+    const n = bytes ? bytes.length : 0;
+    for (let i = 0; i < n; i++) {
+      value = (value << 8) | toByte(bytes[i]);
+      bits += 8;
+      while (bits >= 5) {
+        out += CROCKFORD[(value >>> (bits - 5)) & 31];
+        bits -= 5;
+      }
+    }
+    if (bits > 0) {
+      out += CROCKFORD[(value << (5 - bits)) & 31];
+    }
+    if (numChars == null) return out;
+    return out.slice(0, numChars).padEnd(numChars, CROCKFORD[0]);
+  }
+
+  // `time`: Unix ms → 10 chars; `bytes`: 10-byte (80-bit) source → 16 chars.
+  function ulid(time, bytes) {
+    return encodeTimeCrockford(time, 10) + bytesToCrockford(bytes, 16);
+  }
+
+  // ---- nanoid ------------------------------------------------------------
+
+  function nanoid(size = 21, bytes, alphabet = NANOID_ALPHABET) {
+    const n = Math.max(0, Math.floor(Number(size) || 0));
+    const alpha = alphabet && alphabet.length ? alphabet : NANOID_ALPHABET;
+    let id = '';
+    for (let i = 0; i < n; i++) {
+      id += alpha[toByte(bytes && bytes[i]) % alpha.length];
+    }
+    return id;
+  }
+
+  // ---- Generic random token ---------------------------------------------
+
+  function randomToken(len, alphabet, bytes) {
+    const n = Math.max(0, Math.floor(Number(len) || 0));
+    const alpha = alphabet && alphabet.length ? String(alphabet) : TOKEN_ALPHABETS.hex;
+    let out = '';
+    for (let i = 0; i < n; i++) {
+      out += alpha[toByte(bytes && bytes[i]) % alpha.length];
+    }
+    return out;
+  }
+
+  // ---- Inspect -----------------------------------------------------------
+
+  // Gregorian epoch (1582-10-15) → Unix epoch offset, in 100-ns units.
+  const GREGORIAN_OFFSET_100NS = 122192928000000000n;
+
+  function variantOf(nibble) {
+    // The variant is defined by the high bits of the 17th hex digit.
+    if ((nibble & 0x8) === 0) return { name: 'NCS (reserved, legacy)', bits: '0xxx' };
+    if ((nibble & 0xc) === 0x8) return { name: 'RFC 4122 / DCE 1.1', bits: '10xx' };
+    if ((nibble & 0xe) === 0xc) return { name: 'Microsoft (reserved)', bits: '110x' };
+    return { name: 'Reserved (future)', bits: '111x' };
+  }
+
+  function inspectUuid(str) {
+    const raw = String(str == null ? '' : str).trim();
+    const empty = {
+      valid: false, error: null, canonical: null, hex: null,
+      version: null, versionName: null, variant: null, variantName: null,
+      variantBits: null, isNil: false, isMax: false, timestamp: null, fields: null,
+    };
+    if (raw === '') return { ...empty, error: 'Enter a UUID to inspect.' };
+
+    const stripped = raw.replace(/^urn:uuid:/i, '').replace(/[{}]/g, '').trim();
+    const hex = stripped.replace(/-/g, '');
+    if (!/^[0-9a-fA-F]{32}$/.test(hex)) {
+      return { ...empty, error: 'Not a valid UUID — expected 32 hexadecimal digits (with or without hyphens/braces).' };
+    }
+
+    const lower = hex.toLowerCase();
+    const canonical =
+      lower.slice(0, 8) + '-' + lower.slice(8, 12) + '-' + lower.slice(12, 16) +
+      '-' + lower.slice(16, 20) + '-' + lower.slice(20, 32);
+
+    const isNil = lower === '0'.repeat(32);
+    const isMax = lower === 'f'.repeat(32);
+
+    const version = parseInt(lower[12], 16);
+    const variantNibble = parseInt(lower[16], 16);
+    const variant = variantOf(variantNibble);
+
+    let timestamp = null;
+    if (!isNil && !isMax) {
+      if (version === 7) {
+        // First 48 bits = Unix ms.
+        const ms = parseInt(lower.slice(0, 12), 16);
+        timestamp = new Date(ms);
+      } else if (version === 1) {
+        // 60-bit Gregorian timestamp in 100-ns units, split across fields.
+        const timeLow = BigInt('0x' + lower.slice(0, 8));
+        const timeMid = BigInt('0x' + lower.slice(8, 12));
+        const timeHi = BigInt('0x' + lower.slice(13, 16)); // skip version nibble
+        const t100ns = (timeHi << 48n) | (timeMid << 32n) | timeLow;
+        const unixMs = Number((t100ns - GREGORIAN_OFFSET_100NS) / 10000n);
+        timestamp = new Date(unixMs);
+      }
+    }
+
+    return {
+      valid: true,
+      error: null,
+      canonical,
+      hex: lower,
+      version: Number.isNaN(version) ? null : version,
+      versionName: VERSION_NAMES[version] || (isNil ? 'Nil UUID' : isMax ? 'Max UUID' : `Version ${version} (unknown)`),
+      variant: variantNibble,
+      variantName: variant.name,
+      variantBits: variant.bits,
+      isNil,
+      isMax,
+      timestamp,
+      fields: {
+        timeLow: lower.slice(0, 8),
+        timeMid: lower.slice(8, 12),
+        timeHiAndVersion: lower.slice(12, 16),
+        clockSeqAndVariant: lower.slice(16, 20),
+        node: lower.slice(20, 32),
+      },
+    };
+  }
+
+  export {
+    CROCKFORD,
+    NANOID_ALPHABET,
+    TOKEN_ALPHABETS,
+    VERSION_NAMES,
+    formatUuidBytes,
+    uuidV4,
+    uuidV7,
+    encodeTimeCrockford,
+    bytesToCrockford,
+    ulid,
+    nanoid,
+    randomToken,
+    inspectUuid,
+  };
+  // ===== END PURE-LOGIC =====
+
+  // =====================================================================
+  // 4. Byte source — the ONLY randomness in the tool.
+  //
+  // ⚠️ Uses crypto.getRandomValues (works in EVERY context). We deliberately
+  // never call crypto.randomUUID() — it is secure-context-only and throws over
+  // plain LAN HTTP (documented repo bug; see DESIGN.md / docs/conventions.md).
+  // crypto.getRandomValues caps at 65536 bytes/call, so we chunk. A Math.random
+  // fallback is used ONLY when `crypto` is entirely absent (degraded, non-crypto
+  // strength — flagged in the UI when it happens).
+  // =====================================================================
+  const cryptoObj = (typeof crypto !== 'undefined') ? crypto : null;
+  const hasSecureRandom = !!(cryptoObj && typeof cryptoObj.getRandomValues === 'function');
+
+  function getRandomBytes(n) {
+    const out = new Uint8Array(Math.max(0, n | 0));
+    if (hasSecureRandom) {
+      const MAX = 65536;
+      for (let off = 0; off < out.length; off += MAX) {
+        cryptoObj.getRandomValues(out.subarray(off, Math.min(off + MAX, out.length)));
+      }
+    } else {
+      for (let i = 0; i < out.length; i++) out[i] = Math.floor(Math.random() * 256);
+    }
+    return out;
+  }
+
+  // =====================================================================
+  // 5. Generation
+  // =====================================================================
+  function currentTokenAlphabet() {
+    if (state.tokenAlphabet === 'custom') {
+      return state.customAlphabet && state.customAlphabet.length ? state.customAlphabet : TOKEN_ALPHABETS.hex;
+    }
+    return TOKEN_ALPHABETS[state.tokenAlphabet] || TOKEN_ALPHABETS.hex;
+  }
+
+  function applyUuidFormat(canonical) {
+    let s = canonical;
+    if (!state.hyphens) s = s.replace(/-/g, '');
+    if (state.uppercase) s = s.toUpperCase();
+    if (state.wrap === 'quoted') s = '"' + s + '"';
+    else if (state.wrap === 'braces') s = '{' + s + '}';
+    return s;
+  }
+
+  function generateOne(now) {
+    switch (state.type) {
+      case 'uuidv4':
+        return applyUuidFormat(uuidV4(getRandomBytes(16)));
+      case 'uuidv7':
+        return applyUuidFormat(uuidV7(now, getRandomBytes(16)));
+      case 'ulid':
+        return ulid(now, getRandomBytes(10));
+      case 'nanoid':
+        return nanoid(state.nanoidSize, getRandomBytes(state.nanoidSize), NANOID_ALPHABET);
+      case 'token': {
+        const alpha = currentTokenAlphabet();
+        let t = randomToken(state.tokenLength, alpha, getRandomBytes(state.tokenLength));
+        if (state.tokenUppercase) t = t.toUpperCase();
+        return t;
+      }
+      default:
+        return '';
+    }
+  }
+
+  function generateBatch() {
+    const n = clampInt(countInputEl.value, 1, 1000, state.count);
+    state.count = n;
+    if (countInputEl.value !== String(n)) countInputEl.value = String(n);
+    const now = Date.now();
+    const values = new Array(n);
+    for (let i = 0; i < n; i++) values[i] = generateOne(now);
+    state.values = values;
+    renderResults();
+  }
+
+  // =====================================================================
+  // 6. Rendering — results
+  // =====================================================================
+  function renderResults() {
+    resultsListEl.textContent = '';
+    const values = state.values;
+    if (!values.length) {
+      resultsCountEl.textContent = '';
+      copyAllBtn.disabled = true;
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.dataset.testid = 'empty-state';
+      li.textContent = 'Click Generate to create IDs.';
+      resultsListEl.appendChild(li);
+      return;
+    }
+    copyAllBtn.disabled = false;
+    resultsCountEl.textContent = `${values.length} ${values.length === 1 ? 'value' : 'values'}` +
+      (hasSecureRandom ? '' : ' — ⚠ crypto unavailable, using non-secure Math.random fallback');
+
+    const frag = document.createDocumentFragment();
+    values.forEach((val, idx) => {
+      const li = document.createElement('li');
+      li.className = 'result-row';
+      li.dataset.testid = 'result-row';
+
+      const span = document.createElement('span');
+      span.className = 'result-value';
+      span.dataset.testid = 'result-value';
+      span.textContent = val;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'result-copy-btn';
+      btn.dataset.testid = 'result-copy-btn';
+      btn.dataset.idx = String(idx);
+      btn.title = 'Copy to clipboard';
+      btn.setAttribute('aria-label', 'Copy to clipboard');
+      btn.textContent = '📋';
+
+      li.appendChild(span);
+      li.appendChild(btn);
+      frag.appendChild(li);
+    });
+    resultsListEl.appendChild(frag);
+  }
+
+  // Delegated copy for per-row buttons.
+  resultsListEl.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.result-copy-btn');
+    if (!btn) return;
+    const idx = Number(btn.dataset.idx);
+    const val = state.values[idx];
+    if (val == null) return;
+    const ok = await ctCopy(val);
+    if (ok) ctFlash(btn, { label: '✅', revertTo: '📋' });
+  });
+
+  copyAllBtn.addEventListener('click', async () => {
+    if (!state.values.length) return;
+    const ok = await ctCopy(state.values.join('\n'));
+    if (ok) ctFlash(copyAllBtn, { label: 'Copied!', revertTo: 'Copy all' });
+  });
+
+  // =====================================================================
+  // 7. Contextual option-group visibility
+  // =====================================================================
+  function updateOptionVisibility() {
+    const t = state.type;
+    optsUuidEl.hidden = !(t === 'uuidv4' || t === 'uuidv7');
+    optsNanoidEl.hidden = t !== 'nanoid';
+    optsTokenEl.hidden = t !== 'token';
+    customAlphabetFieldEl.hidden = !(t === 'token' && state.tokenAlphabet === 'custom');
+  }
+
+  function setType(type) {
+    state.type = type;
+    typeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
+    updateOptionVisibility();
+    saveState();
+    generateBatch();
+  }
+
+  // =====================================================================
+  // 8. Inspect
+  // =====================================================================
+  function renderInspect() {
+    inspectResultEl.textContent = '';
+    const raw = inspectInputEl.value;
+    state.inspectText = raw;
+    const info = inspectUuid(raw);
+
+    if (raw.trim() === '') {
+      const p = document.createElement('p');
+      p.className = 'hint';
+      p.textContent = 'Paste a UUID above to inspect it.';
+      inspectResultEl.appendChild(p);
+      return;
+    }
+
+    const status = document.createElement('div');
+    status.className = 'inspect-status ' + (info.valid ? 'valid' : 'invalid');
+    status.dataset.testid = 'inspect-status';
+    status.textContent = info.valid ? '✓ Valid UUID' : '✕ ' + (info.error || 'Invalid UUID');
+    inspectResultEl.appendChild(status);
+
+    if (!info.valid) return;
+
+    // Canonical form + copy.
+    const canonRow = document.createElement('div');
+    canonRow.className = 'ct-field canonical-row';
+    const canonVal = document.createElement('span');
+    canonVal.className = 'canonical-value';
+    canonVal.dataset.testid = 'inspect-canonical';
+    canonVal.textContent = info.canonical;
+    const canonBtn = document.createElement('button');
+    canonBtn.type = 'button';
+    canonBtn.className = 'ct-copy-btn';
+    canonBtn.dataset.testid = 'inspect-copy-btn';
+    canonBtn.title = 'Copy canonical form';
+    canonBtn.setAttribute('aria-label', 'Copy canonical form');
+    canonBtn.textContent = '📋';
+    canonBtn.addEventListener('click', async () => {
+      const ok = await ctCopy(info.canonical);
+      if (ok) ctFlash(canonBtn, { label: '✅', revertTo: '📋' });
+    });
+    canonRow.appendChild(canonVal);
+    canonRow.appendChild(canonBtn);
+    inspectResultEl.appendChild(canonRow);
+
+    if (info.isNil || info.isMax) {
+      const c = document.createElement('p');
+      c.className = 'callout';
+      c.dataset.testid = 'inspect-special';
+      c.textContent = info.isNil
+        ? 'This is the Nil UUID (all zeros).'
+        : 'This is the Max UUID (all ones).';
+      inspectResultEl.appendChild(c);
+    }
+
+    const rows = [
+      ['Version', info.versionName],
+      ['Variant', `${info.variantName} (${info.variantBits})`],
+    ];
+    if (info.timestamp && !isNaN(info.timestamp.getTime())) {
+      rows.push(['Timestamp (ISO)', info.timestamp.toISOString()]);
+      rows.push(['Timestamp (local)', info.timestamp.toString()]);
+    } else if (info.version === 1 || info.version === 7) {
+      rows.push(['Timestamp', 'unavailable']);
+    }
+    rows.push(['time_low', info.fields.timeLow]);
+    rows.push(['time_mid', info.fields.timeMid]);
+    rows.push(['time_hi_and_version', info.fields.timeHiAndVersion]);
+    rows.push(['clock_seq_and_variant', info.fields.clockSeqAndVariant]);
+    rows.push(['node', info.fields.node]);
+
+    const table = document.createElement('table');
+    table.className = 'breakdown';
+    table.dataset.testid = 'inspect-breakdown';
+    const tbody = document.createElement('tbody');
+    rows.forEach(([k, v]) => {
+      const tr = document.createElement('tr');
+      const th = document.createElement('th');
+      th.scope = 'row';
+      th.textContent = k;
+      const td = document.createElement('td');
+      td.textContent = v;
+      tr.appendChild(th);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    inspectResultEl.appendChild(table);
+  }
+
+  // =====================================================================
+  // 9. Mode toggle
+  // =====================================================================
+  function setMode(mode) {
+    state.mode = mode;
+    const isGen = mode === 'generate';
+    generateSectionEl.hidden = !isGen;
+    inspectSectionEl.hidden = isGen;
+    modeGenerateBtn.setAttribute('aria-pressed', String(isGen));
+    modeInspectBtn.setAttribute('aria-pressed', String(!isGen));
+    saveState();
+    if (!isGen) inspectInputEl.focus();
+  }
+
+  // =====================================================================
+  // 10. Events
+  // =====================================================================
+  modeGenerateBtn.addEventListener('click', () => setMode('generate'));
+  modeInspectBtn.addEventListener('click', () => setMode('inspect'));
+
+  typeButtons.forEach((b) => b.addEventListener('click', () => setType(b.dataset.type)));
+
+  countInputEl.addEventListener('change', () => {
+    state.count = clampInt(countInputEl.value, 1, 1000, state.count);
+    countInputEl.value = String(state.count);
+    saveState();
+  });
+
+  uppercaseToggleEl.addEventListener('change', () => { state.uppercase = uppercaseToggleEl.checked; saveState(); regenerateFormatOnly(); });
+  hyphensToggleEl.addEventListener('change', () => { state.hyphens = hyphensToggleEl.checked; saveState(); regenerateFormatOnly(); });
+  wrapSelectEl.addEventListener('change', () => { state.wrap = wrapSelectEl.value; saveState(); regenerateFormatOnly(); });
+
+  nanoidSizeInputEl.addEventListener('change', () => {
+    state.nanoidSize = clampInt(nanoidSizeInputEl.value, 1, 256, state.nanoidSize);
+    nanoidSizeInputEl.value = String(state.nanoidSize);
+    saveState();
+    generateBatch();
+  });
+
+  tokenLengthInputEl.addEventListener('change', () => {
+    state.tokenLength = clampInt(tokenLengthInputEl.value, 1, 512, state.tokenLength);
+    tokenLengthInputEl.value = String(state.tokenLength);
+    saveState();
+    generateBatch();
+  });
+  tokenAlphabetSelectEl.addEventListener('change', () => {
+    state.tokenAlphabet = tokenAlphabetSelectEl.value;
+    updateOptionVisibility();
+    saveState();
+    generateBatch();
+  });
+  tokenUppercaseToggleEl.addEventListener('change', () => { state.tokenUppercase = tokenUppercaseToggleEl.checked; saveState(); generateBatch(); });
+  customAlphabetInputEl.addEventListener('input', () => { state.customAlphabet = customAlphabetInputEl.value; saveState(); });
+  customAlphabetInputEl.addEventListener('change', () => { generateBatch(); });
+
+  // UUID format tweaks (uppercase/hyphens/wrap) can be re-applied to the
+  // existing values without drawing fresh randomness — nicer UX and stable.
+  function regenerateFormatOnly() {
+    if (!(state.type === 'uuidv4' || state.type === 'uuidv7')) return;
+    if (!state.values.length) { generateBatch(); return; }
+    // Re-derive from the current values' canonical hex (strip any prior format).
+    state.values = state.values.map((v) => {
+      const hex = v.replace(/[^0-9a-fA-F]/g, '');
+      if (hex.length !== 32) return v;
+      const lower = hex.toLowerCase();
+      const canonical =
+        lower.slice(0, 8) + '-' + lower.slice(8, 12) + '-' + lower.slice(12, 16) +
+        '-' + lower.slice(16, 20) + '-' + lower.slice(20, 32);
+      return applyUuidFormat(canonical);
+    });
+    renderResults();
+  }
+
+  generateBtn.addEventListener('click', () => {
+    generateBatch();
+    document.activeElement?.blur(); // dismiss mobile keyboard on commit
+  });
+
+  // Shared trailing-edge debounce (jbc-include/util.js, inlined global).
+  const debounce = jbcUtil.debounce;
+  const debouncedInspect = debounce(() => { renderInspect(); saveState(); }, 120);
+  inspectInputEl.addEventListener('input', debouncedInspect);
+
+  // =====================================================================
+  // 11. Help modal (mirrors base64-tool)
+  // =====================================================================
+  let helpPreviouslyFocused = null;
+
+  function getHelpFocusable() {
+    return Array.from(
+      helpDialogEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter((el) => !el.disabled && el.getClientRects().length > 0);
+  }
+
+  function onHelpKeydown(e) {
+    if (e.key === 'Escape') { e.preventDefault(); closeHelp(); return; }
+    if (e.key !== 'Tab') return;
+    const f = getHelpFocusable();
+    if (f.length === 0) return;
+    e.preventDefault();
+    const idx = f.indexOf(document.activeElement);
+    let next = e.shiftKey ? idx - 1 : idx + 1;
+    if (next < 0) next = f.length - 1;
+    if (next >= f.length) next = 0;
+    f[next].focus();
+  }
+
+  function openHelp() {
+    helpPreviouslyFocused = document.activeElement;
+    helpOverlayEl.hidden = false;
+    document.addEventListener('keydown', onHelpKeydown, true);
+    helpDialogEl.scrollTop = 0;
+    helpCloseXBtn.focus({ preventScroll: true });
+  }
+
+  function closeHelp() {
+    if (helpOverlayEl.hidden) return;
+    helpOverlayEl.hidden = true;
+    document.removeEventListener('keydown', onHelpKeydown, true);
+    if (helpPreviouslyFocused && typeof helpPreviouslyFocused.focus === 'function') {
+      try { helpPreviouslyFocused.focus(); } catch (e) { /* ignore */ }
+    }
+    helpPreviouslyFocused = null;
+  }
+
+  helpButtonEl.addEventListener('click', () => openHelp());
+  helpCloseXBtn.addEventListener('click', () => closeHelp());
+  helpOverlayEl.addEventListener('mousedown', (e) => {
+    if (e.target !== helpOverlayEl) return;
+    e.preventDefault();
+    closeHelp();
+  });
+
+  // =====================================================================
+  // 12. Init — restore state, sync controls, first render.
+  // =====================================================================
+  (function init() {
+    loadState();
+
+    // Sync form controls to restored state.
+    countInputEl.value = String(state.count);
+    uppercaseToggleEl.checked = state.uppercase;
+    hyphensToggleEl.checked = state.hyphens;
+    wrapSelectEl.value = state.wrap;
+    nanoidSizeInputEl.value = String(state.nanoidSize);
+    tokenLengthInputEl.value = String(state.tokenLength);
+    tokenAlphabetSelectEl.value = state.tokenAlphabet;
+    tokenUppercaseToggleEl.checked = state.tokenUppercase;
+    customAlphabetInputEl.value = state.customAlphabet;
+    inspectInputEl.value = state.inspectText;
+
+    typeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.type === state.type)));
+    updateOptionVisibility();
+
+    // Apply mode without re-saving redundantly.
+    const isGen = state.mode === 'generate';
+    generateSectionEl.hidden = !isGen;
+    inspectSectionEl.hidden = isGen;
+    modeGenerateBtn.setAttribute('aria-pressed', String(isGen));
+    modeInspectBtn.setAttribute('aria-pressed', String(!isGen));
+
+    generateBatch();
+    renderInspect();
+
+    if (!hasSeenHelp()) {
+      markHelpSeen();
+      openHelp();
+    }
+  })();
+
+  // =====================================================================
+  // 13. Test hook — inert namespace for Playwright-driven tests.
+  // =====================================================================
+  window.__uuidGenerator = {
+    // pure functions
+    uuidV4, uuidV7, ulid, nanoid, randomToken, inspectUuid,
+    formatUuidBytes, encodeTimeCrockford, bytesToCrockford,
+    // constants
+    CROCKFORD, NANOID_ALPHABET, TOKEN_ALPHABETS, VERSION_NAMES,
+    // randomness (uses getRandomValues, never randomUUID)
+    getRandomBytes, hasSecureRandom,
+    // deterministic entry points
+    setMode, setType, generateBatch, renderInspect,
+    // live state
+    state,
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+{
+  "name": "claude-tools",
+  "groupId": "com.codercowboy",
+  "version": "1.0.0",
+  "description": "A collection of small, single-file, vanilla-JS web tools. Each tool under src/tools/ is standalone (its own package.json + node_modules) and its shipped index.html opens straight from file:// with no build step and no runtime dependencies.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Claude (Anthropic) <noreply@anthropic.com>",
+  "contributors": [
+    "Jason Baker <jason@onejasonforsale.com> (https://github.com/codercowboy)"
+  ],
+  "homepage": "https://github.com/codercowboy/claude-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codercowboy/claude-tools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/codercowboy/claude-tools/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "build": "node scripts/build-all.mjs",
+    "build:check": "node scripts/build-all.mjs --check",
+    "postinstall": "node scripts/install-all.mjs",
+    "install:all": "node scripts/install-all.mjs",
+    "test:all": "node scripts/test-all.mjs",
+    "serve": "node scripts/serve.mjs src/tools"
+  },
+  "bin": {
+    "ct": "scripts/ct.mjs"
+  },
+  "keywords": [
+    "web-tools",
+    "developer-tools",
+    "designer-tools",
+    "vanilla-js",
+    "no-dependencies",
+    "zero-dependency",
+    "single-file",
+    "offline",
+    "client-side",
+    "browser",
+    "qr-code",
+    "base64",
+    "color-picker",
+    "color-converter",
+    "color-designer",
+    "uuid",
+    "cron",
+    "cidr",
+    "subnet",
+    "inflation-calculator",
+    "utilities",
+    "tools"
+  ],
+  "optionalDependencies": {
+    "@codercowboy/claude-tpm": "file:../../tpm-workspace/claude-tpm",
+    "jason-code": "file:../../jason-code"
+  }
+}

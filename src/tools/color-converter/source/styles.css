@@ -1,0 +1,479 @@
+
+
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --focus: #2f6fed;
+    --radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* ctConfirm theming — reuse this tool's tokens */
+    --ctc-accent: var(--accent);
+    --ctc-accent-fg: var(--accent-contrast);
+    --ctc-bg: var(--panel);
+    --ctc-fg: var(--text);
+    --ctc-radius: var(--radius);
+    --ctc-btn-radius: var(--radius);
+    --ctc-focus: var(--focus);
+    --ctc-cancel-border: var(--border-strong);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  /* Textarea-heavy tool (paste box + two "one per line" output textareas), so
+     the working areas WIDEN with the viewport instead of sitting in a narrow
+     fixed column with empty margins — docs/conventions.md § "Responsive &
+     mobile" (scale UP on large screens). Generous cap keeps ultra-wide
+     monitors sane while letting content fill real width at ≥1400px. */
+  .app {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+    margin: 0;
+  }
+
+  h2 {
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  .hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  /* ---------- Header row (title + Help button) ---------- */
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  textarea, input[type="text"] {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    /* Matches the button rule below — the paste box and per-row inputs are
+       the main tap/type surfaces, so they get the same double-tap-to-zoom
+       guard on mobile. */
+    touch-action: manipulation;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    /* Tells mobile browsers this control only needs tap/pan-through, not
+       double-tap-to-zoom — removes any residual gesture-recognition delay or
+       ambiguity on a real touch device before the click is dispatched. No
+       visible/behavioral effect on desktop (mouse) input. */
+    touch-action: manipulation;
+  }
+
+  /* Excludes .ctc-btn (the pasted ctConfirm "Yes"/"Cancel" buttons — that
+     component owns its own hover styling and must not be repainted by this
+     generic rule) and .modal-close-x (the modal's top-right ✕ — same
+     specificity trap: this rule's 0,3,1 would otherwise beat
+     .modal-close-x:hover's transparent-to-gray hover with the generic
+     light-gray tint). Fixes an adversarial-review finding: this selector's
+     specificity, 0,2,0 (or 0,2,1 with :not(:disabled)), previously beat
+     .ctc-btn--yes:hover's filter-only rule, 0,2,0, repainting the filled
+     accent "Yes" button near-white while its text stayed white, i.e.
+     invisible. docs/conventions.md's ctConfirm hover-specificity note.
+     Also excludes .ct-copy-btn (the shared in-field copy affordance owns its
+     own subtle hover in controls.css — this generic light-gray fill would
+     wash it out). */
+  button:hover:not(:disabled):not(.ctc-btn):not(.modal-close-x):not(.ct-copy-btn) {
+    background: #eef1f8;
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Paste section ---------- */
+
+  .paste-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  #pasteInput {
+    width: 100%;
+    padding: 0.6rem 0.7rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+  }
+
+  .paste-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  #parseSummary {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Rows section ---------- */
+
+  .rows-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .rows-header {
+    display: grid;
+    grid-template-columns: 1fr 28px 190px 220px 32px;
+    gap: 0.5rem;
+    padding: 0 0.1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .rows-header span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rows-header .swatch-label {
+    /* The swatch column is only 28px wide (sized for the 22px color
+       swatch box, not for text) so it gets no label — the swatches are
+       self-evident. Keeping the cell present (rather than removing it)
+       preserves column alignment with the data rows' grid. */
+    font-size: 0;
+  }
+
+  #rowsList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 28px 190px 220px 32px;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .row-input {
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+  }
+
+  .row.invalid .row-input {
+    border-color: var(--danger);
+  }
+
+  .swatch {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    background-color: var(--swatch-color, transparent);
+    background-image: none;
+    justify-self: center;
+  }
+
+  .swatch.alpha {
+    background-image:
+      linear-gradient(var(--swatch-color), var(--swatch-color)),
+      repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%);
+    background-size: 100% 100%, 8px 8px;
+    background-repeat: no-repeat, repeat;
+  }
+
+  .swatch.invalid {
+    background-color: transparent;
+    background-image: repeating-linear-gradient(45deg, #f88 0 4px, #fff 4px 8px);
+  }
+
+  .swatch.empty {
+    background: transparent;
+  }
+
+  /* ---------- Per-row value fields (in-field copy, controls.css) ----------
+     Each hex/rgba value is a read-only <input> in a `.ct-field` with a
+     `.ct-copy-btn` pinned inside at the right (controls.css supplies the base
+     structure + the copy button). The input carries its own border/radius from
+     the global input rule and shares the standard control height. */
+  .row .ct-field {
+    min-width: 0;
+  }
+
+  .row .ct-field > input {
+    /* Monospace value; padding SHORTHAND here would reset controls.css's
+       reserved right room (the `<select>`/input padding trap in
+       docs/conventions.md), so re-declare padding-right LONGHAND right after
+       it (icon room = 2.6rem). */
+    padding: 0.4rem 0.5rem;
+    padding-right: 2.6rem;
+    font: 0.85rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--panel);
+    color: var(--text);
+  }
+
+  .trash-btn {
+    justify-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--panel);
+    line-height: 1;
+  }
+
+  .rows-actions {
+    display: flex;
+    gap: 0.6rem;
+  }
+
+  /* ---------- Outputs section ---------- */
+
+  .outputs-section {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .output-col {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .output-col .ct-field { width: 100%; }
+
+  .output-col textarea {
+    width: 100%;
+    min-height: 160px;
+    /* padding SHORTHAND resets controls.css's reserved right room, so
+       re-declare padding-right LONGHAND after it so the top line's text never
+       runs under the top-right copy button (docs/conventions.md padding trap). */
+    padding: 0.6rem 0.7rem;
+    padding-right: 2.6rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+    background: #fafafc;
+  }
+
+  /* Readable emoji glyph in the shared in-field copy button. */
+  .ct-copy-btn { font-size: 0.95rem; }
+
+  /* ---------- Help modal ----------
+     Reference pattern: tools/hat-picker's Help modal (see
+     docs/conventions.md "First-load help popup"). Static markup in the
+     document (shown/hidden via [hidden]) rather than built/torn down per
+     open, mirroring hat-picker/mancala. */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(28, 28, 31, 0.55);
+  }
+  /* [hidden] cascade trap (docs/conventions.md): an author display:flex rule
+     out-specifies the UA [hidden]{display:none} rule, so pair it with an
+     explicit !important override. */
+  .help-overlay[hidden] { display: none !important; }
+
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30rem;
+    max-height: min(85vh, 640px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    padding: 1.25rem 3rem 1.1rem 1.35rem;
+  }
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.15rem; }
+  .help-dialog p { margin: 0 0 0.65rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.75rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.35rem; }
+  .help-note {
+    margin-top: 0.75rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  /* ---------- Modal close ✕ (docs/conventions.md "Every content modal has
+     a close ✕ in its top-right corner") ---------- */
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .modal-close-x:hover:not(:disabled) {
+    background: rgba(127, 127, 127, .18);
+  }
+  .modal-close-x:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 700px) {
+    .rows-header { display: none; }
+
+    /* One-line rows even at phone widths: swap the grid (which put each of
+       the raw-input/hex/rgba controls on its own full-width line) for flex,
+       and let those three text controls shrink (flex: 1 1 auto; min-width:
+       0) instead of being pinned to 100%/full-row width — the swatch, raw
+       input, hex field, rgba field, and trash all share one row. */
+    .row {
+      display: flex;
+      flex-wrap: nowrap;
+    }
+
+    .row-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      width: auto;
+    }
+
+    .row .swatch,
+    .row .trash-btn {
+      flex: 0 0 auto;
+    }
+
+    .row .ct-field.hex-field,
+    .row .ct-field.rgba-field {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .outputs-section {
+      flex-direction: column;
+    }
+
+    /* Finger-friendly tap targets (~44px) on narrow/touch screens. Control
+       height (44px) already comes from controls.css; widen the per-row in-field
+       copy button and the trash button to a full 44px WIDTH here (and reserve
+       matching room inside the value fields so text never runs under the wider
+       button). Desktop sizing is untouched. */
+    .row .ct-copy-btn { width: 44px; }
+    .row .ct-field > input { padding-right: 2.9rem; }
+    .trash-btn { min-width: 44px; }
+
+    .help-dialog {
+      padding: 1rem 2.75rem 0.9rem 1rem;
+    }
+  }

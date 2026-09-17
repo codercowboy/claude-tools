@@ -1,0 +1,342 @@
+
+
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    padding: 1.5rem 1rem 1rem;
+  }
+
+  header.app-header {
+    max-width: 960px;
+    margin: 0 auto 1.25rem;
+    text-align: center;
+  }
+  header.app-header h1 {
+    margin: 0 0 0.35rem;
+    font-size: 1.6rem;
+  }
+  header.app-header p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  /* Header row: a spacer + the Help (?) button flank the centered title
+     block so adding the button doesn't shift the existing centered layout
+     (mirrors tools/hat-picker's header-row pattern). */
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .header-spacer,
+  .help-button {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+  .header-titles {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .help-button {
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .help-button:hover:not(:disabled) { background: var(--bg); filter: none; }
+
+  main.app {
+    max-width: 960px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 760px) {
+    main.app { grid-template-columns: 1fr; }
+  }
+
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem 1.2rem;
+  }
+  .input-section { grid-column: 1 / -1; }
+  .output-section { grid-column: 1 / -1; }
+
+  h2 {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 0 0 0.75rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+
+  /* Control heights (inputs/selects/buttons) are governed by controls.css
+     (--control-h: 44px) — no per-tool min-height here. textarea keeps its own
+     taller intrinsic height below (controls.css excludes textareas). */
+  textarea, input[type="number"], input[type="text"] {
+    width: 100%;
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.65rem;
+  }
+  textarea {
+    min-height: 110px;
+    resize: vertical;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 0.9rem;
+  }
+  /* Color/border/radius only here — sizing (min-height/font-size/appearance),
+     padding-right (chevron room), and the chevron image itself come from the
+     ct-base include above. background-color (not the `background` shorthand)
+     so the include's chevron background-image isn't wiped. */
+  select {
+    width: 100%;
+    font: inherit;
+    background-color: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding-left: 0.65rem;
+  }
+
+  input[type="color"] {
+    width: 100%;
+    height: 44px;
+    padding: 0.2rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus);
+    border-color: var(--accent);
+  }
+
+  .field { margin-bottom: 0.9rem; }
+  .field:last-child { margin-bottom: 0; }
+  .field-hint {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+  }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.9rem;
+  }
+  @media (max-width: 420px) {
+    .options-grid { grid-template-columns: 1fr; }
+  }
+
+  #capacity-hint {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    min-height: 1.2em;
+  }
+
+  #contrast-warning {
+    font-size: 0.82rem;
+    color: var(--warn-text);
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    margin-top: 0.6rem;
+    display: none;
+  }
+  #contrast-warning.visible { display: block; }
+
+  #error-message {
+    font-size: 0.9rem;
+    color: var(--error-text);
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.9rem;
+    display: none;
+  }
+  #error-message.visible { display: block; }
+
+  .canvas-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem 0;
+  }
+  #qr-canvas {
+    max-width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+    background: #fff;
+    border-radius: 4px;
+  }
+  #qr-canvas.hidden { display: none; }
+
+  #qr-caption {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0.5rem 0 0.9rem;
+  }
+
+  .download-row {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--accent-contrast);
+    background: var(--accent);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    /* Tells mobile browsers this control only needs tap/pan-through, not
+       double-tap-to-zoom — removes any residual gesture-recognition delay
+       or ambiguity on a real touch device before the click is dispatched.
+       No visible/behavioral effect on desktop (mouse) input. */
+    touch-action: manipulation;
+  }
+  /* Exclude .ct-copy-btn — it's an icon button with its own subtle hover
+     (opacity/background) from controls.css; the accent brightness filter here
+     is for the primary/download buttons only. */
+  button:hover:not(:disabled):not(.ct-copy-btn) { filter: brightness(1.08); }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  button svg { flex: none; }
+
+  /* ---------- In-field copy button (controls.css supplies the base) ----------
+     controls.css already reserves the textarea's right padding (2.6rem) and
+     positions .ct-copy-btn at the top-right for a .ct-field--multiline. This
+     tool's `textarea { padding: <shorthand> }` above would otherwise reset
+     padding-right (the shorthand trap), so re-declare it as a longhand here so
+     the first line of text never runs under the icon. */
+  .ct-field > textarea { padding-right: 2.6rem; }
+  .ct-copy-btn { font-size: 0.95rem; }
+
+  /* ---- Help modal ----
+     Reference pattern: tools/hat-picker and tools/color-designer's Help
+     modal (see docs/conventions.md "First-load help popup"). Static markup
+     in the document (shown/hidden via [hidden]) rather than built/torn down
+     per open. The Close button is a plain <button> so it inherits this
+     tool's existing accent/primary look (above) — no separate primary class
+     needed, and no ctConfirm-style hover-wash-out risk since nothing here
+     excludes accent buttons from the generic button:hover rule. */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(20, 22, 26, 0.55);
+  }
+  /* [hidden] cascade trap (docs/conventions.md): an author display:flex rule
+     out-specifies the UA [hidden]{display:none} rule, so pair it with an
+     explicit !important override. */
+  .help-overlay[hidden] { display: none !important; }
+
+  .help-dialog {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30rem;
+    max-height: min(85vh, 640px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    padding: 1.25rem 3rem 1.1rem 1.35rem;
+    position: relative;
+  }
+
+  /* Persistent close ✕, pinned top-right so it's reachable even when the
+     dialog is scrolled and the Close button is below the fold (see
+     docs/conventions.md "Every content modal has a close ✕"). */
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .modal-close-x:hover { background: rgba(127, 127, 127, .18); }
+  .modal-close-x:focus-visible { outline: 2px solid var(--focus-ring, #7dd3fc); outline-offset: 2px; }
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.25rem; }
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.9rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.4rem; }
+  .help-note {
+    margin-top: 0.9rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  @media (max-width: 420px) {
+    .help-dialog { padding: 1rem 2.75rem 0.9rem 1rem; }
+  }
+

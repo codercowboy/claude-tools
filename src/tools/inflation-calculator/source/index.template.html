@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inflation Calculator</title>
+<meta property="og:title"       content="Inflation Calculator">
+<meta property="og:description" content="See what a US dollar amount from one year is worth in another, using bundled BLS CPI-U data — cumulative inflation and average annual rate, all local in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-alt: #f0f0f4;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #1f7a4d;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --focus: #1f7a4d;
+    --radius: 8px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-alt: #2a2a30;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #4cc98a;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --focus: #4cc98a;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Inflation Calculator</h1>
+        <p class="subtitle">What a US dollar amount from one year is worth in another — bundled BLS CPI-U data, all local in your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <section class="card" aria-labelledby="calc-heading">
+    <h2 id="calc-heading" class="visually-hidden">Inflation calculator</h2>
+
+    <div class="inputs">
+      <div class="field amount-field">
+        <label for="amount-input">Amount (USD)</label>
+        <div class="ct-field">
+          <input type="text" inputmode="decimal" id="amount-input" data-testid="amount-input" autocomplete="off" value="100">
+          <button type="button" class="ct-copy-btn" data-copy-target="amount-input" data-testid="amount-copy" aria-label="Copy amount" title="Copy amount">📋</button>
+        </div>
+      </div>
+
+      <div class="years-row">
+        <div class="field">
+          <label for="from-year">From year</label>
+          <select id="from-year" data-testid="from-year"></select>
+        </div>
+        <button type="button" id="swap-years" class="swap-btn" data-testid="swap-years" title="Swap years" aria-label="Swap from and to years">⇄</button>
+        <div class="field">
+          <label for="to-year">To year</label>
+          <select id="to-year" data-testid="to-year"></select>
+        </div>
+      </div>
+    </div>
+
+    <p class="error" data-testid="error" role="alert" aria-live="polite" hidden></p>
+
+    <div class="result" aria-live="polite">
+      <div class="result-label">Equivalent amount</div>
+      <div class="ct-field">
+        <output class="result-value" data-testid="result-value"></output>
+        <button type="button" class="ct-copy-btn" data-copy-target="result-value" data-testid="result-copy" aria-label="Copy equivalent amount" title="Copy equivalent amount">📋</button>
+      </div>
+      <p class="sentence" data-testid="result-sentence"></p>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Cumulative inflation</div>
+          <div class="stat-value" data-testid="cumulative"></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Average annual rate</div>
+          <div class="stat-value" data-testid="annual-rate"></div>
+        </div>
+      </div>
+
+      <div class="trend" data-testid="trend" hidden></div>
+      <p class="trend-caption">CPI-U trend across the selected span</p>
+    </div>
+
+    <p class="data-note">
+      Data: U.S. Bureau of Labor Statistics <strong>CPI-U</strong> annual average
+      (series <code>CUUR0000SA0</code>, all items, 1982-84=100), covering
+      <strong data-testid="data-range"></strong>. Public domain (U.S. Government work).
+      Last updated <span data-testid="last-updated"></span>.
+      <a href="https://www.bls.gov/cpi/" target="_blank" rel="noopener noreferrer">bls.gov/cpi</a>
+    </p>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">Inflation Calculator</h2>
+    <p>See how the buying power of the US dollar changes over time. Enter an amount, a <strong>from</strong> year, and a <strong>to</strong> year — everything runs locally in your browser, nothing is sent anywhere.</p>
+    <ul>
+      <li><strong>Equivalent amount.</strong> What your amount from the "from" year would be worth in the "to" year, scaled by the change in the price index.</li>
+      <li><strong>Cumulative inflation.</strong> The total percentage change in prices across the whole span.</li>
+      <li><strong>Average annual rate.</strong> The steady yearly rate (compounded) that produces that same overall change.</li>
+      <li><strong>Swap (⇄).</strong> Flip the two years to look backward instead of forward.</li>
+      <li><strong>Copy (📋).</strong> The amount and the result each have a copy-to-clipboard button.</li>
+    </ul>
+    <p>The tool uses the U.S. Bureau of Labor Statistics <strong>CPI-U</strong> annual-average series (all urban consumers, U.S. city average, all items; 1982-84=100), bundled into the page and covering <strong data-testid="data-range"></strong>. It is public-domain U.S. Government data. Figures are nominal-dollar comparisons and reflect the national average basket, not any one region or household.</p>
+    <p class="help-note">Your amount and year selections are remembered on this device, so reopening the tool picks up where you left off.</p>
+  </div>
+</div>
+
+<<ct:include footer.html>>
+
+<script>
+<<ct:include copy.js>>
+</script>
+
+<script>
+  window.__INFLATION_CPI__ = <<ct:inline cpi-data.json>>;
+</script>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

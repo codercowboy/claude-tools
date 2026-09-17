@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Color Picker</title>
+<meta property="og:title"       content="Color Picker">
+<meta property="og:description" content="Load an image, pan/zoom, and sample exact pixel colors with a magnifier loupe. Collect them as rgba() and hex.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+<<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <div class="app-header-row">
+    <div class="header-titles">
+      <h1>Color Picker</h1>
+      <p class="hint">Load an image, pan/zoom to find a pixel, then use Choose Color to sample it.</p>
+    </div>
+    <button
+      id="helpButton"
+      type="button"
+      class="help-button"
+      data-testid="help-button"
+      title="How it works"
+      aria-label="How it works"
+    >?</button>
+  </div>
+
+  <header class="toolbar">
+    <button id="loadBtn" type="button" data-testid="load-btn">Load image</button>
+    <input id="fileInput" type="file" accept="image/*" class="visually-hidden" tabindex="-1">
+    <button id="chooseColorBtn" type="button" class="choose-color-btn" data-testid="choose-color-btn" aria-pressed="false">
+      <span aria-hidden="true">🔍</span> Choose Color
+    </button>
+    <button id="resetViewBtn" type="button" data-testid="reset-view-btn">Reset view</button>
+    <span id="zoomIndicator" class="zoom-indicator" data-testid="zoom-indicator">100%</span>
+  </header>
+
+  <p id="loadError" class="load-error" data-testid="load-error" role="status" hidden></p>
+
+  <div id="stage" class="stage" data-testid="stage">
+    <canvas id="canvas" data-testid="canvas"></canvas>
+    <div id="emptyState" class="empty-state">Drop an image here or use Load image</div>
+    <p id="touchHint" class="touch-hint" data-testid="touch-hint" hidden>Drag to aim &middot; tap to pick</p>
+    <div id="touchCrosshair" class="touch-crosshair" data-testid="touch-crosshair" hidden aria-hidden="true"></div>
+    <div id="loupe" class="loupe" hidden>
+      <canvas id="loupeCanvas"></canvas>
+    </div>
+    <div id="touchToast" class="touch-toast" data-testid="touch-toast" hidden>
+      <span>Drag to aim, tap to pick a color.</span>
+      <button id="touchToastDismiss" type="button" data-testid="touch-toast-dismiss" aria-label="Dismiss hint" title="Dismiss hint">&times;</button>
+    </div>
+  </div>
+
+  <section class="color-list-section">
+    <div class="color-list-header">
+      <h2>Sampled colors</h2>
+      <button id="removeAllBtn" type="button" data-testid="remove-all-btn" disabled>Remove all</button>
+    </div>
+    <ul id="colorList" class="color-list" data-testid="color-list"></ul>
+  </section>
+
+  <section class="outputs-section" data-testid="outputs-section">
+    <div class="output-col" data-testid="rgba-output-col">
+      <label for="rgbaOutput">RGBA (one per line)</label>
+      <textarea id="rgbaOutput" data-testid="rgba-output" readonly aria-label="RGBA output, one per line"></textarea>
+      <button id="rgbaCopyAllBtn" type="button" data-testid="rgba-copy-all" aria-label="Copy all RGBA values" title="Copy all RGBA values" disabled>Copy all</button>
+    </div>
+    <div class="output-col" data-testid="hex-output-col">
+      <label for="hexOutput">HEX (one per line)</label>
+      <textarea id="hexOutput" data-testid="hex-output" readonly aria-label="HEX output, one per line"></textarea>
+      <button id="hexCopyAllBtn" type="button" data-testid="hex-copy-all" aria-label="Copy all HEX values" title="Copy all HEX values" disabled>Copy all</button>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">How Color Picker works</h2>
+    <p>Load an image — click <strong>Load image</strong> to choose a file, or drag and drop one onto the canvas — then scroll or pinch to zoom, and drag to pan around it (<strong>Reset view</strong> returns to the fit-to-frame view).</p>
+    <ul>
+      <li><strong>Sample a pixel.</strong> Turn on <strong>🔍 Choose Color</strong>, then click a spot on the image (or drag to aim the crosshair and tap, on touch) — the magnifier loupe zooms in so you can land on the exact pixel.</li>
+      <li><strong>Collected colors.</strong> Each sample adds a row below with its swatch, rgba() value, and hex value — copy either one, or remove the row with the trash icon.</li>
+      <li><strong>Remove all.</strong> Clears every sampled color, after a confirmation.</li>
+      <li><strong>Copy all.</strong> The RGBA and HEX boxes list every sampled color, one per line — use "Copy all" under each to grab the whole list at once.</li>
+    </ul>
+    <p class="help-note">Your sampled colors are saved on this device, so they're still here next time you open Color Picker.</p>
+  </div>
+</div>
+
+<<ct:include footer.html>>
+
+<script>
+<<ct:include confirm.js>>
+</script>
+
+<script>
+<<ct:include copy.js>>
+</script>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

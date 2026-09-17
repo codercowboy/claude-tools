@@ -1,0 +1,1169 @@
+
+
+  :root {
+    color-scheme: light;
+    --bg: #f6f5fb;
+    --panel: #ffffff;
+    --border: #ddd9ea;
+    --border-strong: #b9b2cf;
+    --text: #201c2b;
+    --text-muted: #6c6580;
+    --accent: #7c3aed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --focus: #7c3aed;
+    --radius: 10px;
+
+    /* ctConfirm theming — reuse this tool's tokens */
+    --ctc-accent: var(--accent);
+    --ctc-accent-fg: var(--accent-contrast);
+    --ctc-bg: var(--panel);
+    --ctc-fg: var(--text);
+    --ctc-radius: var(--radius);
+    --ctc-btn-radius: var(--radius);
+    --ctc-focus: var(--focus);
+    --ctc-cancel-border: var(--border-strong);
+
+    /* live demo crossfade defaults (before JS sets them per-scheme) */
+    --demo-bg: var(--panel);
+    --demo-fg: var(--text);
+    --demo-accent-bg: var(--accent);
+    --demo-accent-fg: var(--accent-contrast);
+
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { overflow-x: hidden; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  /* Wide-screen: use the available width rather than a fixed narrow column
+     (docs/conventions.md § "Responsive & mobile" — scale UP on large screens).
+     The schemes list and the per-scheme export/copy-all textareas widen with
+     the viewport instead of sitting in a ~900px column with empty margins;
+     the top-row cards still cap sensibly via their own grid. */
+  .app {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 1.5rem 1.1rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 { font-size: 1.35rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 0; }
+  h3 { margin: 0; }
+  p { margin: 0; }
+
+  .app-header .hint {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-top: 0.3rem;
+  }
+
+  /* Header row: titles on the left, Help (?) button on the right. Adding
+     this row/wrapper is new (for the Help button); it doesn't relayout the
+     controls-bar/seeds-section below. */
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .help-button {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ---------- Help modal ----------
+     Reference pattern: tools/hat-picker's Help modal (see
+     docs/conventions.md "First-load help popup (all tools)"). Static markup
+     in the document, shown/hidden via [hidden] rather than built/torn down
+     per open. */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(32, 28, 43, 0.55);
+  }
+  /* [hidden] cascade trap (docs/conventions.md): an author display:flex
+     rule out-specifies the UA [hidden]{display:none} rule, so pair it with
+     an explicit !important override. */
+  .help-overlay[hidden] { display: none !important; }
+
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30rem;
+    max-height: min(85vh, 640px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    /* Symmetric horizontal padding so full-width controls aren't shoved into a
+       narrower "column" by right padding reserved for the ✕ (see convention:
+       docs/conventions.md § "Modal close ✕ + padding"). Only the HEADING needs
+       to clear the ✕, via its own padding-right — the body content sits below
+       the ✕ and uses the full symmetric width. */
+    padding: 1.25rem 1.35rem 1.1rem;
+  }
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.2rem; padding-right: 2.25rem; }
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.9rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.4rem; }
+
+  /* ---------- Modal close ✕ (docs/conventions.md "Every content modal has
+     a close ✕ in its top-right corner") ---------- */
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    min-height: 0; /* keep the corner ✕ a 40px square, not stretched by the shared 44px control min-height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .modal-close-x:hover:not(:disabled) { background: rgba(127, 127, 127, .18); }
+  .modal-close-x:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .help-note {
+    margin-top: 0.9rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  label { font-size: 0.9rem; font-weight: 600; }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  input[type="text"], select, textarea {
+    font: inherit;
+    color: var(--text);
+    /* background-color (not the `background` shorthand) so this doesn't wipe
+       out the pasted ct-base include's <select> chevron background-image. */
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  select {
+    /* min-height: 44px and padding-right (chevron room) come from the
+       pasted ct-base include above — only top/bottom/left padding here, so
+       this rule can't clobber that reserved padding-right. */
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    padding-left: 0.6rem;
+  }
+
+  /* Text inputs get the same inner padding as selects so their text and
+     placeholder have left/right breathing room (convention:
+     docs/conventions.md § "Text input padding"), instead of hugging the border. */
+  input[type="text"] {
+    padding: 0.5rem 0.6rem;
+  }
+
+  /* In-field copy button (controls.css supplies the base .ct-field/.ct-copy-btn).
+     The `padding: …` shorthand on input[type="text"] above sits at equal
+     specificity AFTER controls.css and would silently reset padding-right to
+     0.6rem — running the value under the copy icon (docs/conventions.md §
+     "<select> padding shorthand trap", the same trap for text inputs). Re-declare
+     the icon's reserved room here, after the shorthand, so it wins the cascade;
+     the multi-line export textarea gets the same reserve. */
+  .ct-field > input,
+  .ct-field > textarea { padding-right: 2.6rem; }
+  .ct-copy-btn { font-size: 0.95rem; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.9rem;
+    /* Tells mobile browsers this control only needs tap/pan-through, not
+       double-tap-to-zoom — removes any residual gesture-recognition delay
+       or ambiguity on a real touch device before the click is dispatched.
+       No visible/behavioral effect on desktop (mouse) input. Note: the
+       sv-square/hue-slider/alpha-slider (§ Seed color picker) intentionally
+       set touch-action: none instead — those are drag surfaces, not
+       buttons, and are unaffected by this rule. */
+    touch-action: manipulation;
+  }
+
+  /* Excludes .ctc-btn (the pasted ctConfirm "Yes"/"Cancel" buttons — that
+     component owns its own hover styling and must not be repainted by this
+     generic rule) and .btn-primary (Roll again — handled explicitly below,
+     .btn-primary:hover:not(:disabled)) so neither gets washed out on hover.
+     Fixes an adversarial-review finding: this selector's specificity, 0,2,1,
+     previously beat .ctc-btn--yes:hover's filter-only rule, 0,2,0,
+     repainting the filled accent "Yes" button near-white while its text
+     stayed white, i.e. invisible. docs/conventions.md's ctConfirm
+     hover-specificity note.
+     NOTE: adding just `:not(.ctc-btn)` bumps this rule's specificity from
+     0,2,1 to 0,3,1 — enough to newly OUT-SPECIFY .btn-primary:hover's 0,3,0
+     and re-break Roll again's hover invert (caught by this tool's own
+     "purple primary button hover" regression test). Excluding `.btn-primary`
+     here too, structurally, avoids the specificity race entirely — same
+     belt-and-braces pattern color-picker used for its active toggle. */
+  /* Also excludes .ct-copy-btn — the shared in-field copy affordance owns its
+     own subtle hover (controls.css); this generic purple wash would otherwise
+     out-specify it (docs/conventions.md § "Standard control height & in-field
+     copy"). .btn-primary stays excluded structurally to avoid the specificity
+     race with .btn-primary:hover noted below. */
+  button:hover:not(:disabled):not(.ctc-btn):not(.btn-primary):not(.modal-close-x):not(.ct-copy-btn) { background: #f1ecfc; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Top row: roll card (left) + seed card (right), 50/50 ---------- */
+  .top-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: stretch;
+  }
+  @media (max-width: 640px) {
+    .top-row { grid-template-columns: 1fr; }
+  }
+
+  /* Roll card — Bootstrap-vibe stacked controls: label above each control,
+     full-width buttons/selects, Settings pinned to the bottom. */
+  .roll-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+  }
+  .roll-card .control { gap: 0.3rem; }
+  .roll-card .roll-btn,
+  .roll-card select,
+  .roll-card .settings-btn { width: 100%; }
+  .roll-card .hist-cluster { width: 100%; }
+  .roll-card .hist-cluster .hist-btn { flex: 1; }
+  /* Push Settings to the bottom of the card (it stretches to the seed card). */
+  .settings-control { margin-top: auto; }
+  .settings-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+  }
+
+  .control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  /* Bootstrap-5-style spacer label: an empty (but non-empty-text, via
+     &nbsp;) label above a label-less control so its *box* top-aligns with
+     sibling controls that do have a visible label above them (e.g. the
+     harmony select). Decorative only — hidden from assistive tech so an
+     empty label is never announced. */
+  .spacer-label[aria-hidden="true"] { pointer-events: none; }
+
+  .roll-btn {
+    font-size: 1.05rem;
+    font-weight: 700;
+    padding: 0.65rem 1.3rem;
+  }
+
+  /* Purple primary button (the Roll button, and any future purple primary
+     action). Hover INVERTS the fill/text rather than fading toward white on
+     both — keeps the purple border, swaps fill<->text so the label stays
+     readable (fixes the old white-fill + white-text invisible-label bug). */
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border-color: var(--accent);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #fff;
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* Wiggle nudge — plays once each time the user adds a seed color. */
+  @keyframes ctd-roll-wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    20% { transform: rotate(-8deg); }
+    40% { transform: rotate(7deg); }
+    60% { transform: rotate(-5deg); }
+    80% { transform: rotate(3deg); }
+  }
+  .roll-btn.wiggle { animation: ctd-roll-wiggle 420ms ease; }
+  @media (prefers-reduced-motion: reduce) {
+    .roll-btn.wiggle { animation: none; }
+  }
+
+  .count-control { margin-left: auto; }
+
+  .algo-badge {
+    margin: 0;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    background: #efe7fd;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 700;
+    min-height: 0;
+    /* Not a form control — keep it vertically centered against the row
+       rather than top-aligning like the select/button boxes. */
+    align-self: center;
+  }
+
+  .algo-badge:empty { display: none; }
+
+  /* Roll history cluster: Back / Forward together (in the secondary bar). */
+  .hist-cluster { display: flex; align-items: stretch; gap: 0.4rem; }
+  .hist-btn {
+    padding: 0 0.7rem;
+    font-size: 0.9rem;
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .hist-btn:hover:not(:disabled) { background: #faf8ff; }
+  .hist-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* ---------- Settings modal (harmony, colors-per-scheme, vision, demo
+     speed, roll seed + copy-link / save-palette). Mirrors the Help modal. --- */
+  .settings-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(32, 28, 43, 0.55);
+  }
+  .settings-overlay[hidden] { display: none !important; }
+  .settings-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30rem;
+    max-height: min(88vh, 680px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    /* Symmetric padding; only the heading clears the ✕ (see .help-dialog). */
+    padding: 1.25rem 1.35rem 1.1rem;
+  }
+  .settings-dialog h2 { margin: 0 0 0.9rem; font-size: 1.2rem; padding-right: 2.25rem; }
+  .settings-fields { display: flex; flex-direction: column; gap: 0.85rem; }
+  .settings-fields .control { gap: 0.3rem; }
+  .settings-fields select,
+  .settings-fields input[type="text"] { width: 100%; } /* height via controls.css */
+  .settings-tools {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 1.1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--border);
+  }
+  .tool-btn-danger { color: #b3261e; border-color: color-mix(in srgb, #b3261e 45%, var(--border-strong)); }
+
+  /* Vision-preview (color-blindness) active badge — a full-width notice above
+     the schemes so a simulated preview is never mistaken for the real palette. */
+  .cvd-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 0.85rem;
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+  }
+  .cvd-badge[hidden] { display: none !important; }
+  .cvd-badge-text { flex: 1 1 auto; min-width: 0; }
+  .cvd-badge-reset { flex: 0 0 auto; }
+  .settings-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1.1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--border);
+  }
+  .settings-footer .btn-primary { padding: 0.5rem 1.3rem; font-weight: 700; }
+  @media (prefers-reduced-motion: no-preference) {
+    .settings-overlay { animation: help-fade 150ms ease; }
+  }
+
+  .tool-btn {
+    /* Height comes from controls.css (--control-h: 44px) — a per-tool 40px
+       here would conflict with (and undercut) that standard. */
+    padding: 0.45rem 0.8rem;
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .tool-btn:hover:not(:disabled) { background: #faf8ff; }
+  .tool-btn-danger:hover:not(:disabled) { background: #fdecec; color: #b3261e; }
+
+  /* ---------- Saved-palette shelf ---------- */
+  .saved-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.85rem 1rem;
+  }
+  .saved-heading { margin: 0 0 0.6rem; font-size: 0.95rem; }
+  .saved-shelf { display: flex; flex-direction: column; gap: 0.5rem; }
+  .saved-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .saved-item-strip { display: flex; gap: 2px; }
+  .saved-item-swatch {
+    width: 20px; height: 20px; border-radius: 4px;
+    background-color: var(--swatch-color);
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  .saved-item-name {
+    flex: 1 1 8rem;
+    min-width: 6rem;
+    /* Height comes from controls.css (--control-h: 44px). */
+    padding: 0.3rem 0.5rem;
+  }
+  .saved-item-actions { display: flex; gap: 0.4rem; margin-left: auto; }
+
+  /* ---------- Per-scheme tool blocks (contrast / export / hue wheel) ---------- */
+  .tool-block {
+    border-top: 1px solid var(--border);
+    padding-top: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .tool-block-title { margin: 0; font-size: 0.85rem; color: var(--text-muted); font-weight: 700; }
+
+  .export-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .export-output {
+    width: 100%;
+    min-height: 120px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    resize: vertical;
+  }
+
+  .contrast-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.5rem;
+  }
+  .contrast-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 8px;
+    background: var(--c-bg);
+    color: var(--c-fg);
+    border: 1px solid rgba(0,0,0,0.12);
+  }
+  .contrast-sample { font-weight: 700; font-size: 1.05rem; }
+  .contrast-meta { font-size: 0.72rem; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .contrast-row.pass { box-shadow: inset 0 0 0 2px rgba(46,125,50,0.55); }
+  .contrast-row.warn { box-shadow: inset 0 0 0 2px rgba(230,160,20,0.55); }
+  .contrast-row.fail { box-shadow: inset 0 0 0 2px rgba(179,38,30,0.55); }
+
+  .wheel-scroll { overflow-x: auto; }
+  .hue-wheel-svg { display: block; }
+  :root { --wheel-dot-stroke: #ffffff; --wheel-spoke: rgba(90,90,90,0.35); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --wheel-dot-stroke: #1d1b26; --wheel-spoke: rgba(200,200,200,0.35); }
+  }
+  :root[data-theme="dark"] { --wheel-dot-stroke: #1d1b26; --wheel-spoke: rgba(200,200,200,0.35); }
+
+  /* ---------- Seeds section ---------- */
+
+  .seeds-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+  }
+
+  .seed-add-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* ---------- Seed color picker (trigger swatch + popup) ---------- */
+
+  .seed-picker-trigger {
+    position: relative;
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background-image:
+      linear-gradient(45deg, #ccc 25%, transparent 25%),
+      linear-gradient(-45deg, #ccc 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #ccc 75%),
+      linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 10px 10px;
+    background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+    background-color: #fff;
+  }
+
+  .trigger-fill {
+    position: absolute;
+    inset: 0;
+    background-color: var(--trigger-color, transparent);
+  }
+
+  .trigger-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    mix-blend-mode: difference;
+    pointer-events: none;
+  }
+
+  .seed-picker-popup {
+    position: fixed;
+    z-index: 1000;
+    width: 260px;
+    max-width: calc(100vw - 1.5rem);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding: 0.9rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  }
+
+  .seed-picker-popup[hidden] { display: none; }
+
+  .sv-square {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    touch-action: none;
+    cursor: crosshair;
+    background-image:
+      linear-gradient(to bottom, transparent 0%, #000 100%),
+      linear-gradient(to right, #fff 0%, var(--picker-hue-color, #ff0000) 100%);
+  }
+
+  .sv-square:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .sv-thumb {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .hue-slider, .alpha-slider {
+    position: relative;
+    width: 100%;
+    height: 18px;
+    border-radius: 999px;
+    touch-action: none;
+    cursor: pointer;
+  }
+
+  .hue-slider:focus-visible, .alpha-slider:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .hue-slider {
+    background-image: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  }
+
+  .alpha-slider {
+    background-image:
+      linear-gradient(to right, var(--picker-alpha-from, rgba(0, 0, 0, 1)), var(--picker-alpha-to, rgba(0, 0, 0, 0))),
+      linear-gradient(45deg, #ccc 25%, transparent 25%),
+      linear-gradient(-45deg, #ccc 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #ccc 75%),
+      linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 100% 100%, 10px 10px, 10px 10px, 10px 10px, 10px 10px;
+    background-position: 0 0, 0 0, 0 5px, 5px -5px, -5px 0px;
+    background-color: #fff;
+  }
+
+  .hue-thumb, .alpha-thumb {
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  #seedInput {
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 0.5rem 0.65rem;
+    /* height via controls.css (--control-h) */
+  }
+
+  .seed-error {
+    margin: 0;
+    color: var(--danger);
+    font-size: 0.85rem;
+    min-height: 1.1em;
+  }
+
+  .seed-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .seed-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.25rem 0.4rem 0.25rem 0.6rem;
+  }
+
+  .chip-swatch {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    background-color: var(--swatch-color, transparent);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+  }
+
+  .chip-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+  }
+
+  .chip-remove {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    line-height: 1;
+    font-size: 1.05rem;
+    color: var(--text-muted);
+  }
+
+  .chip-remove:hover { background: rgba(124, 58, 237, 0.14); color: var(--text); }
+
+
+  /* ---------- Schemes accordion ---------- */
+
+  .schemes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .scheme {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .scheme-header {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0.85rem;
+    cursor: pointer;
+  }
+
+  .scheme-header:hover { background: #faf8ff; }
+  .scheme-header:focus-visible {
+    outline: 2px solid var(--accent, #6c4cff);
+    outline-offset: -2px;
+  }
+
+  .swatch-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+
+  .swatch-mini {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    width: 58px;
+  }
+
+  .swatch-box {
+    position: relative;
+    display: block;
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    background-color: var(--swatch-color);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+  }
+
+  /* "Add as seed" button — sits in the swatch's bottom-right, hidden until the
+     swatch is hovered or the button itself is focused (keyboard). */
+  .swatch-seed-btn {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 20px;
+    height: 20px;
+    /* Override the shared control min-height (controls.css sets 44px on every
+       button) — this is a deliberately tiny 20px overlay chip. Without this it
+       inflates to 44px and overlaps the lock button, stealing its clicks. */
+    min-height: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #1a1a1a;
+    font-size: 16px;
+    line-height: 1;
+    font-weight: 600;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 120ms ease, transform 120ms ease, background 120ms ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  }
+  .swatch-box:hover .swatch-seed-btn,
+  .swatch-seed-btn:focus-visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .swatch-seed-btn:hover { background: #fff; }
+  .swatch-seed-btn:focus-visible { outline: 2px solid var(--accent, #6c4cff); outline-offset: 1px; }
+  /* Momentary confirmation: the + turns into a ✓ right after a click. */
+  .swatch-seed-btn.added {
+    opacity: 1;
+    transform: scale(1);
+    background: #2e7d32;
+    color: #fff;
+  }
+  .swatch-seed-btn.added::after { content: "\2713"; } /* ✓ */
+  .swatch-seed-btn.added { font-size: 0; }            /* hide the "+" glyph */
+  .swatch-seed-btn.added::after { font-size: 14px; }
+  /* Touch devices have no hover — keep the button gently visible so it's
+     reachable, and skip the flash transition for reduced-motion users. */
+  @media (hover: none) {
+    .swatch-seed-btn { opacity: 0.9; transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .swatch-seed-btn { transition: none; }
+  }
+
+  /* Lock/pin button — top-right of the swatch. Hidden until hover/focus, but a
+     pinned swatch shows its lock persistently + a ring so you can see it. */
+  .swatch-lock-btn {
+    position: absolute;
+    right: 3px;
+    top: 3px;
+    width: 20px;
+    height: 20px;
+    /* Tiny 20px overlay chip — opt out of the shared 44px control min-height
+       (controls.css) so it doesn't inflate and overlap the seed (+) button. */
+    min-height: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.92);
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 120ms ease, transform 120ms ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  }
+  .swatch-box:hover .swatch-lock-btn,
+  .swatch-lock-btn:focus-visible { opacity: 1; transform: scale(1); }
+  .swatch-lock-btn:focus-visible { outline: 2px solid var(--accent, #6c4cff); outline-offset: 1px; }
+  .swatch-mini.locked .swatch-lock-btn { opacity: 1; transform: scale(1); }
+  .swatch-mini.locked .swatch-box {
+    outline: 3px solid var(--accent, #7c3aed);
+    outline-offset: 2px;
+  }
+  @media (hover: none) { .swatch-lock-btn { opacity: 0.9; transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .swatch-lock-btn { transition: none; } }
+
+  .swatch-hex {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+  }
+
+  .scheme-detail {
+    padding: 1rem 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .scheme-detail[hidden] { display: none; }
+
+  /* ---- Live demo ---- */
+
+  .demo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .demo-main {
+    display: flex;
+    gap: 0.85rem;
+    align-items: stretch;
+  }
+
+  .demo-content {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .demo-card {
+    padding: 1.25rem;
+    border-radius: var(--radius);
+    background: var(--demo-bg);
+    color: var(--demo-fg);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transition: background-color 600ms ease, color 600ms ease;
+  }
+
+  .demo-card h3 { font-size: 1.1rem; }
+  .demo-card p { font-size: 0.9rem; line-height: 1.5; }
+
+  .demo-card button {
+    align-self: flex-start;
+    background: var(--demo-accent-bg);
+    color: var(--demo-accent-fg);
+    border: none;
+    font-weight: 600;
+    transition: background-color 600ms ease, color 600ms ease;
+  }
+
+  /* Extra sample lines — one per scheme color used as a background, so ALL
+     N colors are visible together, not just the ~4 the hero card shows. */
+  .demo-lines {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .demo-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 8px;
+    background: var(--line-bg, var(--panel));
+    color: var(--line-fg, var(--text));
+    font-size: 0.82rem;
+    transition: background-color 600ms ease, color 600ms ease;
+  }
+
+  .demo-line-hex {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.7rem;
+    opacity: 0.85;
+  }
+
+  /* Swatch column — the scheme's non-background colors, sitting on top of
+     the current demo background so the user can eyeball how they combine. */
+  .demo-swatches {
+    flex: 0 0 auto;
+    width: 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem;
+    border-radius: var(--radius);
+    background: var(--demo-bg);
+    transition: background-color 600ms ease;
+  }
+
+  .demo-swatch {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 6px;
+    background-color: var(--swatch-color);
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    transition: background-color 600ms ease;
+  }
+
+  .demo-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .demo-control-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    font-size: 1.05rem;
+    line-height: 1;
+    border-radius: 999px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .demo-card, .demo-card button,
+    .demo-line, .demo-swatches, .demo-swatch { transition: none; }
+  }
+
+  /* ---- Per-color rows ---- */
+
+  .color-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .color-row .swatch {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    background-color: var(--swatch-color);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+  }
+
+  /* Per-color value fields (rgba + hex) use the shared in-field copy pattern:
+     each is a .ct-field wrapper (position:relative, from controls.css) holding a
+     read-only <input> plus a .ct-copy-btn pinned inside its right edge — instead
+     of the old bordered flex box with a separate icon button. The 'field' class
+     is kept for the row's flex sizing (and the phone-width layout media query
+     below). The input itself now carries the border/background from the base
+     input[type="text"] rule, and reserves right padding for the icon via the
+     .ct-field > input rule above. */
+  .color-row .field {
+    flex: 1 1 170px;
+    min-width: 150px;
+  }
+  .color-row .field > input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+  }
+
+  /* ---- Copy-all textareas ---- */
+
+  .copy-all-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .output-col {
+    flex: 1 1 240px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .output-col textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.55rem 0.65rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    resize: vertical;
+    background: #fbfaff;
+  }
+
+  .output-col button { align-self: flex-start; } /* height via controls.css */
+
+  /* ---- Fade-in animation (tweak here — isolated per DESIGN.md) ---- */
+  :root {
+    --ctd-fade-duration: 320ms;
+    --ctd-fade-stagger-step: 12ms;
+  }
+  @keyframes ctd-fade-in {
+    from { opacity: 0; transform: translateY(6px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .fade-in-el {
+    animation: ctd-fade-in var(--ctd-fade-duration) ease both;
+    animation-delay: calc(var(--i, 0) * var(--ctd-fade-stagger-step));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in-el { animation: none !important; opacity: 1 !important; transform: none !important; }
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 600px) {
+    .copy-all-section { flex-direction: column; }
+    /* One-line rows even at phone widths: stay row-direction (not the
+       previous column stack) and let the rgba/hex .field boxes shrink
+       (flex: 1 1 auto; min-width: 0, overriding the desktop min-width:
+       150px) instead of each one claiming its own full-width stacked line.
+       The swatch keeps its fixed size via the base .color-row .swatch rule. */
+    .color-row { flex-wrap: nowrap; }
+    .color-row .field { flex: 1 1 auto; min-width: 0; }
+    .demo-main { flex-direction: column; }
+    .demo-swatches { width: 100%; flex-direction: row; flex-wrap: wrap; }
+    .demo-swatch { width: 32px; height: 32px; flex: 0 0 auto; }
+  }
+
+  @media (max-width: 420px) {
+    .roll-card, .seeds-section, .saved-section { padding: 0.85rem; }
+    .contrast-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+    .help-dialog, .settings-dialog { padding: 1rem 1rem 0.9rem; }
+  }

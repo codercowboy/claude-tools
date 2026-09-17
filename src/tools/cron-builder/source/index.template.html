@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cron Builder</title>
+<meta property="og:title"       content="Cron Builder">
+<meta property="og:description" content="Build, parse, and understand a cron expression — field pickers &amp; raw edit in sync, a plain-English explainer, and the next runs preview, all local in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-alt: #f0f0f4;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --focus: #2f6fed;
+    --radius: 8px;
+    /* ctConfirm accents (unused today — no destructive confirms — but set so
+       the shared component reads correctly if ever adopted). */
+    --ctc-accent: #2f6fed;
+    --ctc-accent-contrast: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-alt: #2a2a30;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --focus: #6d9bff;
+      --ctc-accent: #6d9bff;
+      --ctc-accent-contrast: #0b1220;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Cron Builder</h1>
+        <p class="subtitle">Build and understand a cron schedule — pickers and raw expression in sync, plain-English explainer, and the next runs, all local in your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <!-- ==================== Expression card ==================== -->
+  <section class="card" data-testid="card-expression" aria-labelledby="expr-heading">
+    <div class="card-head">
+      <h2 id="expr-heading">Cron expression</h2>
+      <p class="card-blurb">Edit the raw expression or the field pickers below — the other side updates to match.</p>
+    </div>
+
+    <div class="controls-row">
+      <div class="field flavor-field">
+        <label for="flavor-select">Flavor</label>
+        <select id="flavor-select" data-testid="flavor-select" aria-label="Cron flavor"></select>
+      </div>
+
+      <div class="field preset-field">
+        <label for="preset-select">Presets</label>
+        <select id="preset-select" data-testid="preset-select">
+          <option value="">Choose a preset…</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="expr-row">
+      <div class="field grow">
+        <label for="cron-input">Expression</label>
+        <div class="input-copy">
+          <input type="text" id="cron-input" data-testid="cron-input" autocomplete="off" spellcheck="false" autocapitalize="off">
+          <button type="button" class="copy-btn" data-copy-target="cron-input" data-testid="cron-copy" aria-label="Copy expression" title="Copy expression">📋</button>
+        </div>
+      </div>
+    </div>
+    <p class="field-legend" data-testid="field-legend" aria-hidden="true"></p>
+
+    <p class="error" data-testid="cron-error" role="alert" aria-live="polite" hidden></p>
+  </section>
+
+  <!-- ==================== Field editors ==================== -->
+  <section class="card" data-testid="card-fields" aria-labelledby="fields-heading">
+    <div class="card-head">
+      <h2 id="fields-heading">Field editors</h2>
+      <p class="card-blurb">Pick a mode per field. Changes rebuild the expression above.</p>
+    </div>
+    <div class="field-grid" data-testid="field-grid"></div>
+  </section>
+
+  <!-- ==================== Explainer ==================== -->
+  <section class="card" data-testid="card-explain" aria-labelledby="explain-heading">
+    <div class="card-head">
+      <h2 id="explain-heading">In plain English</h2>
+    </div>
+    <p class="explain-text" data-testid="cron-description" aria-live="polite"></p>
+    <p class="hint or-note" data-testid="dom-dow-note" hidden>
+      Note: day-of-month <em>and</em> day-of-week are both set, so this runs when <strong>either</strong> matches (an OR), following standard cron behavior.
+    </p>
+  </section>
+
+  <!-- ==================== Next runs ==================== -->
+  <section class="card" data-testid="card-runs" aria-labelledby="runs-heading">
+    <div class="card-head">
+      <h2 id="runs-heading">Next 5 runs</h2>
+      <p class="card-blurb">Upcoming fire times, computed offline from your device's clock.</p>
+    </div>
+    <ol class="runs-list" data-testid="next-runs"></ol>
+    <p class="runs-empty" data-testid="runs-empty" hidden>No matching times in the next 5 years.</p>
+    <div class="runs-foot">
+      <span class="hint" data-testid="tz-note"></span>
+      <button type="button" id="runs-copy-all" data-testid="runs-copy-all" title="Copy all runs" aria-label="Copy all runs">Copy all</button>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">Cron Builder</h2>
+    <p>Build, read, and preview a <strong>cron schedule</strong> without leaving the page. Everything runs locally in your browser — nothing you type is ever sent anywhere.</p>
+    <ul>
+      <li><strong>Two-way editing.</strong> Type a raw expression, or use the per-field <strong>pickers</strong> (Every / Every N / Range / Specific / Custom). Each side updates the other.</li>
+      <li><strong>Pick a flavor.</strong> The <strong>Flavor</strong> menu sets the field layout, allowed special characters, and day-of-week numbering:
+        <ul>
+          <li><strong>Standard / Unix</strong> (default) — 5 fields <code>minute hour day-of-month month day-of-week</code>. Day-of-week <code>0–7</code> (0 and 7 = Sunday). Macros like <code>@daily</code> work.</li>
+          <li><strong>Unix with seconds</strong> — 6 fields, a leading <code>seconds</code> column.</li>
+          <li><strong>Quartz (Java)</strong> — 6 or 7 fields <code>sec min hour dom month dow [year]</code>. Day-of-week <code>1–7</code> (1 = Sunday). Supports <code>?</code> <code>L</code> <code>W</code> <code>#</code>; exactly one of dom/dow must be <code>?</code>.</li>
+          <li><strong>Spring @Scheduled</strong> — 6 fields <code>sec min hour dom month dow</code>. Day-of-week <code>0–7</code>. Supports <code>?</code> <code>L</code> <code>#</code> (no <code>W</code>).</li>
+          <li><strong>AWS EventBridge</strong> — 6 fields <code>min hour dom month dow year</code>. Day-of-week <code>1–7</code>; one of dom/dow must be <code>?</code>. Supports <code>L</code> <code>W</code> <code>#</code>.</li>
+        </ul>
+      </li>
+      <li><strong>Syntax.</strong> <code>*</code> (every), <code>a</code>, <code>a-b</code> (range), <code>*/n</code> (step), <code>a-b/n</code>, <code>a/n</code>, and lists like <code>0,15,30</code>. Month names <code>JAN–DEC</code> and day names <code>SUN–SAT</code> work. Where the flavor allows: <code>?</code> ("no specific value"), <code>L</code> (last), <code>W</code> (nearest weekday), and <code>#</code> (nth weekday, e.g. <code>6#3</code>).</li>
+      <li><strong>Day-of-month vs day-of-week.</strong> When <em>both</em> are set, cron fires when <strong>either</strong> matches (an OR) — the explainer flags this.</li>
+      <li><strong>Plain English + next runs.</strong> A live description and the next 5 fire times (in your local time zone) update as you edit.</li>
+      <li><strong>Presets &amp; copy.</strong> Start from a common schedule, and copy the expression or the run list with the copy buttons.</li>
+    </ul>
+    <p class="help-note">Your expression and the chosen flavor are remembered on this device, so reopening the tool picks up where you left off. Times are shown in your local time zone; around daylight-saving changes the preview follows your system clock.</p>
+  </div>
+</div>
+
+<<ct:include footer.html>>
+
+<script>
+<<ct:include copy.js>>
+</script>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

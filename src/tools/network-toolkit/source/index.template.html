@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Network Toolkit</title>
+<meta property="og:title"       content="Network Toolkit">
+<meta property="og:description" content="Transfer-time, CIDR/subnet, IP conversion, and netmask &harr; prefix calculators — all local in your browser, no DNS or network calls.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6f7;
+    --panel: #ffffff;
+    --panel-alt: #eef2f2;
+    --border: #d3dad9;
+    --border-strong: #b3bebc;
+    --text: #16201e;
+    --text-muted: #5f6d6a;
+    --accent: #0d8f7f;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --focus: #0d8f7f;
+    --radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #12191a;
+      --panel: #1b2324;
+      --panel-alt: #232d2e;
+      --border: #32403f;
+      --border-strong: #465554;
+      --text: #e7edec;
+      --text-muted: #93a29f;
+      --accent: #3fd6bf;
+      --accent-contrast: #06201c;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --focus: #3fd6bf;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Network Toolkit</h1>
+        <p class="subtitle">Transfer-time, CIDR/subnet, IP conversion, and netmask &harr; prefix — all local, nothing leaves your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <!-- ==================== Card 1 — Transfer time & rate =============== -->
+  <section class="card" data-testid="card-transfer" aria-labelledby="transfer-heading">
+    <div class="card-head">
+      <h2 id="transfer-heading">Transfer Time &amp; Rate Calculator</h2>
+      <p class="card-blurb">How long does an amount of data take at a given speed? Enter an amount and a speed; the reference table shows 1&nbsp;MB → 1&nbsp;PB at that speed.</p>
+    </div>
+
+    <div class="controls-row">
+      <div class="base-toggle" role="group" aria-label="Prefix base">
+        <button type="button" data-testid="transfer-base-1000" id="transfer-base-1000" aria-pressed="true">Decimal (1000)</button>
+        <button type="button" data-testid="transfer-base-1024" id="transfer-base-1024" aria-pressed="false">Binary (1024)</button>
+      </div>
+    </div>
+    <p class="hint">Decimal = 1000 per prefix (how network rates are quoted); Binary = 1024. bit ↔ byte is always ×8.</p>
+
+    <div class="transfer-inputs">
+      <div class="source-row">
+        <div class="field grow">
+          <label for="transfer-size">Amount to transfer</label>
+          <div class="ct-field">
+            <input type="text" inputmode="decimal" id="transfer-size" data-testid="transfer-size" value="1" autocomplete="off">
+            <button type="button" class="ct-copy-btn" data-copy-target="transfer-size" data-testid="transfer-size-copy" aria-label="Copy amount" title="Copy amount" hidden>📋</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="transfer-size-unit">Unit</label>
+          <select id="transfer-size-unit" data-testid="transfer-size-unit"></select>
+        </div>
+      </div>
+
+      <div class="source-row">
+        <div class="field grow">
+          <label for="transfer-rate">Speed</label>
+          <div class="ct-field">
+            <input type="text" inputmode="decimal" id="transfer-rate" data-testid="transfer-rate" value="100" autocomplete="off">
+            <button type="button" class="ct-copy-btn" data-copy-target="transfer-rate" data-testid="transfer-rate-copy" aria-label="Copy speed" title="Copy speed" hidden>📋</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="transfer-rate-unit">Speed unit</label>
+          <select id="transfer-rate-unit" data-testid="transfer-rate-unit"></select>
+        </div>
+      </div>
+    </div>
+
+    <p class="error" data-testid="transfer-error" role="alert" aria-live="polite" hidden></p>
+
+    <div class="out-rows">
+      <div class="out-row">
+        <span class="out-label">Time</span>
+        <div class="ct-field">
+          <output class="out-value out-value--strong" data-testid="transfer-time"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="transfer-time" data-testid="transfer-time-copy" aria-label="Copy transfer time" title="Copy transfer time">📋</button>
+        </div>
+      </div>
+      <div class="out-row">
+        <span class="out-label">Exact seconds</span>
+        <div class="ct-field">
+          <output class="out-value" data-testid="transfer-seconds"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="transfer-seconds" data-testid="transfer-seconds-copy" aria-label="Copy exact seconds" title="Copy exact seconds">📋</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ref-block">
+      <div class="ref-head">
+        <span class="ref-title">At this speed…</span>
+      </div>
+      <div class="ref-scroll">
+        <table class="ref-table" data-testid="transfer-ref">
+          <thead>
+            <tr><th scope="col">Amount</th><th scope="col">Time</th></tr>
+          </thead>
+          <tbody data-testid="transfer-ref-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button type="button" id="transfer-copy-all" data-testid="transfer-copy-all" title="Copy all transfer results" aria-label="Copy all transfer results">Copy all</button>
+    </div>
+  </section>
+
+  <!-- ==================== Card 2 — CIDR / subnet ===================== -->
+  <section class="card" data-testid="card-cidr" aria-labelledby="cidr-heading">
+    <div class="card-head">
+      <h2 id="cidr-heading">CIDR / Subnet Calculator</h2>
+      <p class="card-blurb">Enter an IPv4 address and a prefix; get the netmask, network &amp; broadcast, usable host range, and counts.</p>
+    </div>
+
+    <div class="source-row">
+      <div class="field grow">
+        <label for="cidr-ip">IPv4 address</label>
+        <div class="ct-field">
+          <input type="text" id="cidr-ip" data-testid="cidr-ip" value="192.168.1.10" autocomplete="off" spellcheck="false" inputmode="decimal">
+          <button type="button" class="ct-copy-btn" data-copy-target="cidr-ip" data-testid="cidr-ip-copy" aria-label="Copy address" title="Copy address" hidden>📋</button>
+        </div>
+      </div>
+      <div class="field field-prefix">
+        <label for="cidr-prefix">Prefix (/0–32)</label>
+        <input type="number" id="cidr-prefix" data-testid="cidr-prefix" value="24" min="0" max="32" step="1" inputmode="numeric">
+      </div>
+    </div>
+
+    <p class="error" data-testid="cidr-error" role="alert" aria-live="polite" hidden></p>
+
+    <div class="out-rows" data-testid="cidr-results"></div>
+
+    <div class="actions-row">
+      <button type="button" id="cidr-copy-all" data-testid="cidr-copy-all" title="Copy all subnet results" aria-label="Copy all subnet results">Copy all</button>
+    </div>
+  </section>
+
+  <!-- ==================== Card 3 — IP converter ====================== -->
+  <section class="card" data-testid="card-ipconv" aria-labelledby="ipconv-heading">
+    <div class="card-head">
+      <h2 id="ipconv-heading">IP Converter</h2>
+      <p class="card-blurb">Edit any representation and the rest update. IPv4 dotted ⇄ integer ⇄ hex ⇄ binary; IPv6 compressed ⇄ expanded ⇄ hex.</p>
+    </div>
+
+    <h3 class="sub-heading">IPv4</h3>
+    <p class="error" data-testid="ipv4-error" role="alert" aria-live="polite" hidden></p>
+    <div class="conv-rows">
+      <div class="conv-row">
+        <label for="ipv4-dotted">Dotted</label>
+        <div class="ct-field">
+          <input type="text" id="ipv4-dotted" data-testid="ipv4-dotted" value="192.168.1.10" autocomplete="off" spellcheck="false" inputmode="decimal">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv4-dotted" data-testid="ipv4-dotted-copy" aria-label="Copy dotted" title="Copy dotted">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv4-int">Integer</label>
+        <div class="ct-field">
+          <input type="text" id="ipv4-int" data-testid="ipv4-int" autocomplete="off" spellcheck="false" inputmode="numeric">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv4-int" data-testid="ipv4-int-copy" aria-label="Copy integer" title="Copy integer">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv4-hex">Hex</label>
+        <div class="ct-field">
+          <input type="text" id="ipv4-hex" data-testid="ipv4-hex" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv4-hex" data-testid="ipv4-hex-copy" aria-label="Copy hex" title="Copy hex">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv4-bin">Binary</label>
+        <div class="ct-field">
+          <input type="text" id="ipv4-bin" data-testid="ipv4-bin" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv4-bin" data-testid="ipv4-bin-copy" aria-label="Copy binary" title="Copy binary">📋</button>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="sub-heading">IPv6</h3>
+    <p class="error" data-testid="ipv6-error" role="alert" aria-live="polite" hidden></p>
+    <div class="conv-rows">
+      <div class="conv-row">
+        <label for="ipv6-compressed">Compressed</label>
+        <div class="ct-field">
+          <input type="text" id="ipv6-compressed" data-testid="ipv6-compressed" value="2001:db8::1" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv6-compressed" data-testid="ipv6-compressed-copy" aria-label="Copy compressed" title="Copy compressed">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv6-expanded">Expanded</label>
+        <div class="ct-field">
+          <input type="text" id="ipv6-expanded" data-testid="ipv6-expanded" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv6-expanded" data-testid="ipv6-expanded-copy" aria-label="Copy expanded" title="Copy expanded">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv6-hex">Hex</label>
+        <div class="ct-field">
+          <input type="text" id="ipv6-hex" data-testid="ipv6-hex" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv6-hex" data-testid="ipv6-hex-copy" aria-label="Copy hex" title="Copy hex">📋</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Card 4 — Netmask <-> prefix ================ -->
+  <section class="card" data-testid="card-netmask" aria-labelledby="netmask-heading">
+    <div class="card-head">
+      <h2 id="netmask-heading">Netmask ⇄ Prefix</h2>
+      <p class="card-blurb">Convert a dotted netmask to a /prefix and back. Non-contiguous masks are rejected.</p>
+    </div>
+
+    <div class="source-row">
+      <div class="field grow">
+        <label for="netmask-mask">Netmask</label>
+        <div class="ct-field">
+          <input type="text" id="netmask-mask" data-testid="netmask-mask" value="255.255.255.0" autocomplete="off" spellcheck="false" inputmode="decimal">
+          <button type="button" class="ct-copy-btn" data-copy-target="netmask-mask" data-testid="netmask-mask-copy" aria-label="Copy netmask" title="Copy netmask">📋</button>
+        </div>
+      </div>
+      <div class="field field-prefix">
+        <label for="netmask-prefix">Prefix</label>
+        <input type="number" id="netmask-prefix" data-testid="netmask-prefix" value="24" min="0" max="32" step="1" inputmode="numeric">
+      </div>
+    </div>
+
+    <p class="error" data-testid="netmask-error" role="alert" aria-live="polite" hidden></p>
+
+    <div class="out-rows">
+      <div class="out-row">
+        <span class="out-label">Prefix</span>
+        <div class="ct-field">
+          <output class="out-value" data-testid="netmask-out-prefix"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="netmask-out-prefix" data-testid="netmask-out-prefix-copy" aria-label="Copy prefix" title="Copy prefix">📋</button>
+        </div>
+      </div>
+      <div class="out-row">
+        <span class="out-label">Netmask</span>
+        <div class="ct-field">
+          <output class="out-value" data-testid="netmask-out-mask"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="netmask-out-mask" data-testid="netmask-out-mask-copy" aria-label="Copy netmask" title="Copy netmask">📋</button>
+        </div>
+      </div>
+      <div class="out-row">
+        <span class="out-label">Wildcard</span>
+        <div class="ct-field">
+          <output class="out-value" data-testid="netmask-out-wildcard"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="netmask-out-wildcard" data-testid="netmask-out-wildcard-copy" aria-label="Copy wildcard" title="Copy wildcard">📋</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">Network Toolkit</h2>
+    <p>Four independent networking calculators. Everything runs locally in your browser — there are <strong>no DNS lookups, no pings, and no network requests of any kind</strong>. Nothing you type is ever sent anywhere.</p>
+    <ul>
+      <li><strong>Transfer Time &amp; Rate.</strong> Enter an amount and a speed to get the transfer time, plus a table of how long 1&nbsp;MB → 1&nbsp;PB take at that speed. Amounts and speeds accept any bit or byte unit; <strong>bit ↔ byte is always ×8</strong>. The <strong>Decimal (1000)</strong> / <strong>Binary (1024)</strong> toggle sets the prefix base — network rates are conventionally decimal (Mbps = 1,000,000&nbsp;bit/s), while file sizes are often binary; pick whichever you mean.</li>
+      <li><strong>CIDR / Subnet.</strong> An IPv4 address + prefix gives netmask, wildcard, network, broadcast, first/last usable host, and host counts. <code>/31</code> (point-to-point) has 2 usable hosts and <code>/32</code> has 1 — broadcast isn't meaningful there.</li>
+      <li><strong>IP Converter.</strong> Edit any field and the rest follow. IPv4: dotted ⇄ integer ⇄ hex ⇄ binary. IPv6: compressed ⇄ expanded ⇄ hex, with <code>::</code> zero-compression and embedded-IPv4 input.</li>
+      <li><strong>Netmask ⇄ Prefix.</strong> Dotted mask to <code>/prefix</code> and back. A non-contiguous mask (e.g. <code>255.0.255.0</code>) is rejected.</li>
+      <li><strong>Copy buttons (📋).</strong> Each value has an in-field copy button; each card has a <strong>Copy all</strong>.</li>
+    </ul>
+    <p class="help-note">Your inputs and unit choices are remembered on this device, so reopening the tool picks up where you left off.</p>
+  </div>
+</div>
+
+<<ct:include footer.html>>
+
+<script>
+<<ct:include copy.js>>
+</script>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

@@ -1,0 +1,448 @@
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+    margin: 0 0 0.3rem;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  input[type="text"],
+  input[type="number"] {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.65rem;
+  }
+
+  /* Selects must preserve base.css's chevron room. Set padding with LONGHANDS
+     (never the `padding` shorthand, which sits at equal specificity after
+     base.css and silently resets padding-right, running the selected option
+     under the caret — docs/conventions.md § "select padding shorthand trap").
+     Keep the fill as background-color so base.css's chevron background-image
+     survives (the `background` shorthand would wipe it). */
+  select {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding-block: 0.5rem;
+    padding-left: 0.65rem;
+    padding-right: 2rem;
+  }
+
+  /* The token alphabet select carries the longest option text ("Hex (0-9a-f)").
+     width:auto + a min-width sizes it for that longest option so the value never
+     overflows onto the chevron. */
+  #tokenAlphabetSelect { width: auto; min-width: 11rem; }
+
+  input[type="number"] { width: 7rem; }
+  input[type="text"] { width: 100%; }
+
+  input:disabled, select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+
+  /* The :not(.ctc-btn) carve-out keeps a shared confirm dialog's accent "Yes"
+     button from being washed out on hover (docs/conventions.md hover-specificity
+     trap) — future-proofing even though this tool ships no confirm today. */
+  button:hover:not(:disabled):not(.ctc-btn):not(.ct-copy-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+
+  .app-header { display: flex; flex-direction: column; gap: 0.2rem; }
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* ---------- Segmented controls (mode + type) ---------- */
+
+  .segmented {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .segmented button {
+    flex: 1 1 auto;
+    padding: 0.6rem 0.9rem;
+    font-weight: 600;
+  }
+
+  .segmented button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .segmented button[aria-pressed="true"]:hover {
+    background: var(--accent);
+  }
+
+  .type-toggle button { flex: 1 1 0; }
+
+  /* ---------- Sections & controls ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  /* One inline row of controls: Generate first, then Count, then the
+     contextual option group. Wraps gracefully on narrow/mobile. */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.1rem;
+    padding: 1rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .option-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.4rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .field-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .field-inline label { white-space: nowrap; }
+
+  .checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .checkbox input { width: 1.1rem; height: 1.1rem; }
+
+  .hint { color: var(--text-muted); font-size: 0.8rem; margin: 0; }
+
+  .generate-btn {
+    flex: 0 0 auto;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+    font-weight: 700;
+    padding: 0.6rem 1.4rem;
+  }
+
+  .generate-btn:hover:not(:disabled):not(.ctc-btn) { background: var(--accent); filter: brightness(1.05); }
+
+  /* ---------- Results list ---------- */
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .results-count { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
+
+  .results-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .result-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem 0.45rem 0.7rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .result-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-user-select: all;
+    user-select: all;
+  }
+
+  .result-row button,
+  .copy-all-btn {
+    flex: 0 0 auto;
+    line-height: 1;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .empty-state {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 1rem;
+    text-align: center;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+  }
+
+  /* ---------- Inspect ---------- */
+
+  .inspect-result {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .inspect-status {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .inspect-status.valid { color: var(--ok); }
+  .inspect-status.invalid { color: var(--danger); }
+
+  /* The canonical form uses the shared in-field copy pattern: a .ct-field
+     wrapper (position:relative from controls.css) holds the value with the
+     .ct-copy-btn pinned inside at the right edge. */
+  .canonical-row {
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.65rem;
+  }
+
+  .canonical-value {
+    display: block;
+    min-width: 0;
+    padding-right: 2.6rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.95rem;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .breakdown {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+
+  .breakdown th,
+  .breakdown td {
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .breakdown th {
+    width: 38%;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .breakdown td {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    word-break: break-word;
+  }
+
+  .callout {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    color: var(--text);
+  }
+
+  /* ---------- Help modal ---------- */
+
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 32rem;
+    max-height: min(85vh, 660px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    padding: 1.25rem 3rem 1.1rem 1.4rem;
+  }
+
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .modal-close-x:hover:not(:disabled):not(.ctc-btn) {
+    background: rgba(127, 127, 127, .18);
+  }
+
+  .modal-close-x:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.2rem; }
+  .help-dialog h3 { margin: 0.9rem 0 0.3rem; font-size: 0.98rem; }
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.4rem; }
+
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 640px) {
+    .segmented button,
+    .generate-btn,
+    .copy-all-btn,
+    .result-row button {
+      min-height: 44px;
+    }
+
+    .type-toggle button { flex: 1 1 40%; }
+
+    input[type="number"] { width: 100%; }
+
+    .field-inline { width: 100%; }
+    .field-inline input[type="number"] { flex: 1; }
+  }

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Color Converter</title>
+<meta property="og:title"       content="Color Converter">
+<meta property="og:description" content="Convert a batch of intermixed rgba()/hex colors into one consistent format. Type or bulk-paste, see swatches, copy them out.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+<<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Color Converter</h1>
+        <p class="hint">Paste or type mixed rgba/hex colors, convert them all to one format.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <section class="paste-section" data-testid="paste-section">
+    <label for="pasteInput">Paste colors, one per line (rgba or hex, mixed is fine)</label>
+    <textarea id="pasteInput" data-testid="paste-input" rows="6" placeholder="#ff0000&#10;rgba(0, 255, 0, 0.5)&#10;rgb(0 0 255 / 0.8)"></textarea>
+    <div class="paste-actions">
+      <button id="convertBtn" type="button" data-testid="convert-btn">Convert</button>
+      <button id="clearPasteBtn" type="button" data-testid="clear-paste-btn">Clear</button>
+      <p id="parseSummary" data-testid="parse-summary" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="rows-section" data-testid="rows-section">
+    <h2>Rows</h2>
+    <div class="rows-header" aria-hidden="true">
+      <span>Input</span><span class="swatch-label">Swatch</span><span>Hex</span><span>RGBA</span><span></span>
+    </div>
+    <ul id="rowsList" data-testid="rows-list"></ul>
+    <div class="rows-actions">
+      <button id="addRowBtn" type="button" data-testid="add-row-btn">Add row</button>
+      <button id="removeAllBtn" type="button" data-testid="remove-all-btn" disabled>Remove all</button>
+    </div>
+  </section>
+
+  <section class="outputs-section" data-testid="outputs-section">
+    <div class="output-col" data-testid="rgba-output-col">
+      <label for="rgbaOutput">RGBA (one per line)</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="rgbaOutput" data-testid="rgba-output" readonly aria-label="RGBA output, one per line"></textarea>
+        <button id="rgbaOutputCopyBtn" type="button" class="ct-copy-btn" data-testid="rgba-output-copy" aria-label="Copy RGBA output" title="Copy RGBA output">📋</button>
+      </div>
+      <button id="rgbaCopyAllBtn" type="button" data-testid="rgba-copy-all-btn" aria-label="Copy all RGBA values" title="Copy all RGBA values">Copy all</button>
+    </div>
+    <div class="output-col" data-testid="hex-output-col">
+      <label for="hexOutput">HEX (one per line)</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="hexOutput" data-testid="hex-output" readonly aria-label="HEX output, one per line"></textarea>
+        <button id="hexOutputCopyBtn" type="button" class="ct-copy-btn" data-testid="hex-output-copy" aria-label="Copy HEX output" title="Copy HEX output">📋</button>
+      </div>
+      <button id="hexCopyAllBtn" type="button" data-testid="hex-copy-all-btn" aria-label="Copy all HEX values" title="Copy all HEX values">Copy all</button>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">How Color Converter works</h2>
+    <p>Paste or type colors — <code>rgba()</code> (or <code>rgb()</code>) and hex, mixed together is fine — one per line, into the box at the top, then tap <strong>Convert</strong> to turn each line into its own row below with a live color swatch and both formats.</p>
+    <ul>
+      <li><strong>Convert.</strong> Replaces the rows below with a fresh row for every non-blank line you pasted or typed — swatch, hex, and rgba are generated for each. Lines that can't be parsed as a color get an <code>INVALID: …</code> row instead, so you can find and fix them.</li>
+      <li><strong>Rows.</strong> Each row shows a swatch preview plus editable hex and rgba fields with their own copy (📋) buttons — edit a row's input directly and its swatch and fields update as you type. Add row starts a new blank row; the trash icon removes a single row (asks you to confirm first).</li>
+      <li><strong>Copy all.</strong> The Hex and RGBA output boxes list every row's value, one per line, in the order the rows appear — use their "Copy all" buttons to grab the whole list at once.</li>
+      <li><strong>Clear / Remove all.</strong> Clear empties the paste box; Remove all empties every row. Both ask you to confirm first, since they can't be undone.</li>
+    </ul>
+    <p class="help-note">Your rows and the paste box's text are saved on this device, so they're still here next time you open Color Converter.</p>
+  </div>
+</div>
+
+<<ct:include footer.html>>
+
+<script>
+<<ct:include confirm.js>>
+</script>
+
+<script>
+<<ct:include copy.js>>
+</script>
+<script>
+<<ct:include util.js>>
+</script>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UUID Generator</title>
+<meta property="og:title"       content="UUID Generator">
+<meta property="og:description" content="Generate UUID v4 / v7, ULID, nanoid, and random tokens in bulk — and inspect any UUID — entirely in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #6d3fed;
+    --accent-contrast: #ffffff;
+    --accent-soft: #efe9fd;
+    --ok: #1f7a3d;
+    --danger: #c4362a;
+    --focus: #6d3fed;
+    --radius: 8px;
+    /* ctConfirm accent (future-proofing; no confirm ships today) */
+    --ctc-accent: #6d3fed;
+    --ctc-accent-contrast: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #a488ff;
+      --accent-contrast: #14101f;
+      --accent-soft: #2a2340;
+      --ok: #5fd48a;
+      --danger: #ff6b60;
+      --focus: #a488ff;
+      --ctc-accent: #a488ff;
+      --ctc-accent-contrast: #14101f;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>UUID Generator</h1>
+        <p class="subtitle">UUID v4 &amp; v7, ULID, nanoid, and random tokens — generate in bulk or inspect one. All local, nothing leaves your browser.</p>
+      </div>
+      <button id="help-button" type="button" class="help-button" data-testid="help-button" title="How it works" aria-label="How it works">?</button>
+    </div>
+  </header>
+
+  <div class="segmented mode-toggle" data-testid="mode-toggle" role="group" aria-label="Mode">
+    <button type="button" id="modeGenerateBtn" data-testid="mode-generate-btn" aria-pressed="true">Generate</button>
+    <button type="button" id="modeInspectBtn" data-testid="mode-inspect-btn" aria-pressed="false">Inspect</button>
+  </div>
+
+  <!-- ======================= GENERATE ======================= -->
+  <section class="generate-section" data-testid="generate-section">
+    <div class="segmented type-toggle" data-testid="type-toggle" role="group" aria-label="ID type">
+      <button type="button" data-type="uuidv4" data-testid="type-uuidv4-btn" aria-pressed="true">UUID v4</button>
+      <button type="button" data-type="uuidv7" data-testid="type-uuidv7-btn" aria-pressed="false">UUID v7</button>
+      <button type="button" data-type="ulid" data-testid="type-ulid-btn" aria-pressed="false">ULID</button>
+      <button type="button" data-type="nanoid" data-testid="type-nanoid-btn" aria-pressed="false">nanoid</button>
+      <button type="button" data-type="token" data-testid="type-token-btn" aria-pressed="false">Token</button>
+    </div>
+
+    <div class="controls" data-testid="controls">
+      <!-- Generate leads the control row; the options follow inline. -->
+      <button type="button" class="generate-btn" id="generateBtn" data-testid="generate-btn">Generate</button>
+
+      <div class="field-inline">
+        <label for="countInput">Count</label>
+        <input type="number" id="countInput" data-testid="count-input" min="1" max="1000" step="1" value="10">
+      </div>
+
+      <!-- UUID v4/v7 format options -->
+      <div class="option-row" data-testid="opts-uuid">
+        <label class="checkbox"><input type="checkbox" id="uppercaseToggle" data-testid="uppercase-toggle"> Uppercase</label>
+        <label class="checkbox"><input type="checkbox" id="hyphensToggle" data-testid="hyphens-toggle" checked> Hyphens</label>
+        <div class="field-inline">
+          <label for="wrapSelect">Wrap</label>
+          <select id="wrapSelect" data-testid="wrap-select">
+            <option value="plain">Plain</option>
+            <option value="quoted">Quoted "…"</option>
+            <option value="braces">Braces {…}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- nanoid options -->
+      <div class="option-row" data-testid="opts-nanoid" hidden>
+        <div class="field-inline">
+          <label for="nanoidSizeInput">Length</label>
+          <input type="number" id="nanoidSizeInput" data-testid="nanoid-size-input" min="1" max="256" step="1" value="21">
+        </div>
+      </div>
+
+      <!-- token options -->
+      <div class="option-row" data-testid="opts-token" hidden>
+        <div class="field-inline">
+          <label for="tokenLengthInput">Length</label>
+          <input type="number" id="tokenLengthInput" data-testid="token-length-input" min="1" max="512" step="1" value="32">
+        </div>
+        <div class="field-inline">
+          <label for="tokenAlphabetSelect">Alphabet</label>
+          <select id="tokenAlphabetSelect" data-testid="token-alphabet-select">
+            <option value="hex">Hex (0-9a-f)</option>
+            <option value="base62">Base62</option>
+            <option value="base64url">Base64URL</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+        <label class="checkbox"><input type="checkbox" id="tokenUppercaseToggle" data-testid="token-uppercase-toggle"> Uppercase</label>
+        <div class="field" data-testid="custom-alphabet-field" hidden style="flex:1 1 100%;">
+          <label for="customAlphabetInput">Custom alphabet</label>
+          <input type="text" id="customAlphabetInput" data-testid="custom-alphabet-input" placeholder="e.g. ABCDEFGHJKMNPQRSTUVWXYZ23456789" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+    </div>
+
+    <div class="results-header">
+      <p class="results-count" data-testid="results-count" aria-live="polite"></p>
+      <button type="button" class="copy-all-btn" id="copyAllBtn" data-testid="copy-all-btn" title="Copy all to clipboard" aria-label="Copy all to clipboard">Copy all</button>
+    </div>
+
+    <ul class="results-list" id="resultsList" data-testid="results-list"></ul>
+  </section>
+
+  <!-- ======================= INSPECT ======================= -->
+  <section class="inspect-section" data-testid="inspect-section" hidden>
+    <div class="field">
+      <label for="inspectInput">Paste a UUID to inspect</label>
+      <input type="text" id="inspectInput" data-testid="inspect-input" placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="inspect-result" data-testid="inspect-result"></div>
+  </section>
+</div>
+
+<!-- ======================= HELP ======================= -->
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">About the UUID Generator</h2>
+    <p>Everything runs locally in your browser — nothing is ever sent anywhere. All randomness comes from <code>crypto.getRandomValues</code>, so this works identically opened from a file or served over plain HTTP on a LAN.</p>
+
+    <h3>Generate</h3>
+    <ul>
+      <li>Pick an <strong>ID type</strong> — <strong>UUID v4</strong> (random), <strong>UUID v7</strong> (time-ordered, sortable), <strong>ULID</strong> (time-sortable, Crockford base32), <strong>nanoid</strong> (compact, URL-safe), or a generic <strong>Token</strong>.</li>
+      <li>Set a <strong>Count</strong> (1–1000) and click <strong>Generate</strong> for a fresh batch.</li>
+      <li><strong>UUID options:</strong> Uppercase, Hyphens on/off, and a Wrap style (plain, quoted, or braces).</li>
+      <li><strong>nanoid / Token:</strong> set the Length; Tokens also choose an alphabet (Hex, Base62, Base64URL, or a Custom set).</li>
+      <li><strong>Copy</strong> any single value with its 📋 button, or <strong>Copy all</strong> to grab the whole list (one per line).</li>
+    </ul>
+
+    <h3>Inspect</h3>
+    <ul>
+      <li>Paste a UUID (hyphens, braces, or a <code>urn:uuid:</code> prefix are all fine) to see its <strong>version</strong>, <strong>variant</strong>, field breakdown, and validity.</li>
+      <li>For <strong>v1</strong> and <strong>v7</strong> UUIDs the embedded <strong>timestamp</strong> is decoded and shown.</li>
+    </ul>
+
+    <p class="help-note">Your selected type, count, and options are remembered on this device — the generated values themselves are not stored (they're throwaway; just click Generate again).</p>
+  </div>
+</div>
+
+<<ct:include footer.html>>
+
+<script>
+<<ct:include copy.js>>
+</script>
+<script>
+<<ct:include util.js>>
+</script>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

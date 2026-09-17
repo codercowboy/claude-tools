@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Base64 / Data URI Tool</title>
+<meta property="og:title"       content="Base64 / Data URI Tool">
+<meta property="og:description" content="Encode and decode Base64 and data: URIs from text or files, entirely in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --warning: #8a6300;
+    --warning-bg: #fff6e0;
+    --focus: #2f6fed;
+    --radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --warning: #ffce6b;
+      --warning-bg: #3a2c0d;
+      --focus: #6d9bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Base64 / Data URI Tool</h1>
+        <p class="subtitle">Encode and decode Base64 and data: URIs — text or files, all local, nothing leaves your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <div class="mode-toggle" data-testid="mode-toggle" role="group" aria-label="Mode">
+    <button type="button" id="modeEncodeBtn" data-testid="mode-encode-btn" aria-pressed="true">Encode</button>
+    <button type="button" id="modeDecodeBtn" data-testid="mode-decode-btn" aria-pressed="false">Decode</button>
+  </div>
+
+  <section class="encode-section" data-testid="encode-section">
+    <div class="field">
+      <label for="encodeTextInput">Text to encode</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeTextInput" data-testid="encode-text-input" rows="6"
+          placeholder="Paste or type text..."></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeTextCopyBtn" data-testid="encode-text-copy-btn" aria-label="Copy text" title="Copy text" hidden>📋</button>
+      </div>
+    </div>
+
+    <label class="dropzone" for="encodeFileInput" data-testid="encode-dropzone">
+      <input type="file" id="encodeFileInput" data-testid="encode-file-input" class="visually-hidden">
+      <span>Drop a file here, or click to choose one</span>
+    </label>
+
+    <div class="file-info" data-testid="encode-file-info" hidden>
+      <span class="file-name"></span>
+      <span>&middot;</span>
+      <span class="file-size"></span>
+      <span>&middot;</span>
+      <span class="file-mime"></span>
+      <button type="button" data-testid="encode-remove-file-btn" aria-label="Remove file" title="Remove file">✕</button>
+    </div>
+
+    <div class="field">
+      <label for="encodeMimeInput">MIME type (used for the data URI; ignored while a file is selected)</label>
+      <div class="ct-field">
+        <input type="text" id="encodeMimeInput" data-testid="encode-mime-input" value="text/plain">
+        <button type="button" class="ct-copy-btn" id="encodeMimeCopyBtn" data-testid="encode-mime-copy-btn" aria-label="Copy MIME type" title="Copy MIME type" hidden>📋</button>
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button type="button" id="encodeClearBtn" data-testid="encode-clear-btn">Clear</button>
+    </div>
+
+    <p class="error" data-testid="encode-error" role="alert" hidden></p>
+    <p class="warning" data-testid="encode-warning" role="status" aria-live="polite" hidden></p>
+
+    <div class="output-field" data-testid="encode-base64-col">
+      <label for="encodeBase64Output">Base64</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeBase64Output" data-testid="encode-base64-output" readonly aria-label="Base64 output"></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeBase64CopyBtn" data-testid="encode-base64-copy-btn" aria-label="Copy Base64" title="Copy Base64">📋</button>
+      </div>
+    </div>
+
+    <div class="output-field" data-testid="encode-base64url-col">
+      <label for="encodeBase64UrlOutput">Base64URL (URL-safe, unpadded)</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeBase64UrlOutput" data-testid="encode-base64url-output" readonly aria-label="Base64URL output"></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeBase64UrlCopyBtn" data-testid="encode-base64url-copy-btn" aria-label="Copy Base64URL" title="Copy Base64URL">📋</button>
+      </div>
+    </div>
+
+    <div class="output-field" data-testid="encode-datauri-col">
+      <label for="encodeDataUriOutput">data: URI</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeDataUriOutput" data-testid="encode-datauri-output" readonly aria-label="data URI output"></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeDataUriCopyBtn" data-testid="encode-datauri-copy-btn" aria-label="Copy data URI" title="Copy data URI">📋</button>
+      </div>
+    </div>
+
+    <div class="output-field" data-testid="encode-snippet-col">
+      <label for="encodeSnippetOutput">JS snippet</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeSnippetOutput" data-testid="encode-snippet-output" readonly rows="4" aria-label="JS snippet output"></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeSnippetCopyBtn" data-testid="encode-snippet-copy-btn" aria-label="Copy JS snippet" title="Copy JS snippet">📋</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="decode-section" data-testid="decode-section" hidden>
+    <div class="field">
+      <label for="decodeInput">Base64 or data: URI to decode</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="decodeInput" data-testid="decode-input" rows="6"
+          placeholder="Paste Base64, Base64URL, or a data:... URI"></textarea>
+        <button type="button" class="ct-copy-btn" id="decodeInputCopyBtn" data-testid="decode-input-copy-btn" aria-label="Copy input" title="Copy input" hidden>📋</button>
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button type="button" id="decodeClearBtn" data-testid="decode-clear-btn">Clear</button>
+    </div>
+
+    <p class="error" data-testid="decode-error" role="alert" hidden></p>
+
+    <p class="detected-mime" data-testid="decode-detected-mime" role="status" aria-live="polite" hidden></p>
+
+    <div class="output-field" data-testid="decode-text-col" hidden>
+      <label for="decodeTextOutput">Decoded text</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="decodeTextOutput" data-testid="decode-text-output" readonly aria-label="Decoded text output"></textarea>
+        <button type="button" class="ct-copy-btn" id="decodeTextCopyBtn" data-testid="decode-text-copy-btn" aria-label="Copy decoded text" title="Copy decoded text">📋</button>
+      </div>
+    </div>
+
+    <p class="binary-note" data-testid="decode-binary-note" hidden>
+      Not valid UTF-8 text — use Download to save the decoded bytes as a file.
+    </p>
+
+    <div class="actions-row">
+      <button type="button" id="decodeDownloadBtn" data-testid="decode-download-btn" disabled>Download as file</button>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">How the Base64 / Data URI Tool works</h2>
+    <p>Everything runs locally in your browser — nothing you type or drop here is ever sent anywhere.</p>
+    <ul>
+      <li><strong>Encode.</strong> Type or paste text, or drop a file onto the dropzone (or click it to choose one). A selected file always wins over typed text. Four outputs update live: <strong>Base64</strong>, <strong>Base64URL</strong> (the URL/filename-safe variant, unpadded), a <strong>data: URI</strong>, and a ready-to-use <strong>JS snippet</strong> that turns that data URI back into a Blob.</li>
+      <li><strong>MIME type.</strong> The text field above the outputs sets the MIME type used in the data URI when encoding typed text. It's ignored (and disabled) while a file is selected — the file's own type is used instead.</li>
+      <li><strong>Decode.</strong> Paste Base64, Base64URL, or a full <code>data:</code> URI. If the decoded bytes are valid UTF-8 text, they're shown directly; otherwise you'll see a note that it's binary data, with a <strong>Download as file</strong> button to save the exact bytes.</li>
+      <li><strong>Copy buttons (📋).</strong> Each field has its own copy-to-clipboard button tucked into its top-right corner — it briefly turns into a checkmark to confirm the copy. Output fields always show it; editable fields reveal it once they contain something.</li>
+    </ul>
+    <p class="help-note">Your current mode and typed text are remembered on this device (not any selected file), so reopening the tool picks up where you left off.</p>
+  </div>
+</div>
+
+<<ct:include footer.html>>
+
+<script>
+<<ct:include copy.js>>
+</script>
+<script>
+<<ct:include util.js>>
+</script>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

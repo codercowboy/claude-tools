@@ -1,0 +1,43 @@
+{
+  "name": "@codercowboy/inflation-calculator",
+  "groupId": "com.codercowboy",
+  "version": "0.1.0",
+  "description": "Single-file HTML inflation calculator: what a US dollar amount from one year is worth in another, using bundled BLS CPI-U annual data, fully offline.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Claude (Anthropic) <noreply@anthropic.com>",
+  "contributors": [
+    "Jason <jason@onejasonforsale.com> (design / project lead)"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "index.html",
+  "files": [
+    "index.html",
+    "README.md",
+    "preview.png"
+  ],
+  "scripts": {
+    "build": "node ../../../scripts/build-tool.mjs",
+    "build:check": "node ../../../scripts/build-tool.mjs --check",
+    "build:data": "node source/build-data.mjs",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test tests/unit/*.test.mjs",
+    "pretest:unit": "node ../../../scripts/build-tool.mjs --check",
+    "test:e2e": "playwright test --config=tests/playwright.config.mjs",
+    "pretest:e2e": "node ../../../scripts/build-tool.mjs --check",
+    "serve": "node ../../../scripts/serve.mjs"
+  },
+  "keywords": [
+    "inflation",
+    "cpi",
+    "cpi-u",
+    "bls",
+    "calculator",
+    "web-tool"
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
+  }
+}

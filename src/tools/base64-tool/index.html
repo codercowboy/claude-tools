@@ -1,0 +1,1828 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Base64 / Data URI Tool</title>
+<meta property="og:title"       content="Base64 / Data URI Tool">
+<meta property="og:description" content="Encode and decode Base64 and data: URIs from text or files, entirely in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --warning: #8a6300;
+    --warning-bg: #fff6e0;
+    --focus: #2f6fed;
+    --radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --warning: #ffce6b;
+      --warning-bg: #3a2c0d;
+      --focus: #6d9bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  /* ===== Begin ct-base ===== */
+/* claude-tools shared base styles — inlined by the build
+   near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
+   This is the single source of truth: edit here, run `npm run build`. See
+   docs/conventions.md § Build-assembled tools.
+   It sits near the TOP of the <style> block (after any reset) so a tool's own
+   later rules can still layer colors on top; for <select>, keep the tool's fill as
+   `background-color` (not the `background` shorthand, which would wipe the chevron). */
+html { touch-action: manipulation; } /* double-tap won't zoom the page; pinch-zoom + scroll still work. Gesture canvases keep their own touch-action:none. */
+[hidden] { display: none !important; } /* an author `display:` rule must never defeat the hidden attribute */
+.visually-hidden { /* screen-reader-only (kept in the a11y tree, unlike display:none) */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* iOS/Safari sizes a native <select> from font-size and ignores height/min-height
+   (renders ~half as tall as inputs). Opt out of the native control so the box model
+   applies, and supply our own chevron (appearance:none removes the native one). */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  font-size: 16px; /* >=16px also stops iOS zoom-on-focus */
+  padding-right: 2rem; /* room for the chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.6 6 6.4l5-4.8' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.72rem;
+}
+/* ===== end ct-base ===== */
+/* ===== Begin ct-controls ===== */
+/* claude-tools shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the ct:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See docs/conventions.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use ctCopy/ctFlash for behavior
+   (copy.js). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+    margin: 0 0 0.3rem;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  textarea, input[type="text"] {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.7rem;
+  }
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    overflow: auto;
+    min-height: 90px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+  }
+
+  /* ---------- In-field copy button (controls.css supplies the base) ----------
+     The .ct-copy-btn is absolutely positioned inside a .ct-field (see
+     controls.css). The field must reserve right padding so its text never runs
+     under the icon — re-declared here AFTER this tool's own input/textarea
+     padding SHORTHAND above (which would otherwise reset padding-right at equal
+     specificity, source order winning), per docs/conventions.md's padding
+     shorthand trap. This tool has no <select>, so no chevron reserve is needed. */
+  .ct-field > input,
+  .ct-field > textarea { padding-right: 2.6rem; }
+
+  input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    /* Tells mobile browsers this control only needs tap/pan-through, not
+       double-tap-to-zoom — avoids the browser's double-tap-to-zoom gesture
+       firing on a quick double-tap. No visible/behavioral effect on desktop
+       (mouse) input. Covers every button in the tool, including the Help
+       button/dialog added below. */
+    touch-action: manipulation;
+  }
+
+  /* Exclude .ct-copy-btn so the in-field copy button keeps its own
+     controls.css hover (docs/conventions.md's hover specificity note). */
+  button:hover:not(:disabled):not(.ct-copy-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  .dropzone:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+
+  .app-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* ---------- Mode toggle ---------- */
+
+  .mode-toggle {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .mode-toggle button {
+    flex: 1 1 0;
+    padding: 0.6rem 0.9rem;
+    font-weight: 600;
+  }
+
+  .mode-toggle button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .mode-toggle button[aria-pressed="true"]:hover {
+    background: var(--accent);
+  }
+
+  /* ---------- Sections ---------- */
+
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  /* ---------- Dropzone ---------- */
+
+  .dropzone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1.5rem 1rem;
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--panel);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+
+  .dropzone:hover {
+    border-color: var(--accent);
+  }
+
+  .dropzone.drag-over {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+    color: var(--text);
+  }
+
+  /* ---------- File info ---------- */
+
+  .file-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  .file-info .file-name {
+    font-weight: 600;
+    word-break: break-all;
+  }
+
+  .file-info .file-size,
+  .file-info .file-mime {
+    color: var(--text-muted);
+  }
+
+  .file-info button {
+    margin-left: auto;
+    padding: 0.3rem 0.55rem;
+    line-height: 1;
+  }
+
+  /* ---------- Error / warning / status messages ---------- */
+
+  .error {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  .warning {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  .detected-mime {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .binary-note {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Output fields ---------- */
+
+  .output-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .output-field textarea {
+    background: color-mix(in srgb, var(--panel) 92%, var(--text) 2%);
+  }
+
+  .actions-row {
+    display: flex;
+    gap: 0.6rem;
+  }
+
+  /* ---------- Help modal ----------
+     Reference pattern: tools/hat-picker's Help modal (see
+     docs/conventions.md "First-load help popup"). Static markup in the
+     document, shown/hidden via the `hidden` attribute. This tool already
+     has a top-of-file `[hidden] { display: none !important; }` rule (its
+     earlier bug — see docs/conventions.md's "[hidden] cascade trap"), which
+     already out-specifies this block's `.help-overlay { display: flex; }`
+     below whenever `hidden` is set, so no second guard rule is needed here. */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30rem;
+    max-height: min(85vh, 640px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    padding: 1.25rem 3rem 1.1rem 1.4rem;
+  }
+
+  /* ---------- Modal close ✕ (docs/conventions.md "Every content modal has
+     a close ✕ in its top-right corner") ---------- */
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  /* :not(:disabled) bumps specificity above the generic
+     `button:hover:not(:disabled)` rule above (docs/conventions.md's hover
+     specificity trap), so this background actually wins on hover. */
+  .modal-close-x:hover:not(:disabled) {
+    background: rgba(127, 127, 127, .18);
+  }
+
+  .modal-close-x:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .help-dialog h2 {
+    margin: 0 0 0.6rem;
+    font-size: 1.2rem;
+  }
+
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.4rem; }
+
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 640px) {
+    /* Single-line control heights come from controls.css's --control-h; the
+       dropzone is a label (not covered there), so keep its tap-target size. */
+    .dropzone {
+      min-height: 44px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dropzone {
+      transition: none;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Base64 / Data URI Tool</h1>
+        <p class="subtitle">Encode and decode Base64 and data: URIs — text or files, all local, nothing leaves your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <div class="mode-toggle" data-testid="mode-toggle" role="group" aria-label="Mode">
+    <button type="button" id="modeEncodeBtn" data-testid="mode-encode-btn" aria-pressed="true">Encode</button>
+    <button type="button" id="modeDecodeBtn" data-testid="mode-decode-btn" aria-pressed="false">Decode</button>
+  </div>
+
+  <section class="encode-section" data-testid="encode-section">
+    <div class="field">
+      <label for="encodeTextInput">Text to encode</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeTextInput" data-testid="encode-text-input" rows="6"
+          placeholder="Paste or type text..."></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeTextCopyBtn" data-testid="encode-text-copy-btn" aria-label="Copy text" title="Copy text" hidden>📋</button>
+      </div>
+    </div>
+
+    <label class="dropzone" for="encodeFileInput" data-testid="encode-dropzone">
+      <input type="file" id="encodeFileInput" data-testid="encode-file-input" class="visually-hidden">
+      <span>Drop a file here, or click to choose one</span>
+    </label>
+
+    <div class="file-info" data-testid="encode-file-info" hidden>
+      <span class="file-name"></span>
+      <span>&middot;</span>
+      <span class="file-size"></span>
+      <span>&middot;</span>
+      <span class="file-mime"></span>
+      <button type="button" data-testid="encode-remove-file-btn" aria-label="Remove file" title="Remove file">✕</button>
+    </div>
+
+    <div class="field">
+      <label for="encodeMimeInput">MIME type (used for the data URI; ignored while a file is selected)</label>
+      <div class="ct-field">
+        <input type="text" id="encodeMimeInput" data-testid="encode-mime-input" value="text/plain">
+        <button type="button" class="ct-copy-btn" id="encodeMimeCopyBtn" data-testid="encode-mime-copy-btn" aria-label="Copy MIME type" title="Copy MIME type" hidden>📋</button>
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button type="button" id="encodeClearBtn" data-testid="encode-clear-btn">Clear</button>
+    </div>
+
+    <p class="error" data-testid="encode-error" role="alert" hidden></p>
+    <p class="warning" data-testid="encode-warning" role="status" aria-live="polite" hidden></p>
+
+    <div class="output-field" data-testid="encode-base64-col">
+      <label for="encodeBase64Output">Base64</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeBase64Output" data-testid="encode-base64-output" readonly aria-label="Base64 output"></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeBase64CopyBtn" data-testid="encode-base64-copy-btn" aria-label="Copy Base64" title="Copy Base64">📋</button>
+      </div>
+    </div>
+
+    <div class="output-field" data-testid="encode-base64url-col">
+      <label for="encodeBase64UrlOutput">Base64URL (URL-safe, unpadded)</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeBase64UrlOutput" data-testid="encode-base64url-output" readonly aria-label="Base64URL output"></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeBase64UrlCopyBtn" data-testid="encode-base64url-copy-btn" aria-label="Copy Base64URL" title="Copy Base64URL">📋</button>
+      </div>
+    </div>
+
+    <div class="output-field" data-testid="encode-datauri-col">
+      <label for="encodeDataUriOutput">data: URI</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeDataUriOutput" data-testid="encode-datauri-output" readonly aria-label="data URI output"></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeDataUriCopyBtn" data-testid="encode-datauri-copy-btn" aria-label="Copy data URI" title="Copy data URI">📋</button>
+      </div>
+    </div>
+
+    <div class="output-field" data-testid="encode-snippet-col">
+      <label for="encodeSnippetOutput">JS snippet</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="encodeSnippetOutput" data-testid="encode-snippet-output" readonly rows="4" aria-label="JS snippet output"></textarea>
+        <button type="button" class="ct-copy-btn" id="encodeSnippetCopyBtn" data-testid="encode-snippet-copy-btn" aria-label="Copy JS snippet" title="Copy JS snippet">📋</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="decode-section" data-testid="decode-section" hidden>
+    <div class="field">
+      <label for="decodeInput">Base64 or data: URI to decode</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="decodeInput" data-testid="decode-input" rows="6"
+          placeholder="Paste Base64, Base64URL, or a data:... URI"></textarea>
+        <button type="button" class="ct-copy-btn" id="decodeInputCopyBtn" data-testid="decode-input-copy-btn" aria-label="Copy input" title="Copy input" hidden>📋</button>
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button type="button" id="decodeClearBtn" data-testid="decode-clear-btn">Clear</button>
+    </div>
+
+    <p class="error" data-testid="decode-error" role="alert" hidden></p>
+
+    <p class="detected-mime" data-testid="decode-detected-mime" role="status" aria-live="polite" hidden></p>
+
+    <div class="output-field" data-testid="decode-text-col" hidden>
+      <label for="decodeTextOutput">Decoded text</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="decodeTextOutput" data-testid="decode-text-output" readonly aria-label="Decoded text output"></textarea>
+        <button type="button" class="ct-copy-btn" id="decodeTextCopyBtn" data-testid="decode-text-copy-btn" aria-label="Copy decoded text" title="Copy decoded text">📋</button>
+      </div>
+    </div>
+
+    <p class="binary-note" data-testid="decode-binary-note" hidden>
+      Not valid UTF-8 text — use Download to save the decoded bytes as a file.
+    </p>
+
+    <div class="actions-row">
+      <button type="button" id="decodeDownloadBtn" data-testid="decode-download-btn" disabled>Download as file</button>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">How the Base64 / Data URI Tool works</h2>
+    <p>Everything runs locally in your browser — nothing you type or drop here is ever sent anywhere.</p>
+    <ul>
+      <li><strong>Encode.</strong> Type or paste text, or drop a file onto the dropzone (or click it to choose one). A selected file always wins over typed text. Four outputs update live: <strong>Base64</strong>, <strong>Base64URL</strong> (the URL/filename-safe variant, unpadded), a <strong>data: URI</strong>, and a ready-to-use <strong>JS snippet</strong> that turns that data URI back into a Blob.</li>
+      <li><strong>MIME type.</strong> The text field above the outputs sets the MIME type used in the data URI when encoding typed text. It's ignored (and disabled) while a file is selected — the file's own type is used instead.</li>
+      <li><strong>Decode.</strong> Paste Base64, Base64URL, or a full <code>data:</code> URI. If the decoded bytes are valid UTF-8 text, they're shown directly; otherwise you'll see a note that it's binary data, with a <strong>Download as file</strong> button to save the exact bytes.</li>
+      <li><strong>Copy buttons (📋).</strong> Each field has its own copy-to-clipboard button tucked into its top-right corner — it briefly turns into a checkmark to confirm the copy. Output fields always show it; editable fields reveal it once they contain something.</li>
+    </ul>
+    <p class="help-note">Your current mode and typed text are remembered on this device (not any selected file), so reopening the tool picks up where you left off.</p>
+  </div>
+</div>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<script>
+/* ct-license — shared License modal.
+   Inlined on EVERY page via footer.html (the ct:include license.js token wrapped
+   in a script tag), so any tool that carries the footer gets it
+   for free. Opens on a click of any [data-ct-license] trigger (the footer link) or
+   via `window.ctLicense()`. Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (only audio-converter does today). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. */
+(function () {
+  if (window.__ctLicenseInit) return; // idempotent
+  window.__ctLicenseInit = true;
+
+  var REPO = 'https://github.com/codercowboy/claude-tools';
+  var MIT = [
+    'MIT License',
+    '',
+    'Copyright (c) 2026 Jason and Claude (Anthropic)',
+    '',
+    'Permission is hereby granted, free of charge, to any person obtaining a copy',
+    'of this software and associated documentation files (the "Software"), to deal',
+    'in the Software without restriction, including without limitation the rights',
+    'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+    'copies of the Software, and to permit persons to whom the Software is',
+    'furnished to do so, subject to the following conditions:',
+    '',
+    'The above copyright notice and this permission notice shall be included in all',
+    'copies or substantial portions of the Software.',
+    '',
+    'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+    'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+    'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+    'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+    'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+    'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+    'SOFTWARE.'
+  ].join('\n');
+
+  var overlay, dialog, prevFocus, styleEl;
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function injectStyles() {
+    if (styleEl) return;
+    styleEl = document.createElement('style');
+    styleEl.textContent =
+      '.ctl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+      '.ctl-overlay[hidden]{display:none!important;}' +
+      '@media (prefers-reduced-motion:no-preference){.ctl-overlay{animation:ctl-fade .15s ease;}@keyframes ctl-fade{from{opacity:0}to{opacity:1}}}' +
+      '.ctl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+      '.ctl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+      '.ctl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+      '.ctl-dialog a{color:LinkText;}' +
+      '.ctl-lead{margin:0 0 .8rem;}' +
+      '.ctl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+      '.ctl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.ctl-tp li{margin-bottom:.3rem;}' +
+      '.ctl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+      '.ctl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+      '.ctl-close:hover{background:rgba(127,127,127,.18);}' +
+      '.ctl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+    (document.head || document.documentElement).appendChild(styleEl);
+  }
+
+  function build() {
+    injectStyles();
+    overlay = document.createElement('div');
+    overlay.className = 'ctl-overlay';
+    overlay.hidden = true;
+    overlay.setAttribute('data-testid', 'license-overlay');
+    overlay.innerHTML =
+      '<div class="ctl-dialog" role="dialog" aria-modal="true" aria-labelledby="ctl-title" data-testid="license-modal">' +
+        '<button type="button" class="ctl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+        '<h2 id="ctl-title">License</h2>' +
+        '<div class="ctl-body"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    dialog = overlay.querySelector('.ctl-dialog');
+    overlay.querySelector('.ctl-close').addEventListener('click', close);
+    overlay.addEventListener('mousedown', function (e) {
+      if (e.target === overlay) { e.preventDefault(); close(); }
+    });
+  }
+
+  function renderBody() {
+    var html =
+      '<p class="ctl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+      '<a href="' + REPO + '" target="_blank" rel="noopener noreferrer">github.com/codercowboy/claude-tools</a></p>' +
+      '<pre class="ctl-text">' + esc(MIT) + '</pre>';
+    var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+    if (tp.length) {
+      html += '<h3>Bundled third-party libraries</h3><ul class="ctl-tp">';
+      tp.forEach(function (d) {
+        var label = esc(d.name || '') + (d.version ? ' ' + esc(d.version) : '');
+        var lic = d.license ? ' &mdash; ' + esc(d.license) : '';
+        var link = d.url ? ' &middot; <a href="' + esc(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+        html += '<li>' + label + lic + link + '</li>';
+      });
+      html += '</ul><p class="ctl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+    } else {
+      html += '<p class="ctl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+    }
+    overlay.querySelector('.ctl-body').innerHTML = html;
+  }
+
+  function focusables() {
+    return Array.prototype.slice
+      .call(dialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+      .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+  }
+
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    var f = focusables();
+    if (!f.length) return;
+    e.preventDefault();
+    var i = f.indexOf(document.activeElement);
+    var n = e.shiftKey ? i - 1 : i + 1;
+    if (n < 0) n = f.length - 1;
+    if (n >= f.length) n = 0;
+    f[n].focus();
+  }
+
+  function open() {
+    if (!overlay) build();
+    renderBody();
+    prevFocus = document.activeElement;
+    // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+    var host = document.fullscreenElement || document.body;
+    if (overlay.parentNode !== host) host.appendChild(overlay);
+    overlay.hidden = false;
+    document.addEventListener('keydown', onKey, true);
+    dialog.scrollTop = 0;
+    overlay.querySelector('.ctl-close').focus({ preventScroll: true });
+  }
+
+  function close() {
+    if (!overlay || overlay.hidden) return;
+    overlay.hidden = true;
+    document.removeEventListener('keydown', onKey, true);
+    if (overlay.parentNode !== document.body) document.body.appendChild(overlay);
+    if (prevFocus && typeof prevFocus.focus === 'function') { try { prevFocus.focus(); } catch (e) {} }
+    prevFocus = null;
+  }
+
+  window.ctLicense = open;
+
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); open(); }
+  });
+})();
+
+</script>
+<!---- end footer -->
+
+
+<script>
+// ===== Begin ctCopy =====
+/*
+ * ctCopy(text) -> Promise<boolean>
+ * ctFlash(el, opts?) -> void
+ * ---------------------------------------------------------------------------
+ * Tiny, dependency-free copy-to-clipboard helpers for claude-tools. Pasteable,
+ * not imported: drop this whole block (sentinels included) inside a <script>
+ * tag in a tool's single-file index.html, then:
+ *
+ *     btn.addEventListener('click', async () => {
+ *       if (!text) return;
+ *       const ok = await ctCopy(text);
+ *       if (!ok) return;
+ *       ctFlash(btn, { label: '✅', revertTo: '📋' });
+ *     });
+ *
+ * ctCopy(text):
+ * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
+ *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
+ *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
+ *   Clipboard API is unavailable or denied.
+ * - Always RESOLVES — never rejects/throws. Resolves `true` on success,
+ *   `false` if every copy path failed (denied permission, unsupported
+ *   browser, etc.) — callers check the boolean rather than try/catch.
+ *
+ * ctFlash(el, opts?):
+ * - Transient "copied" feedback on a button: swaps `el.textContent` to
+ *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
+ *   reverts and clears the timer.
+ * - Revert target: `opts.revertTo` if given (for icon-only buttons that
+ *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
+ *   current text — captured once and reused if `ctFlash` is called again on
+ *   the same element before the previous flash reverted (rapid re-clicks
+ *   don't lose the true original label).
+ * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
+ *   decorative scale pulse (see STYLING below) — no functional behavior
+ *   depends on it.
+ *
+ * STYLING:
+ * - The only visual injected is the optional `.ctc-flash` pulse animation,
+ *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
+ *   text swap + revert timing are unaffected either way).
+ * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
+ *   `ctFlash` call and no styles are injected.
+ *
+ * This is a shared component inlined by the build.
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * tools/include/copy.js
+ */
+(function () {
+  if (window.ctCopy && window.ctFlash) return; // idempotent if pasted more than once
+
+  window.ctCopy = function (text) {
+    text = String(text == null ? '' : text);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(
+        function () { return true; },
+        function () { return fallbackCopy(text); }
+      );
+    }
+    return Promise.resolve(fallbackCopy(text));
+  };
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  var STYLE_ID = 'ctc-copy-style';
+  function ensureStyles() {
+    if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+    if (document.getElementById(STYLE_ID)) return;
+    var style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = [
+      '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+      '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+      '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+      '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+    ].join('');
+    document.head.appendChild(style);
+  }
+
+  var flashTimeouts = new WeakMap();
+  window.ctFlash = function (el, opts) {
+    opts = opts || {};
+    var ms = opts.ms != null ? opts.ms : 1000;
+    var label = opts.label != null ? opts.label : '✅';
+
+    ensureStyles();
+    clearTimeout(flashTimeouts.get(el));
+
+    var original;
+    if (opts.revertTo != null) {
+      original = opts.revertTo;
+    } else if (el.dataset.ctcFlashOriginal != null) {
+      original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+    } else {
+      original = el.textContent;
+    }
+    el.dataset.ctcFlashOriginal = original;
+
+    el.textContent = label;
+    el.classList.remove('ctc-flash');
+    void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+    el.classList.add('ctc-flash');
+
+    var t = setTimeout(function () {
+      el.textContent = original;
+      el.classList.remove('ctc-flash');
+      delete el.dataset.ctcFlashOriginal;
+      flashTimeouts.delete(el);
+    }, ms);
+    flashTimeouts.set(el, t);
+  };
+})();
+// ===== end ctCopy =====
+
+</script>
+<script>
+// ===== Begin jbcUtil =====
+/*
+ * jbcUtil — tiny, dependency-free runtime helpers for single-file tools.
+ * ---------------------------------------------------------------------------
+ * Pasteable, not imported: drop this whole block (sentinels included) inside a
+ * <script> tag in a tool's single-file index.html, then reach for the helpers
+ * on the global `jbcUtil` object. Establish this BEFORE the module <script>
+ * that runs the tool so the global exists when the tool code executes.
+ *
+ * These are the browser/DOM-facing idioms every tool re-rolled by hand. They
+ * are deliberately runtime-only (they touch document / URL / setTimeout), so
+ * they live in this inlined <script> — not in a tool's pure, unit-tested
+ * source/logic.mjs. Pure algorithms (e.g. crc32) live in their own block.
+ *
+ * jbcUtil.downloadBlob(data, filename, mime?):
+ * - Triggers a file download. `data` may be a Blob, a string, or a Uint8Array
+ *   (anything the Blob constructor accepts). A Blob is used as-is; anything
+ *   else is wrapped in a Blob (with `mime` as its type when given).
+ * - Creates an object URL, clicks a temporary hidden <a download>, then revokes
+ *   the URL on a short timeout so the download has time to start.
+ *
+ * jbcUtil.debounce(fn, ms):
+ * - Returns a trailing-edge debounced wrapper: repeated calls reset the timer,
+ *   and `fn` runs once, `ms` after the last call, with the latest args and
+ *   `this`.
+ *
+ * jbcUtil.formatBytes(n):
+ * - Formats a byte count as a compact human string with NO space between the
+ *   number and unit. Under 1KB shows integer bytes with a lowercase "b"
+ *   (e.g. "678b"); KB/MB/GB show 2 decimals and TB shows 1; tiers are binary
+ *   (1024). Non-finite / missing input formats as "0b".
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+(function () {
+  if (window.jbcUtil) return; // idempotent if pasted more than once
+
+  function downloadBlob(data, filename, mime) {
+    var blob = (data instanceof Blob)
+      ? data
+      : new Blob([data], mime ? { type: mime } : undefined);
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename == null ? '' : String(filename);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      var self = this, args = arguments;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(self, args); }, ms);
+    };
+  }
+
+  function formatBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return Math.round(n) + 'b';
+    var units = ['KB', 'MB', 'GB', 'TB'];
+    var v = n / 1024, i = 0;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return v.toFixed(units[i] === 'TB' ? 1 : 2) + units[i];
+  }
+
+  window.jbcUtil = {
+    downloadBlob: downloadBlob,
+    debounce: debounce,
+    formatBytes: formatBytes
+  };
+})();
+// ===== end jbcUtil =====
+
+</script>
+
+<script type="module">
+  // =====================================================================
+  // 1. DOM references
+  // =====================================================================
+  const modeEncodeBtn = document.getElementById('modeEncodeBtn');
+  const modeDecodeBtn = document.getElementById('modeDecodeBtn');
+  const encodeSectionEl = document.querySelector('.encode-section');
+  const decodeSectionEl = document.querySelector('.decode-section');
+
+  const encodeTextInputEl = document.getElementById('encodeTextInput');
+  const dropzoneEl = document.querySelector('.dropzone');
+  const encodeFileInputEl = document.getElementById('encodeFileInput');
+  const encodeFileInfoEl = document.querySelector('[data-testid="encode-file-info"]');
+  const encodeFileNameEl = encodeFileInfoEl.querySelector('.file-name');
+  const encodeFileSizeEl = encodeFileInfoEl.querySelector('.file-size');
+  const encodeFileMimeEl = encodeFileInfoEl.querySelector('.file-mime');
+  const encodeRemoveFileBtn = document.querySelector('[data-testid="encode-remove-file-btn"]');
+  const encodeMimeInputEl = document.getElementById('encodeMimeInput');
+  const encodeTextCopyBtn = document.getElementById('encodeTextCopyBtn');
+  const encodeMimeCopyBtn = document.getElementById('encodeMimeCopyBtn');
+  const encodeClearBtn = document.getElementById('encodeClearBtn');
+  const encodeErrorEl = document.querySelector('[data-testid="encode-error"]');
+  const encodeWarningEl = document.querySelector('[data-testid="encode-warning"]');
+
+  const encodeBase64OutputEl = document.getElementById('encodeBase64Output');
+  const encodeBase64CopyBtn = document.getElementById('encodeBase64CopyBtn');
+  const encodeBase64UrlOutputEl = document.getElementById('encodeBase64UrlOutput');
+  const encodeBase64UrlCopyBtn = document.getElementById('encodeBase64UrlCopyBtn');
+  const encodeDataUriOutputEl = document.getElementById('encodeDataUriOutput');
+  const encodeDataUriCopyBtn = document.getElementById('encodeDataUriCopyBtn');
+  const encodeSnippetOutputEl = document.getElementById('encodeSnippetOutput');
+  const encodeSnippetCopyBtn = document.getElementById('encodeSnippetCopyBtn');
+
+  const decodeInputEl = document.getElementById('decodeInput');
+  const decodeInputCopyBtn = document.getElementById('decodeInputCopyBtn');
+  const decodeClearBtn = document.getElementById('decodeClearBtn');
+  const decodeErrorEl = document.querySelector('[data-testid="decode-error"]');
+  const decodeDetectedMimeEl = document.querySelector('[data-testid="decode-detected-mime"]');
+  const decodeTextColEl = document.querySelector('[data-testid="decode-text-col"]');
+  const decodeTextOutputEl = document.getElementById('decodeTextOutput');
+  const decodeTextCopyBtn = document.getElementById('decodeTextCopyBtn');
+  const decodeBinaryNoteEl = document.querySelector('[data-testid="decode-binary-note"]');
+  const decodeDownloadBtn = document.getElementById('decodeDownloadBtn');
+
+  const helpButtonEl = document.getElementById('help-button');
+  const helpOverlayEl = document.querySelector('[data-testid="help-overlay"]');
+  const helpDialogEl = document.querySelector('[data-testid="help-modal"]');
+  const helpCloseXBtn = helpDialogEl.querySelector('[data-testid="modal-close-x"]');
+
+  // =====================================================================
+  // 2. State & persistence
+  // =====================================================================
+  const state = {
+    mode: 'encode',          // 'encode' | 'decode'
+    encode: {
+      sourceFile: null,      // File | null — when set, its bytes win over the textarea
+    },
+    decode: {
+      last: null,            // { mime, bytes, text, isText } | null
+    },
+  };
+
+  // localStorage UI-state persistence — docs/conventions.md § "Persist UI
+  // state (localStorage)" (hat-picker is the exemplar). Versioned key
+  // "base64-tool:v1". We persist only the mode + the two raw text inputs
+  // (encode text-input, decode input) — never the uploaded file's bytes
+  // (too large / inappropriate to store) and never the four encode outputs
+  // or the decoded output, which are DERIVED and get recomputed on restore.
+  // Every read/write is try/catch-wrapped and degrades silently: the tool
+  // must work fully with no stored state (file://, private mode, quota,
+  // browser policy can all make localStorage throw).
+  const STORAGE_KEY = 'base64-tool:v1';
+
+  // First-load Help popup — docs/conventions.md § "First-load help popup
+  // (all tools)". Persisted separately from STORAGE_KEY (a distinct
+  // one-shot flag, not versioned UI state) under its own key, same
+  // try/catch-degrade pattern. If localStorage throws, treat the popup as
+  // already-seen so we don't nag every load — the ? button is always there
+  // if the visitor wants it later.
+  const HELP_SEEN_KEY = 'base64-tool:help-seen:v1';
+
+  function hasSeenHelp() {
+    try {
+      return localStorage.getItem(HELP_SEEN_KEY) === '1';
+    } catch (err) {
+      return true;
+    }
+  }
+
+  function markHelpSeen() {
+    try {
+      localStorage.setItem(HELP_SEEN_KEY, '1');
+    } catch (err) {
+      // Best-effort, same as saveState().
+    }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        mode: state.mode,
+        encodeText: encodeTextInputEl.value,
+        decodeText: decodeInputEl.value,
+      }));
+    } catch (err) {
+      // Best-effort: localStorage unavailable/throwing. Degrade silently to
+      // in-memory only.
+    }
+  }
+
+  function loadState() {
+    const fallback = { mode: 'encode', encodeText: '', decodeText: '' };
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return {
+        mode: parsed && parsed.mode === 'decode' ? 'decode' : 'encode',
+        encodeText: parsed && typeof parsed.encodeText === 'string' ? parsed.encodeText : '',
+        decodeText: parsed && typeof parsed.decodeText === 'string' ? parsed.decodeText : '',
+      };
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  // =====================================================================
+  // 3. Pure core functions (no DOM access)
+  // =====================================================================
+  // ===== BEGIN PURE-LOGIC (unit-tested by tests/unit/*.test.mjs via
+  // tests/unit/extract-inline-module.mjs — see docs/conventions.md) =====
+
+  // bytes <-> Base64 -------------------------------------------------------
+
+  // Chunked to avoid a stack-overflow from String.fromCharCode.apply on very
+  // large byte arrays (Function.prototype.apply has an argument-count limit).
+  function bytesToBase64(bytes) {
+    const CHUNK = 0x8000; // 32k
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+  }
+
+  function base64ToBytes(b64) {
+    let binary;
+    try {
+      binary = atob(b64);
+    } catch {
+      throw new Error('Invalid Base64 input.');
+    }
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  // text <-> Base64, via TextEncoder/TextDecoder (NOT raw btoa/atob on the
+  // string — btoa throws on any code point outside Latin1, so straight
+  // `btoa(str)` silently breaks on accents/emoji/CJK). fatal:true makes
+  // TextDecoder throw on invalid UTF-8 instead of substituting U+FFFD, which
+  // is what lets decode mode tell "valid UTF-8 text" from "binary data".
+
+  function encodeText(str) {
+    return bytesToBase64(new TextEncoder().encode(String(str ?? '')));
+  }
+
+  function decodeText(b64) {
+    const bytes = base64ToBytes(b64);
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes); // throws on invalid UTF-8
+  }
+
+  // Base64 <-> Base64URL ----------------------------------------------------
+
+  function toBase64Url(b64) {
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function fromBase64Url(s) {
+    let b64 = String(s).replace(/-/g, '+').replace(/_/g, '/');
+    const rem = b64.length % 4;
+    if (rem === 1) throw new Error('Invalid Base64URL length.');
+    if (rem === 2) b64 += '==';
+    else if (rem === 3) b64 += '=';
+    return b64;
+  }
+
+  // data: URI parsing ---------------------------------------------------
+  // data:[<mime>][;param=value ...][;base64],<data>
+  // We only need mime + whether the payload is base64 + the raw payload text.
+
+  function parseDataUri(s) {
+    const str = String(s ?? '').trim();
+    const m = str.match(/^data:([^,]*),([\s\S]*)$/);
+    if (!m) return null;
+    const parts = m[1].split(';').filter((p) => p !== '');
+    const isBase64 = parts[parts.length - 1] === 'base64';
+    if (isBase64) parts.pop();
+    const mime = parts[0] || 'text/plain';
+    return { mime, isBase64, payload: m[2] };
+  }
+
+  // Tolerant normalization for pasted Base64: strips whitespace/newlines,
+  // accepts either the standard or URL-safe alphabet (not a mix of both — a
+  // string containing both '+/' AND '-_' is ambiguous and rejected), restores
+  // dropped padding, then validates the final charset.
+
+  function normalizeBase64(input) {
+    let s = String(input ?? '').replace(/\s+/g, '');
+    if (s === '') throw new Error('No input to decode.');
+    const hasUrlSafe = /[-_]/.test(s);
+    const hasStandard = /[+/]/.test(s);
+    if (hasUrlSafe && hasStandard) {
+      throw new Error('Mixed standard and URL-safe Base64 characters.');
+    }
+    if (hasUrlSafe) {
+      s = fromBase64Url(s);
+    } else {
+      const rem = s.length % 4;
+      if (rem === 1) throw new Error('Invalid Base64 length.');
+      if (rem !== 0) s += '='.repeat(4 - rem);
+    }
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(s)) {
+      throw new Error('Contains characters outside the Base64 alphabet.');
+    }
+    return s;
+  }
+
+  // One entry point for the whole decode flow: accepts raw Base64/Base64URL OR
+  // a data: URI, returns the decoded bytes + best-effort text + detected mime.
+  // Throws a friendly Error on anything invalid — callers catch and display
+  // err.message.
+
+  const MAX_DECODE_B64_CHARS = 14_000_000; // ~10MB decoded
+
+  function decodeInput(raw) {
+    const trimmed = String(raw ?? '').trim();
+    if (trimmed === '') throw new Error('Nothing to decode.');
+
+    const parsed = parseDataUri(trimmed);
+    let mime = null;
+    let payload = trimmed;
+    if (parsed) {
+      if (!parsed.isBase64) {
+        throw new Error('Only base64-encoded data: URIs are supported.');
+      }
+      mime = parsed.mime;
+      payload = parsed.payload;
+    }
+
+    const clean = normalizeBase64(payload);
+    if (clean.length > MAX_DECODE_B64_CHARS) {
+      throw new Error(
+        `Input too large to decode (${clean.length.toLocaleString()} characters, ` +
+        `limit ${MAX_DECODE_B64_CHARS.toLocaleString()}).`
+      );
+    }
+    const bytes = base64ToBytes(clean);
+
+    let text = null;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+      text = null;
+    }
+
+    return { mime: mime || 'application/octet-stream', bytes, text, isText: text !== null };
+  }
+
+  // MIME -> file extension, for the Download button's filename.
+
+  const MIME_EXTENSIONS = {
+    'text/plain': 'txt', 'text/html': 'html', 'text/css': 'css', 'text/csv': 'csv',
+    'text/markdown': 'md', 'application/json': 'json',
+    'application/javascript': 'js', 'text/javascript': 'js',
+    'application/xml': 'xml', 'text/xml': 'xml',
+    'application/pdf': 'pdf', 'application/zip': 'zip',
+    'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp',
+    'image/svg+xml': 'svg', 'image/bmp': 'bmp', 'image/x-icon': 'ico',
+    'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/ogg': 'ogg',
+    'video/mp4': 'mp4', 'video/webm': 'webm',
+    'application/octet-stream': 'bin',
+  };
+
+  function extensionForMime(mime) {
+    const clean = String(mime || '').toLowerCase().split(';')[0].trim();
+    if (MIME_EXTENSIONS[clean]) return MIME_EXTENSIONS[clean];
+    const subtype = clean.split('/')[1];
+    if (subtype) {
+      const simple = subtype.split('+')[0].replace(/[^a-z0-9]/g, '');
+      if (simple) return simple;
+    }
+    return 'bin';
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    const units = ['KB', 'MB', 'GB'];
+    let value = bytes / 1024;
+    let i = 0;
+    while (value >= 1024 && i < units.length - 1) {
+      value /= 1024;
+      i++;
+    }
+    return `${value.toFixed(1)} ${units[i]}`;
+  }
+
+  export {
+    bytesToBase64,
+    base64ToBytes,
+    encodeText,
+    decodeText,
+    toBase64Url,
+    fromBase64Url,
+    parseDataUri,
+    normalizeBase64,
+    decodeInput,
+    MAX_DECODE_B64_CHARS,
+    MIME_EXTENSIONS,
+    extensionForMime,
+    formatBytes,
+  };
+  // ===== END PURE-LOGIC =====
+
+  // =====================================================================
+  // 4. Mode toggle
+  // =====================================================================
+  function setMode(mode) {
+    state.mode = mode;
+    const isEncode = mode === 'encode';
+    encodeSectionEl.hidden = !isEncode;
+    decodeSectionEl.hidden = isEncode;
+    modeEncodeBtn.setAttribute('aria-pressed', String(isEncode));
+    modeDecodeBtn.setAttribute('aria-pressed', String(!isEncode));
+    (isEncode ? encodeTextInputEl : decodeInputEl).focus();
+    saveState();
+  }
+  modeEncodeBtn.addEventListener('click', () => setMode('encode'));
+  modeDecodeBtn.addEventListener('click', () => setMode('decode'));
+
+  // =====================================================================
+  // 5. Encode: inputs (text, file, drag-drop), MIME field, guard
+  // =====================================================================
+  const MAX_ENCODE_FILE_BYTES = 10 * 1024 * 1024; // 10 MB hard cap
+  const WARN_ENCODE_FILE_BYTES = 2 * 1024 * 1024; //  2 MB soft warning
+
+  function setEncodeFile(file) {
+    state.encode.sourceFile = file || null;
+    updateFileInfo();
+    renderEncodeOutputs();
+  }
+
+  encodeFileInputEl.addEventListener('change', () => {
+    setEncodeFile(encodeFileInputEl.files[0] || null);
+  });
+
+  ['dragenter', 'dragover'].forEach((evt) =>
+    dropzoneEl.addEventListener(evt, (e) => { e.preventDefault(); dropzoneEl.classList.add('drag-over'); })
+  );
+  ['dragleave', 'drop'].forEach((evt) =>
+    dropzoneEl.addEventListener(evt, (e) => { e.preventDefault(); dropzoneEl.classList.remove('drag-over'); })
+  );
+  dropzoneEl.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) setEncodeFile(file);
+  });
+
+  function updateFileInfo() {
+    const file = state.encode.sourceFile;
+    if (file) {
+      encodeFileInfoEl.hidden = false;
+      encodeFileNameEl.textContent = file.name;
+      encodeFileSizeEl.textContent = formatBytes(file.size);
+      encodeFileMimeEl.textContent = file.type || 'application/octet-stream';
+      encodeMimeInputEl.disabled = true;
+    } else {
+      encodeFileInfoEl.hidden = true;
+      encodeMimeInputEl.disabled = false;
+    }
+  }
+
+  encodeRemoveFileBtn.addEventListener('click', () => {
+    encodeFileInputEl.value = ''; // so re-selecting the same filename still fires 'change'
+    setEncodeFile(null);
+  });
+
+  function currentEncodeSourceByteLength() {
+    const file = state.encode.sourceFile;
+    if (file) return file.size;
+    return new TextEncoder().encode(encodeTextInputEl.value).length;
+  }
+
+  function updateEncodeWarning() {
+    const len = currentEncodeSourceByteLength();
+    if (len > WARN_ENCODE_FILE_BYTES && len <= MAX_ENCODE_FILE_BYTES) {
+      showEncodeWarning(`Large input (${formatBytes(len)}) — this may take a moment.`);
+    } else {
+      hideEncodeWarning();
+    }
+  }
+
+  function showEncodeWarning(message) {
+    encodeWarningEl.textContent = message;
+    encodeWarningEl.hidden = false;
+  }
+
+  function hideEncodeWarning() {
+    encodeWarningEl.hidden = true;
+    encodeWarningEl.textContent = '';
+  }
+
+  function showEncodeError(message) {
+    encodeErrorEl.textContent = message;
+    encodeErrorEl.hidden = false;
+  }
+
+  function hideEncodeError() {
+    encodeErrorEl.hidden = true;
+    encodeErrorEl.textContent = '';
+  }
+
+  function clearEncodeOutputs() {
+    encodeBase64OutputEl.value = '';
+    encodeBase64UrlOutputEl.value = '';
+    encodeDataUriOutputEl.value = '';
+    encodeSnippetOutputEl.value = '';
+  }
+
+  // =====================================================================
+  // 6. Encode: computing and rendering the four outputs
+  // =====================================================================
+  async function getEncodeSourceBytes() {
+    const file = state.encode.sourceFile;
+    if (file) {
+      if (file.size > MAX_ENCODE_FILE_BYTES) {
+        throw new Error(`File too large to encode (${formatBytes(file.size)}, limit ${formatBytes(MAX_ENCODE_FILE_BYTES)}).`);
+      }
+      return new Uint8Array(await file.arrayBuffer());
+    }
+    return new TextEncoder().encode(encodeTextInputEl.value);
+  }
+
+  function getEncodeMime() {
+    if (state.encode.sourceFile) return state.encode.sourceFile.type || 'application/octet-stream';
+    return encodeMimeInputEl.value.trim() || 'text/plain';
+  }
+
+  function jsSnippet(dataUri) {
+    return [
+      '// Turn this data URI back into a Blob:',
+      `fetch(${JSON.stringify(dataUri)})`,
+      '  .then((res) => res.blob())',
+      '  .then((blob) => {',
+      '    // use `blob` here, e.g.:',
+      '    // const url = URL.createObjectURL(blob);',
+      '  });',
+    ].join('\n');
+  }
+
+  async function renderEncodeOutputs() {
+    hideEncodeError();
+    updateEncodeWarning();
+    const hasSource = state.encode.sourceFile || encodeTextInputEl.value !== '';
+    if (!hasSource) { clearEncodeOutputs(); return; }
+    try {
+      const bytes = await getEncodeSourceBytes();
+      const mime = getEncodeMime();
+      const b64 = bytesToBase64(bytes);
+      const b64url = toBase64Url(b64);
+      const dataUri = `data:${mime};base64,${b64}`;
+      encodeBase64OutputEl.value = b64;
+      encodeBase64UrlOutputEl.value = b64url;
+      encodeDataUriOutputEl.value = dataUri;
+      encodeSnippetOutputEl.value = jsSnippet(dataUri);
+    } catch (err) {
+      showEncodeError(err.message);
+      clearEncodeOutputs();
+    }
+  }
+
+  // Shared trailing-edge debounce (jbc-include/util.js, inlined as a global).
+  const debounce = jbcUtil.debounce;
+
+  const debouncedRenderEncodeOutputs = debounce(() => { renderEncodeOutputs(); }, 150);
+  // The encode text-input is persisted (per docs/conventions.md); save on
+  // the same debounce cadence as the re-render. The MIME field is not
+  // persisted, so it only triggers the render debounce.
+  const debouncedSaveEncodeText = debounce(() => { saveState(); }, 150);
+  encodeTextInputEl.addEventListener('input', debouncedRenderEncodeOutputs);
+  encodeTextInputEl.addEventListener('input', debouncedSaveEncodeText);
+  encodeMimeInputEl.addEventListener('input', debouncedRenderEncodeOutputs);
+
+  // =====================================================================
+  // 7. Decode: parsing, rendering, and Download
+  // =====================================================================
+  function showDecodeError(message) {
+    decodeErrorEl.textContent = message;
+    decodeErrorEl.hidden = false;
+  }
+
+  function hideDecodeError() {
+    decodeErrorEl.hidden = true;
+    decodeErrorEl.textContent = '';
+  }
+
+  function clearDecodeOutputs() {
+    state.decode.last = null;
+    decodeDetectedMimeEl.hidden = true;
+    decodeDetectedMimeEl.textContent = '';
+    decodeTextColEl.hidden = true;
+    decodeTextOutputEl.value = '';
+    decodeBinaryNoteEl.hidden = true;
+    decodeDownloadBtn.disabled = true;
+  }
+
+  function renderDecodeOutput() {
+    hideDecodeError();
+    const raw = decodeInputEl.value;
+    if (raw.trim() === '') { clearDecodeOutputs(); return; }
+    let result;
+    try {
+      result = decodeInput(raw);
+    } catch (err) {
+      showDecodeError(err.message);
+      clearDecodeOutputs();
+      return;
+    }
+    state.decode.last = result;
+    decodeDetectedMimeEl.hidden = false;
+    decodeDetectedMimeEl.textContent = `Detected type: ${result.mime}`;
+    if (result.isText) {
+      decodeTextColEl.hidden = false;
+      decodeTextOutputEl.value = result.text;
+      decodeBinaryNoteEl.hidden = true;
+    } else {
+      decodeTextColEl.hidden = true;
+      decodeTextOutputEl.value = '';
+      decodeBinaryNoteEl.hidden = false;
+    }
+    decodeDownloadBtn.disabled = false;
+  }
+
+  const debouncedRenderDecodeOutput = debounce(() => { renderDecodeOutput(); }, 150);
+  const debouncedSaveDecodeText = debounce(() => { saveState(); }, 150);
+  decodeInputEl.addEventListener('input', debouncedRenderDecodeOutput);
+  decodeInputEl.addEventListener('input', debouncedSaveDecodeText);
+
+  function downloadDecoded() {
+    const result = state.decode.last;
+    if (!result) return;
+    // Shared file-download helper (jbc-include/util.js, inlined as a global).
+    jbcUtil.downloadBlob(result.bytes, `decoded.${extensionForMime(result.mime)}`, result.mime);
+  }
+  decodeDownloadBtn.addEventListener('click', downloadDecoded);
+
+  // =====================================================================
+  // 8. Copy buttons (shared pattern) — ctCopy/ctFlash (tools/include/
+  // copy.js, pasted above as a classic <script>)
+  // =====================================================================
+  async function handleCopyClick(btn, text) {
+    if (!text) return;
+    const ok = await ctCopy(text);
+    if (!ok) return;
+    ctFlash(btn, { label: '✅', revertTo: '📋' });
+  }
+
+  // Always-on copies (read-only outputs live inside their .ct-field).
+  encodeBase64CopyBtn.addEventListener('click', () => handleCopyClick(encodeBase64CopyBtn, encodeBase64OutputEl.value));
+  encodeBase64UrlCopyBtn.addEventListener('click', () => handleCopyClick(encodeBase64UrlCopyBtn, encodeBase64UrlOutputEl.value));
+  encodeDataUriCopyBtn.addEventListener('click', () => handleCopyClick(encodeDataUriCopyBtn, encodeDataUriOutputEl.value));
+  encodeSnippetCopyBtn.addEventListener('click', () => handleCopyClick(encodeSnippetCopyBtn, encodeSnippetOutputEl.value));
+  decodeTextCopyBtn.addEventListener('click', () => handleCopyClick(decodeTextCopyBtn, decodeTextOutputEl.value));
+
+  // In-field copy on the EDITABLE inputs (encode text, decode input, MIME) —
+  // revealed only when the field is non-empty (docs/conventions.md § "In-field
+  // copy button"). CSS can't read a value, so we toggle the button's [hidden]
+  // on input; refreshEditableCopy() re-syncs after a programmatic value change
+  // (Clear, restore-on-load).
+  encodeTextCopyBtn.addEventListener('click', () => handleCopyClick(encodeTextCopyBtn, encodeTextInputEl.value));
+  decodeInputCopyBtn.addEventListener('click', () => handleCopyClick(decodeInputCopyBtn, decodeInputEl.value));
+  encodeMimeCopyBtn.addEventListener('click', () => handleCopyClick(encodeMimeCopyBtn, encodeMimeInputEl.value));
+
+  function wireEditableCopy(inputEl, btn) {
+    if (!inputEl || !btn) return;
+    const sync = () => { btn.hidden = inputEl.value.trim() === ''; };
+    inputEl.addEventListener('input', sync);
+    inputEl.__ctCopySync = sync; // let programmatic value changes refresh it
+    sync();
+  }
+
+  function refreshEditableCopy(inputEl) {
+    if (inputEl && typeof inputEl.__ctCopySync === 'function') inputEl.__ctCopySync();
+  }
+
+  wireEditableCopy(encodeTextInputEl, encodeTextCopyBtn);
+  wireEditableCopy(decodeInputEl, decodeInputCopyBtn);
+  wireEditableCopy(encodeMimeInputEl, encodeMimeCopyBtn);
+
+  // =====================================================================
+  // 9. Clear buttons (no confirm dialog — DESIGN.md marks Clear low-stakes)
+  // =====================================================================
+  encodeClearBtn.addEventListener('click', () => {
+    encodeTextInputEl.value = '';
+    encodeMimeInputEl.value = 'text/plain';
+    encodeMimeInputEl.disabled = false;
+    encodeFileInputEl.value = '';
+    state.encode.sourceFile = null;
+    updateFileInfo();
+    clearEncodeOutputs();
+    hideEncodeError();
+    hideEncodeWarning();
+    refreshEditableCopy(encodeTextInputEl); // now empty → hide its copy
+    refreshEditableCopy(encodeMimeInputEl); // reset to "text/plain" → show its copy
+    document.activeElement?.blur();
+    encodeTextInputEl.focus();
+    saveState();
+  });
+
+  decodeClearBtn.addEventListener('click', () => {
+    decodeInputEl.value = '';
+    clearDecodeOutputs();
+    hideDecodeError();
+    refreshEditableCopy(decodeInputEl); // now empty → hide its copy
+    document.activeElement?.blur();
+    decodeInputEl.focus();
+    saveState();
+  });
+
+  // =====================================================================
+  // 9b. Help modal — purely informational (what the tool does + how to use
+  // it), auto-shown once on first load per docs/conventions.md's "First-load
+  // help popup (all tools)". Static markup in the document (shown/hidden via
+  // the `hidden` attribute) rather than built/torn down per open/close.
+  // Structure/focus-handling mirrors tools/hat-picker's Help modal, the
+  // reference implementation for this convention.
+  // =====================================================================
+  let helpPreviouslyFocused = null;
+
+  function getHelpFocusable() {
+    return Array.from(
+      helpDialogEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter((el) => !el.disabled && el.getClientRects().length > 0);
+  }
+
+  function onHelpKeydown(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeHelp();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const focusable = getHelpFocusable();
+    if (focusable.length === 0) return;
+    e.preventDefault();
+    const idx = focusable.indexOf(document.activeElement);
+    let next = e.shiftKey ? idx - 1 : idx + 1;
+    if (next < 0) next = focusable.length - 1;
+    if (next >= focusable.length) next = 0;
+    focusable[next].focus();
+  }
+
+  function openHelp() {
+    helpPreviouslyFocused = document.activeElement;
+    helpOverlayEl.hidden = false;
+    document.addEventListener('keydown', onHelpKeydown, true);
+    helpDialogEl.scrollTop = 0;
+    helpCloseXBtn.focus({ preventScroll: true });
+  }
+
+  function closeHelp() {
+    if (helpOverlayEl.hidden) return;
+    helpOverlayEl.hidden = true;
+    document.removeEventListener('keydown', onHelpKeydown, true);
+    if (helpPreviouslyFocused && typeof helpPreviouslyFocused.focus === 'function') {
+      try { helpPreviouslyFocused.focus(); } catch (e) { /* ignore */ }
+    }
+    helpPreviouslyFocused = null;
+  }
+
+  helpButtonEl.addEventListener('click', () => openHelp());
+  helpCloseXBtn.addEventListener('click', () => closeHelp());
+  helpOverlayEl.addEventListener('mousedown', (e) => {
+    if (e.target !== helpOverlayEl) return;
+    // Prevent the browser's default mousedown focus handling: since the
+    // overlay itself isn't a focusable element, a plain click on it would
+    // otherwise blur/refocus (typically to <body>) AFTER closeHelp() below
+    // has already returned focus to the trigger, silently undoing it.
+    e.preventDefault();
+    closeHelp();
+  });
+
+  // =====================================================================
+  // 10. Initial render — restore persisted mode + text inputs (if any),
+  // then re-run encode/decode so the derived outputs reflect the restored
+  // text, exactly as if the user had just typed it. If nothing is stored
+  // (or it's unreadable), loadState() returns the same defaults as today
+  // and the tool starts empty.
+  // =====================================================================
+  (function init() {
+    const loaded = loadState();
+    encodeTextInputEl.value = loaded.encodeText;
+    decodeInputEl.value = loaded.decodeText;
+    setMode(loaded.mode);
+    renderEncodeOutputs();
+    renderDecodeOutput();
+    // Sync the editable in-field copy buttons to the restored values.
+    refreshEditableCopy(encodeTextInputEl);
+    refreshEditableCopy(decodeInputEl);
+    refreshEditableCopy(encodeMimeInputEl);
+
+    // Auto-show the Help modal once, on a genuinely fresh visit only. Marking
+    // it seen right away (rather than on close) keeps this a true "once" —
+    // even if the visitor navigates away without explicitly closing it, it
+    // won't auto-show again next time.
+    if (!hasSeenHelp()) {
+      markHelpSeen();
+      openHelp();
+    }
+  })();
+
+  // =====================================================================
+  // 11. Test hook — inert namespace for Playwright-driven tests
+  // =====================================================================
+  window.__base64Tool = {
+    // pure functions (DESIGN.md's required set)
+    encodeText,
+    decodeText,
+    bytesToBase64,
+    base64ToBytes,
+    toBase64Url,
+    fromBase64Url,
+    parseDataUri,
+
+    // additional pure/logic helpers
+    normalizeBase64,
+    decodeInput,
+    extensionForMime,
+
+    // deterministic entry points
+    setMode,
+    renderEncodeOutputs,
+    renderDecodeOutput,
+
+    // live state
+    state,
+  };
+</script>
+</body>
+</html>

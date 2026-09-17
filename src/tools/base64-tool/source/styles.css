@@ -1,0 +1,392 @@
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+    margin: 0 0 0.3rem;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  textarea, input[type="text"] {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.7rem;
+  }
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    overflow: auto;
+    min-height: 90px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+  }
+
+  /* ---------- In-field copy button (controls.css supplies the base) ----------
+     The .ct-copy-btn is absolutely positioned inside a .ct-field (see
+     controls.css). The field must reserve right padding so its text never runs
+     under the icon — re-declared here AFTER this tool's own input/textarea
+     padding SHORTHAND above (which would otherwise reset padding-right at equal
+     specificity, source order winning), per docs/conventions.md's padding
+     shorthand trap. This tool has no <select>, so no chevron reserve is needed. */
+  .ct-field > input,
+  .ct-field > textarea { padding-right: 2.6rem; }
+
+  input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    /* Tells mobile browsers this control only needs tap/pan-through, not
+       double-tap-to-zoom — avoids the browser's double-tap-to-zoom gesture
+       firing on a quick double-tap. No visible/behavioral effect on desktop
+       (mouse) input. Covers every button in the tool, including the Help
+       button/dialog added below. */
+    touch-action: manipulation;
+  }
+
+  /* Exclude .ct-copy-btn so the in-field copy button keeps its own
+     controls.css hover (docs/conventions.md's hover specificity note). */
+  button:hover:not(:disabled):not(.ct-copy-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  .dropzone:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+
+  .app-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* ---------- Mode toggle ---------- */
+
+  .mode-toggle {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .mode-toggle button {
+    flex: 1 1 0;
+    padding: 0.6rem 0.9rem;
+    font-weight: 600;
+  }
+
+  .mode-toggle button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .mode-toggle button[aria-pressed="true"]:hover {
+    background: var(--accent);
+  }
+
+  /* ---------- Sections ---------- */
+
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  /* ---------- Dropzone ---------- */
+
+  .dropzone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1.5rem 1rem;
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--panel);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+
+  .dropzone:hover {
+    border-color: var(--accent);
+  }
+
+  .dropzone.drag-over {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+    color: var(--text);
+  }
+
+  /* ---------- File info ---------- */
+
+  .file-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  .file-info .file-name {
+    font-weight: 600;
+    word-break: break-all;
+  }
+
+  .file-info .file-size,
+  .file-info .file-mime {
+    color: var(--text-muted);
+  }
+
+  .file-info button {
+    margin-left: auto;
+    padding: 0.3rem 0.55rem;
+    line-height: 1;
+  }
+
+  /* ---------- Error / warning / status messages ---------- */
+
+  .error {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  .warning {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  .detected-mime {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .binary-note {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Output fields ---------- */
+
+  .output-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .output-field textarea {
+    background: color-mix(in srgb, var(--panel) 92%, var(--text) 2%);
+  }
+
+  .actions-row {
+    display: flex;
+    gap: 0.6rem;
+  }
+
+  /* ---------- Help modal ----------
+     Reference pattern: tools/hat-picker's Help modal (see
+     docs/conventions.md "First-load help popup"). Static markup in the
+     document, shown/hidden via the `hidden` attribute. This tool already
+     has a top-of-file `[hidden] { display: none !important; }` rule (its
+     earlier bug — see docs/conventions.md's "[hidden] cascade trap"), which
+     already out-specifies this block's `.help-overlay { display: flex; }`
+     below whenever `hidden` is set, so no second guard rule is needed here. */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30rem;
+    max-height: min(85vh, 640px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    padding: 1.25rem 3rem 1.1rem 1.4rem;
+  }
+
+  /* ---------- Modal close ✕ (docs/conventions.md "Every content modal has
+     a close ✕ in its top-right corner") ---------- */
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  /* :not(:disabled) bumps specificity above the generic
+     `button:hover:not(:disabled)` rule above (docs/conventions.md's hover
+     specificity trap), so this background actually wins on hover. */
+  .modal-close-x:hover:not(:disabled) {
+    background: rgba(127, 127, 127, .18);
+  }
+
+  .modal-close-x:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .help-dialog h2 {
+    margin: 0 0 0.6rem;
+    font-size: 1.2rem;
+  }
+
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.4rem; }
+
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 640px) {
+    /* Single-line control heights come from controls.css's --control-h; the
+       dropzone is a label (not covered there), so keep its tap-target size. */
+    .dropzone {
+      min-height: 44px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dropzone {
+      transition: none;
+    }
+  }
