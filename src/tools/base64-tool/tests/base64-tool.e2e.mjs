@@ -15,8 +15,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 // Shared test-support (imported, never inlined into the shipped index.html).
-import { toolUrl, helpSeenKey, seedHelpSeen } from '../../test-support/setup.mjs';
-import { assertLicenseModal } from '../../test-support/shared-ui.mjs';
+import { toolUrl, helpSeenKey, seedHelpSeen } from '../../../lib/test-support/setup.mjs';
+import { assertLicenseModal } from '../../../lib/test-support/shared-ui.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const INDEX_HTML_PATH = path.resolve(__dirname, '../index.html');
@@ -1290,8 +1290,8 @@ test.describe('first-load Help popup', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Shared License modal (src/tools/include/license.js, inlined via the shared
-// footer.html). The footer "MIT License" link opens an accessible modal
+// Shared License modal (src/lib/components/CtLicense.mjs, inlined via the
+// <<ct:module>> token). The footer "MIT License" link opens an accessible modal
 // (role=dialog, focus trap, ✕/Esc/backdrop close, focus return). base64-tool
 // bundles no third-party libraries, so the modal shows the "100% vanilla"
 // note rather than a dependency list.

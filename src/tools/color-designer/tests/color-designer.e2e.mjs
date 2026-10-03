@@ -11,7 +11,7 @@
 
 import { test, expect } from '@playwright/test';
 // Shared test-support (imported, never inlined into the shipped index.html).
-import { toolUrl, helpSeenKey, seedHelpSeen } from '../../test-support/setup.mjs';
+import { toolUrl, helpSeenKey, seedHelpSeen } from '../../../lib/test-support/setup.mjs';
 
 const TOOL_URL = toolUrl(import.meta.url);
 

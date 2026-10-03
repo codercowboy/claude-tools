@@ -1,0 +1,29 @@
+{
+  "name": "__TOOL_SCOPE__/__TOOL_NAME__",
+  "version": "0.1.0",
+  "description": "__TOOL_DESC__",
+  "groupId": "__GROUP_ID__",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "index.html",
+    "preview.png",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node ../../../scripts/build-tool.mjs",
+    "build:check": "node ../../../scripts/build-tool.mjs --check",
+    "pretest:unit": "npm run build:check",
+    "test:unit": "node --test tests/unit/*.test.mjs",
+    "pretest:e2e": "npm run build:check",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:e2e",
+    "serve": "node ../../../scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

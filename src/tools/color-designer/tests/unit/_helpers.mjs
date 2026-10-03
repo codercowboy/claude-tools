@@ -2,9 +2,9 @@
 // Dev/test-only — never referenced by index.html.
 //
 // The shared memoized logic loader now lives in the shared test-support module
-// (../../../test-support/unit.mjs); this file re-exports it under the tool's
+// (../../../../lib/test-support/unit.mjs); this file re-exports it under the tool's
 // historical name and keeps the tool-specific RNG fixture below.
-import { loadLogic } from '../../../test-support/unit.mjs';
+import { loadLogic } from '../../../../lib/test-support/unit.mjs';
 
 // loadColorDesigner() -> Promise of source/logic.mjs's module namespace (memoized).
 export function loadColorDesigner() {

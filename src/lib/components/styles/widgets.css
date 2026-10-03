@@ -1,0 +1,57 @@
+/* ===== Begin ct-widgets ===== */
+/* claude-tools shared UI-widget styles — inlined by the build into a tool's
+   <style> via the ct:include widgets.css token. Palette-agnostic: structure +
+   a few tunable CSS custom properties only; colors come from the tool (its own
+   --accent / --border / currentColor). Pairs with the CtComponents DOM/UI wiring
+   helpers (wireDropzone / wireSegmented / showError / .ct-checkerboard).
+   Single source of truth: edit here, run `npm run build`. */
+
+/* ---- Transparency checkerboard (candidate #41) ----
+   Put `.ct-checkerboard` on a preview backdrop so transparent pixels read as a
+   checker tile. Tune via --ct-checker (tile color) and --ct-checker-size. */
+.ct-checkerboard {
+  background-image: repeating-conic-gradient(
+    var(--ct-checker, rgba(127, 127, 127, 0.28)) 0% 25%, transparent 0% 50%);
+  background-size: var(--ct-checker-size, 20px) var(--ct-checker-size, 20px);
+}
+
+/* ---- Segmented single-select (candidate #35) ----
+   A row of <button aria-pressed> driven by wireSegmented (CtComponents); the pressed
+   button gets an accent. Colors come from the tool's --accent / currentColor. */
+.ct-segmented { display: inline-flex; }
+.ct-segmented > button { border-radius: 0; }
+.ct-segmented > button:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+.ct-segmented > button:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+.ct-segmented > button[aria-pressed="true"] {
+  background: var(--accent, rgba(127, 127, 127, 0.22));
+  color: var(--accent-contrast, inherit);
+  font-weight: 600;
+}
+
+/* ---- Dropzone (candidate #36) ----
+   Put `.ct-dropzone` on a drop target; wireDropzone (CtComponents) toggles
+   `.ct-drag-over` during a drag. */
+.ct-dropzone {
+  border: 2px dashed var(--border, rgba(127, 127, 127, 0.5));
+  border-radius: 12px;
+  padding: 1.25rem;
+  text-align: center;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.ct-dropzone.ct-drag-over {
+  border-color: var(--accent, #2563eb);
+  background: rgba(127, 127, 127, 0.08);
+}
+
+/* ---- Error / warning banners (candidate #51) ----
+   Show/hide with showError (CtComponents) / showWarning (CtComponents; they toggle [hidden] +
+   textContent). Colors are conservative and theme-neutral. */
+.ct-banner { padding: 0.6rem 0.85rem; border-radius: 8px; border: 1px solid transparent; }
+.ct-banner[hidden] { display: none; }
+.ct-error { color: #b91c1c; border-color: rgba(185, 28, 28, 0.4); background: rgba(185, 28, 28, 0.08); }
+.ct-warning { color: #92640a; border-color: rgba(146, 100, 10, 0.4); background: rgba(146, 100, 10, 0.10); }
+@media (prefers-color-scheme: dark) {
+  .ct-error { color: #fca5a5; }
+  .ct-warning { color: #fcd34d; }
+}
+/* ===== end ct-widgets ===== */

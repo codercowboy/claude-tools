@@ -15,7 +15,7 @@
     --radius: 8px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
-    /* ctConfirm theming — reuse this tool's tokens */
+    /* CtConfirm theming — reuse this tool's tokens */
     --ctc-accent: var(--accent);
     --ctc-accent-fg: var(--accent-contrast);
     --ctc-bg: var(--panel);
@@ -126,7 +126,7 @@
     touch-action: manipulation;
   }
 
-  /* Excludes .ctc-btn (the pasted ctConfirm "Yes"/"Cancel" buttons — that
+  /* Excludes .ctc-btn (the pasted CtConfirm "Yes"/"Cancel" buttons — that
      component owns its own hover styling and must not be repainted by this
      generic rule) and .modal-close-x (the modal's top-right ✕ — same
      specificity trap: this rule's 0,3,1 would otherwise beat
@@ -135,7 +135,7 @@
      specificity, 0,2,0 (or 0,2,1 with :not(:disabled)), previously beat
      .ctc-btn--yes:hover's filter-only rule, 0,2,0, repainting the filled
      accent "Yes" button near-white while its text stayed white, i.e.
-     invisible. docs/conventions.md's ctConfirm hover-specificity note.
+     invisible. docs/conventions.md's CtConfirm hover-specificity note.
      Also excludes .ct-copy-btn (the shared in-field copy affordance owns its
      own subtle hover in controls.css — this generic light-gray fill would
      wash it out). */

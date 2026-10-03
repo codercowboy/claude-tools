@@ -13,10 +13,10 @@
 <meta name="twitter:card"       content="summary_large_image">
 <style>
 /* ===== Begin ct-base ===== */
-/* claude-tools shared base styles — inlined by the build
+/* Shared single-file-tool base styles — inlined by the build
    near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
    This is the single source of truth: edit here, run `npm run build`. See
-   docs/conventions.md § Build-assembled tools.
+   the html-single-file conventions (web-craft.md).
    It sits near the TOP of the <style> block (after any reset) so a tool's own
    later rules can still layer colors on top; for <select>, keep the tool's fill as
    `background-color` (not the `background` shorthand, which would wipe the chevron). */
@@ -42,10 +42,10 @@ select {
 }
 /* ===== end ct-base ===== */
 /* ===== Begin ct-controls ===== */
-/* claude-tools shared control conventions — inlined by the build into each
-   UTILITY tool's <style> via the ct:include controls.css token, placed AFTER
+/* Shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the jbc:include controls.css token, placed AFTER
    ct-base and BEFORE the tool's own color rules. Single source of truth: edit
-   here, run `npm run build`. See docs/conventions.md § "Standard control height"
+   here, run `npm run build`. See web-craft.md § "Standard control height"
    and § "In-field copy button". Opt-in: only utility tools include it.
 
    Palette-agnostic: sizing + structure only; colors come from the tool via
@@ -66,8 +66,8 @@ button {
 /* ---- In-field copy button ----
    Wrap a value field in `.ct-field` (position:relative). The field reserves
    right padding so its text never runs under the icon; the copy <button> is
-   `.ct-copy-btn` and sits inside at the right. Use ctCopy/ctFlash for behavior
-   (copy.js). Outputs show it always; editable inputs reveal it only when
+   `.ct-copy-btn` and sits inside at the right. Use CtClipboardUtil copy/flash for behavior
+   (components/CtClipboardUtil.mjs). Outputs show it always; editable inputs reveal it only when
    non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
    value). Skip secret fields (e.g. an HMAC key). */
 .ct-field { position: relative; display: block; }
@@ -119,7 +119,7 @@ button {
     --radius: 8px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
-    /* ctConfirm theming — reuse this tool's own tokens so "Yes" renders as a
+    /* confirm dialog theming — reuse this tool's own tokens so "Yes" renders as a
        clear filled primary button (not the bare AccentColor fallback, which
        can look near-white and match Cancel). */
     --ctc-accent: var(--accent);
@@ -175,7 +175,7 @@ button {
     touch-action: manipulation;
   }
 
-  /* Excludes .ctc-btn (the pasted ctConfirm "Yes"/"Cancel" buttons — that
+  /* Excludes .ctc-btn (the pasted confirm dialog "Yes"/"Cancel" buttons — that
      component owns its own hover styling and must not be repainted by this
      generic rule), the active Choose Color toggle (handled explicitly
      below, .choose-color-btn.active:hover), and .modal-close-x (the pinned
@@ -831,181 +831,25 @@ button {
   </a>
   <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
 </footer>
-<script>
-/* ct-license — shared License modal.
-   Inlined on EVERY page via footer.html (the ct:include license.js token wrapped
-   in a script tag), so any tool that carries the footer gets it
-   for free. Opens on a click of any [data-ct-license] trigger (the footer link) or
-   via `window.ctLicense()`. Shows the project's MIT license, plus any bundled
-   third-party libraries a tool declares by setting
-   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
-   opened (only audio-converter does today). Accessible modal (role=dialog,
-   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
-   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
-   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
-   colors so it tracks the page's light/dark. */
-(function () {
-  if (window.__ctLicenseInit) return; // idempotent
-  window.__ctLicenseInit = true;
-
-  var REPO = 'https://github.com/codercowboy/claude-tools';
-  var MIT = [
-    'MIT License',
-    '',
-    'Copyright (c) 2026 Jason and Claude (Anthropic)',
-    '',
-    'Permission is hereby granted, free of charge, to any person obtaining a copy',
-    'of this software and associated documentation files (the "Software"), to deal',
-    'in the Software without restriction, including without limitation the rights',
-    'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
-    'copies of the Software, and to permit persons to whom the Software is',
-    'furnished to do so, subject to the following conditions:',
-    '',
-    'The above copyright notice and this permission notice shall be included in all',
-    'copies or substantial portions of the Software.',
-    '',
-    'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
-    'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
-    'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
-    'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
-    'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
-    'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
-    'SOFTWARE.'
-  ].join('\n');
-
-  var overlay, dialog, prevFocus, styleEl;
-
-  function esc(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
-  }
-
-  function injectStyles() {
-    if (styleEl) return;
-    styleEl = document.createElement('style');
-    styleEl.textContent =
-      '.ctl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
-      '.ctl-overlay[hidden]{display:none!important;}' +
-      '@media (prefers-reduced-motion:no-preference){.ctl-overlay{animation:ctl-fade .15s ease;}@keyframes ctl-fade{from{opacity:0}to{opacity:1}}}' +
-      '.ctl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
-      '.ctl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
-      '.ctl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
-      '.ctl-dialog a{color:LinkText;}' +
-      '.ctl-lead{margin:0 0 .8rem;}' +
-      '.ctl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
-      '.ctl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.ctl-tp li{margin-bottom:.3rem;}' +
-      '.ctl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
-      '.ctl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
-      '.ctl-close:hover{background:rgba(127,127,127,.18);}' +
-      '.ctl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
-    (document.head || document.documentElement).appendChild(styleEl);
-  }
-
-  function build() {
-    injectStyles();
-    overlay = document.createElement('div');
-    overlay.className = 'ctl-overlay';
-    overlay.hidden = true;
-    overlay.setAttribute('data-testid', 'license-overlay');
-    overlay.innerHTML =
-      '<div class="ctl-dialog" role="dialog" aria-modal="true" aria-labelledby="ctl-title" data-testid="license-modal">' +
-        '<button type="button" class="ctl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
-        '<h2 id="ctl-title">License</h2>' +
-        '<div class="ctl-body"></div>' +
-      '</div>';
-    document.body.appendChild(overlay);
-    dialog = overlay.querySelector('.ctl-dialog');
-    overlay.querySelector('.ctl-close').addEventListener('click', close);
-    overlay.addEventListener('mousedown', function (e) {
-      if (e.target === overlay) { e.preventDefault(); close(); }
-    });
-  }
-
-  function renderBody() {
-    var html =
-      '<p class="ctl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
-      '<a href="' + REPO + '" target="_blank" rel="noopener noreferrer">github.com/codercowboy/claude-tools</a></p>' +
-      '<pre class="ctl-text">' + esc(MIT) + '</pre>';
-    var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
-    if (tp.length) {
-      html += '<h3>Bundled third-party libraries</h3><ul class="ctl-tp">';
-      tp.forEach(function (d) {
-        var label = esc(d.name || '') + (d.version ? ' ' + esc(d.version) : '');
-        var lic = d.license ? ' &mdash; ' + esc(d.license) : '';
-        var link = d.url ? ' &middot; <a href="' + esc(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
-        html += '<li>' + label + lic + link + '</li>';
-      });
-      html += '</ul><p class="ctl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
-    } else {
-      html += '<p class="ctl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
-    }
-    overlay.querySelector('.ctl-body').innerHTML = html;
-  }
-
-  function focusables() {
-    return Array.prototype.slice
-      .call(dialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
-      .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
-  }
-
-  function onKey(e) {
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-    if (e.key !== 'Tab') return;
-    var f = focusables();
-    if (!f.length) return;
-    e.preventDefault();
-    var i = f.indexOf(document.activeElement);
-    var n = e.shiftKey ? i - 1 : i + 1;
-    if (n < 0) n = f.length - 1;
-    if (n >= f.length) n = 0;
-    f[n].focus();
-  }
-
-  function open() {
-    if (!overlay) build();
-    renderBody();
-    prevFocus = document.activeElement;
-    // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
-    var host = document.fullscreenElement || document.body;
-    if (overlay.parentNode !== host) host.appendChild(overlay);
-    overlay.hidden = false;
-    document.addEventListener('keydown', onKey, true);
-    dialog.scrollTop = 0;
-    overlay.querySelector('.ctl-close').focus({ preventScroll: true });
-  }
-
-  function close() {
-    if (!overlay || overlay.hidden) return;
-    overlay.hidden = true;
-    document.removeEventListener('keydown', onKey, true);
-    if (overlay.parentNode !== document.body) document.body.appendChild(overlay);
-    if (prevFocus && typeof prevFocus.focus === 'function') { try { prevFocus.focus(); } catch (e) {} }
-    prevFocus = null;
-  }
-
-  window.ctLicense = open;
-
-  document.addEventListener('click', function (e) {
-    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
-    if (t) { e.preventDefault(); open(); }
-  });
-})();
-
-</script>
 <!---- end footer -->
 
 
-<script>
-// ===== Begin ctConfirm =====
+
+<script type="module">
+/* ct:module components/CtConfirm.mjs */
+const __ct_components_CtConfirm = (() => {
+// ===== Begin CtConfirm (ES module) =====
 /*
- * ctConfirm(message?) -> Promise<boolean>
+ * confirmDialog(message?) -> Promise<boolean>   (ES module; was the jbcConfirm window global)
  * ---------------------------------------------------------------------------
- * A tiny, dependency-free confirm dialog for claude-tools. Pasteable, not
- * imported: drop this whole block (sentinels included) inside a <script> tag
- * in a tool's single-file index.html, then:
+ * A tiny, dependency-free confirm dialog for single-file tools.
  *
- *     if (await ctConfirm('Remove this color?')) { ...do it... }
+ *     import { confirmDialog } from '<rel>/jbc-include/components/CtConfirm.mjs';
+ *     // (or `CtConfirm.confirm` via the aggregator class at the bottom — the
+ *     //  static REFERENCES the named binding, single implementation. The named
+ *     //  export is `confirmDialog`, NOT `confirm`, so it never shadows window.confirm.)
+ *
+ *     if (await confirmDialog('Remove this color?')) { ...do it... }
  *
  * - Returns a Promise<boolean>: true = confirmed, false = cancelled.
  * - message is optional; null/empty/whitespace becomes "Are you sure?".
@@ -1029,154 +873,170 @@ button {
  *   (.ctc-overlay/.ctc-dialog/.ctc-message/.ctc-buttons/.ctc-btn/
  *   .ctc-btn--cancel/.ctc-btn--yes).
  *
- * This is a shared component inlined by the build.
+ * Formerly a pasteable IIFE script exposing the old `jbcConfirm` window global
+ * (vendored copies called it `ctConfirm`); those globals are GONE — `confirmDialog` =
+ * ex-jbcConfirm, body unchanged. The CSS still self-injects on the first call
+ * (ensureConfirmStyles) and the `window.ctConfirmStyles = false` opt-out is still honored.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
  * Edit here and run `npm run build` — every tool picks it up; there is no hash
  * to recompute. Canonical source:
- * tools/include/confirm.js
+ * html-single-file/assets/components/CtConfirm.mjs
  */
-(function () {
-  if (window.ctConfirm) return; // idempotent if pasted more than once
 
-  var STYLE_ID = 'ctc-style';
-  function ensureStyles() {
-    if (window.ctConfirmStyles === false) return; // tool supplies its own CSS
-    if (document.getElementById(STYLE_ID)) return;
-    var style = document.createElement('style');
-    style.id = STYLE_ID;
-    style.textContent = [
-      '.ctc-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;',
-      'align-items:center;justify-content:center;padding:1rem;',
-      'color-scheme:light dark;background:var(--ctc-backdrop,rgba(0,0,0,0.5));}',
-      '.ctc-dialog{box-sizing:border-box;width:100%;',
-      'max-width:var(--ctc-max-width,22rem);padding:1.25rem 1.25rem 1rem;',
-      'background:var(--ctc-bg,Canvas);color:var(--ctc-fg,CanvasText);',
-      'border-radius:var(--ctc-radius,12px);',
-      'box-shadow:var(--ctc-shadow,0 10px 40px rgba(0,0,0,0.3));',
-      'font-family:var(--ctc-font,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);}',
-      '.ctc-message{margin:0 0 1.1rem;font-size:1rem;line-height:1.45;}',
-      '.ctc-buttons{display:flex;justify-content:flex-end;gap:0.6rem;}',
-      '.ctc-btn{box-sizing:border-box;min-height:44px;padding:0.5rem 1.1rem;',
-      'border-radius:var(--ctc-btn-radius,8px);font:inherit;font-weight:600;',
-      'cursor:pointer;border:1px solid transparent;}',
-      '.ctc-btn:focus-visible{outline:2px solid var(--ctc-focus,AccentColor);',
-      'outline-offset:2px;}',
-      '.ctc-btn--cancel{background:transparent;color:inherit;',
-      'border-color:var(--ctc-cancel-border,rgba(128,128,128,0.5));}',
-      '.ctc-btn--cancel:hover{background:rgba(128,128,128,0.15);}',
-      '.ctc-btn--yes{background:var(--ctc-accent,AccentColor);',
-      'color:var(--ctc-accent-fg,AccentColorText);}',
-      '.ctc-btn--yes:hover{filter:brightness(1.08);}'
-    ].join('');
-    document.head.appendChild(style);
-  }
+var CONFIRM_STYLE_ID = 'ctc-style';
+function ensureConfirmStyles() {
+  if (window.ctConfirmStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(CONFIRM_STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = CONFIRM_STYLE_ID;
+  style.textContent = [
+    '.ctc-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;',
+    'align-items:center;justify-content:center;padding:1rem;',
+    'color-scheme:light dark;background:var(--ctc-backdrop,rgba(0,0,0,0.5));}',
+    '.ctc-dialog{box-sizing:border-box;width:100%;',
+    'max-width:var(--ctc-max-width,22rem);padding:1.25rem 1.25rem 1rem;',
+    'background:var(--ctc-bg,Canvas);color:var(--ctc-fg,CanvasText);',
+    'border-radius:var(--ctc-radius,12px);',
+    'box-shadow:var(--ctc-shadow,0 10px 40px rgba(0,0,0,0.3));',
+    'font-family:var(--ctc-font,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);}',
+    '.ctc-message{margin:0 0 1.1rem;font-size:1rem;line-height:1.45;}',
+    '.ctc-buttons{display:flex;justify-content:flex-end;gap:0.6rem;}',
+    '.ctc-btn{box-sizing:border-box;min-height:44px;padding:0.5rem 1.1rem;',
+    'border-radius:var(--ctc-btn-radius,8px);font:inherit;font-weight:600;',
+    'cursor:pointer;border:1px solid transparent;}',
+    '.ctc-btn:focus-visible{outline:2px solid var(--ctc-focus,AccentColor);',
+    'outline-offset:2px;}',
+    '.ctc-btn--cancel{background:transparent;color:inherit;',
+    'border-color:var(--ctc-cancel-border,rgba(128,128,128,0.5));}',
+    '.ctc-btn--cancel:hover{background:rgba(128,128,128,0.15);}',
+    '.ctc-btn--yes{background:var(--ctc-accent,AccentColor);',
+    'color:var(--ctc-accent-fg,AccentColorText);}',
+    '.ctc-btn--yes:hover{filter:brightness(1.08);}'
+  ].join('');
+  document.head.appendChild(style);
+}
 
-  window.ctConfirm = function (message) {
-    ensureStyles();
-    var text = (message == null || String(message).trim() === '')
-      ? 'Are you sure?' : String(message);
+function confirmDialog(message) {
+  ensureConfirmStyles();
+  var text = (message == null || String(message).trim() === '')
+    ? 'Are you sure?' : String(message);
 
-    return new Promise(function (resolve) {
-      var previouslyFocused = document.activeElement;
+  return new Promise(function (resolve) {
+    var previouslyFocused = document.activeElement;
 
-      var overlay = document.createElement('div');
-      overlay.className = 'ctc-overlay';
+    var overlay = document.createElement('div');
+    overlay.className = 'ctc-overlay';
 
-      var dialog = document.createElement('div');
-      dialog.className = 'ctc-dialog';
-      dialog.setAttribute('role', 'dialog');
-      dialog.setAttribute('aria-modal', 'true');
+    var dialog = document.createElement('div');
+    dialog.className = 'ctc-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
 
-      var msgEl = document.createElement('p');
-      msgEl.className = 'ctc-message';
-      msgEl.textContent = text;
-      var msgId = 'ctc-msg-' + Math.random().toString(36).slice(2);
-      msgEl.id = msgId;
-      dialog.setAttribute('aria-labelledby', msgId);
+    var msgEl = document.createElement('p');
+    msgEl.className = 'ctc-message';
+    msgEl.textContent = text;
+    var msgId = 'ctc-msg-' + Math.random().toString(36).slice(2);
+    msgEl.id = msgId;
+    dialog.setAttribute('aria-labelledby', msgId);
 
-      var buttons = document.createElement('div');
-      buttons.className = 'ctc-buttons';
+    var buttons = document.createElement('div');
+    buttons.className = 'ctc-buttons';
 
-      var cancelBtn = document.createElement('button');
-      cancelBtn.type = 'button';
-      cancelBtn.className = 'ctc-btn ctc-btn--cancel';
-      cancelBtn.textContent = 'Cancel';
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'ctc-btn ctc-btn--cancel';
+    cancelBtn.textContent = 'Cancel';
 
-      var yesBtn = document.createElement('button');
-      yesBtn.type = 'button';
-      yesBtn.className = 'ctc-btn ctc-btn--yes';
-      yesBtn.textContent = 'Yes';
+    var yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'ctc-btn ctc-btn--yes';
+    yesBtn.textContent = 'Yes';
 
-      buttons.appendChild(cancelBtn);
-      buttons.appendChild(yesBtn);
-      dialog.appendChild(msgEl);
-      dialog.appendChild(buttons);
-      overlay.appendChild(dialog);
-      document.body.appendChild(overlay);
+    buttons.appendChild(cancelBtn);
+    buttons.appendChild(yesBtn);
+    dialog.appendChild(msgEl);
+    dialog.appendChild(buttons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
 
-      var done = false;
-      function close(result) {
-        if (done) return;
-        done = true;
-        document.removeEventListener('keydown', onKeydown, true);
-        overlay.remove();
-        if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
-          try { previouslyFocused.focus(); } catch (e) { /* ignore */ }
-        }
-        resolve(result);
+    var done = false;
+    function close(result) {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKeydown, true);
+      overlay.remove();
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        try { previouslyFocused.focus(); } catch (e) { /* ignore */ }
       }
+      resolve(result);
+    }
 
-      function onKeydown(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          close(true);
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          close(false);
-        } else if (e.key === 'Tab') {
-          // trap focus between the two buttons
-          e.preventDefault();
-          var order = [cancelBtn, yesBtn];
-          var idx = order.indexOf(document.activeElement);
-          var next = e.shiftKey ? idx - 1 : idx + 1;
-          if (next < 0) next = order.length - 1;
-          if (next >= order.length) next = 0;
-          order[next].focus();
-        }
+    function onKeydown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        close(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        close(false);
+      } else if (e.key === 'Tab') {
+        // trap focus between the two buttons
+        e.preventDefault();
+        var order = [cancelBtn, yesBtn];
+        var idx = order.indexOf(document.activeElement);
+        var next = e.shiftKey ? idx - 1 : idx + 1;
+        if (next < 0) next = order.length - 1;
+        if (next >= order.length) next = 0;
+        order[next].focus();
       }
+    }
 
-      document.addEventListener('keydown', onKeydown, true);
-      overlay.addEventListener('mousedown', function (e) {
-        if (e.target === overlay) close(false);
-      });
-      cancelBtn.addEventListener('click', function () { close(false); });
-      yesBtn.addEventListener('click', function () { close(true); });
-
-      yesBtn.focus(); // "Yes" is the default
+    document.addEventListener('keydown', onKeydown, true);
+    overlay.addEventListener('mousedown', function (e) {
+      if (e.target === overlay) close(false);
     });
-  };
+    cancelBtn.addEventListener('click', function () { close(false); });
+    yesBtn.addEventListener('click', function () { close(true); });
+
+    yesBtn.focus(); // "Yes" is the default
+  });
+}
+
+/** Aggregator (decision #3): static REFERENCES the named export above. */
+class CtConfirm {
+  static confirm = confirmDialog;
+}
+// ===== end CtConfirm =====
+return { confirmDialog, CtConfirm };
 })();
-// ===== end ctConfirm =====
+const { confirmDialog, CtConfirm } = __ct_components_CtConfirm;
 
-</script>
-
-<script>
-// ===== Begin ctCopy =====
+/* ct:module components/CtClipboardUtil.mjs */
+const __ct_components_CtClipboardUtil = (() => {
+// ===== Begin CtClipboardUtil (ES module) =====
 /*
- * ctCopy(text) -> Promise<boolean>
- * ctFlash(el, opts?) -> void
+ * CtClipboardUtil — copy-to-clipboard + button-flash helpers (ES module; was copy.js)
  * ---------------------------------------------------------------------------
- * Tiny, dependency-free copy-to-clipboard helpers for claude-tools. Pasteable,
- * not imported: drop this whole block (sentinels included) inside a <script>
- * tag in a tool's single-file index.html, then:
+ * import { copy, flash } from '<rel>/jbc-include/components/CtClipboardUtil.mjs';
+ * (or `CtClipboardUtil.copy` / `CtClipboardUtil.flash` via the aggregator class
+ * at the bottom — statics REFERENCE the named bindings, single implementation.)
+ *
+ * Formerly the pasteable IIFE copy.js exposing the jbcCopy / jbcFlash window globals;
+ * those globals are GONE. `copy` = ex-jbcCopy, `flash` = ex-jbcFlash — bodies
+ * unchanged. The `.ctc-flash` CSS still self-injects on the first `flash()` call
+ * (ensureStyles) and the `window.ctCopyStyles = false` opt-out is still honored.
+ *
+ * copy(text) -> Promise<boolean>
+ * flash(el, opts?) -> void
  *
  *     btn.addEventListener('click', async () => {
  *       if (!text) return;
- *       const ok = await ctCopy(text);
+ *       const ok = await copy(text);
  *       if (!ok) return;
- *       ctFlash(btn, { label: '✅', revertTo: '📋' });
+ *       flash(btn, { label: '✅', revertTo: '📋' });
  *     });
  *
- * ctCopy(text):
+ * copy(text):
  * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
  *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
  *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
@@ -1185,13 +1045,13 @@ button {
  *   `false` if every copy path failed (denied permission, unsupported
  *   browser, etc.) — callers check the boolean rather than try/catch.
  *
- * ctFlash(el, opts?):
+ * flash(el, opts?):
  * - Transient "copied" feedback on a button: swaps `el.textContent` to
  *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
  *   reverts and clears the timer.
  * - Revert target: `opts.revertTo` if given (for icon-only buttons that
  *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
- *   current text — captured once and reused if `ctFlash` is called again on
+ *   current text — captured once and reused if `flash` is called again on
  *   the same element before the previous flash reverted (rapid re-clicks
  *   don't lose the true original label).
  * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
@@ -1203,94 +1063,272 @@ button {
  *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
  *   text swap + revert timing are unaffected either way).
  * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
- *   `ctFlash` call and no styles are injected.
+ *   `flash` call and no styles are injected.
  *
- * This is a shared component inlined by the build.
+ * This is a shared component inlined by the build (import-inlining; no globals).
  * Edit here and run `npm run build` — every tool picks it up; there is no hash
  * to recompute. Canonical source:
- * tools/include/copy.js
+ * html-single-file/assets/components/CtClipboardUtil.mjs
  */
-(function () {
-  if (window.ctCopy && window.ctFlash) return; // idempotent if pasted more than once
 
-  window.ctCopy = function (text) {
-    text = String(text == null ? '' : text);
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text).then(
-        function () { return true; },
-        function () { return fallbackCopy(text); }
-      );
-    }
-    return Promise.resolve(fallbackCopy(text));
-  };
 
-  function fallbackCopy(text) {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    var ok = false;
-    try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
-    document.body.removeChild(ta);
-    return ok;
+function copy(text) {
+  text = String(text == null ? '' : text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      function () { return true; },
+      function () { return fallbackCopy(text); }
+    );
   }
+  return Promise.resolve(fallbackCopy(text));
+}
 
-  var STYLE_ID = 'ctc-copy-style';
-  function ensureStyles() {
-    if (window.ctCopyStyles === false) return; // tool supplies its own CSS
-    if (document.getElementById(STYLE_ID)) return;
-    var style = document.createElement('style');
-    style.id = STYLE_ID;
-    style.textContent = [
-      '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
-      '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
-      '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
-      '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
-    ].join('');
-    document.head.appendChild(style);
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+var STYLE_ID = 'ctc-copy-style';
+function ensureStyles() {
+  if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = [
+    '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+    '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+    '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+    '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+var flashTimeouts = new WeakMap();
+function flash(el, opts) {
+  opts = opts || {};
+  var ms = opts.ms != null ? opts.ms : 1000;
+  var label = opts.label != null ? opts.label : '✅';
+
+  ensureStyles();
+  clearTimeout(flashTimeouts.get(el));
+
+  var original;
+  if (opts.revertTo != null) {
+    original = opts.revertTo;
+  } else if (el.dataset.ctcFlashOriginal != null) {
+    original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+  } else {
+    original = el.textContent;
   }
+  el.dataset.ctcFlashOriginal = original;
 
-  var flashTimeouts = new WeakMap();
-  window.ctFlash = function (el, opts) {
-    opts = opts || {};
-    var ms = opts.ms != null ? opts.ms : 1000;
-    var label = opts.label != null ? opts.label : '✅';
+  el.textContent = label;
+  el.classList.remove('ctc-flash');
+  void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+  el.classList.add('ctc-flash');
 
-    ensureStyles();
-    clearTimeout(flashTimeouts.get(el));
-
-    var original;
-    if (opts.revertTo != null) {
-      original = opts.revertTo;
-    } else if (el.dataset.ctcFlashOriginal != null) {
-      original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
-    } else {
-      original = el.textContent;
-    }
-    el.dataset.ctcFlashOriginal = original;
-
-    el.textContent = label;
+  var t = setTimeout(function () {
+    el.textContent = original;
     el.classList.remove('ctc-flash');
-    void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
-    el.classList.add('ctc-flash');
+    delete el.dataset.ctcFlashOriginal;
+    flashTimeouts.delete(el);
+  }, ms);
+  flashTimeouts.set(el, t);
+}
 
-    var t = setTimeout(function () {
-      el.textContent = original;
-      el.classList.remove('ctc-flash');
-      delete el.dataset.ctcFlashOriginal;
-      flashTimeouts.delete(el);
-    }, ms);
-    flashTimeouts.set(el, t);
-  };
+/** Aggregator (decision #3): statics REFERENCE the named exports above. */
+class CtClipboardUtil {
+  static copy = copy;
+  static flash = flash;
+}
+// ===== end CtClipboardUtil =====
+return { copy, flash, CtClipboardUtil };
 })();
-// ===== end ctCopy =====
+const { copy, flash, CtClipboardUtil } = __ct_components_CtClipboardUtil;
 
-</script>
+/* ct:module components/CtLicense.mjs */
+const __ct_components_CtLicense = (() => {
+/* CtLicense — shared License modal (components/CtLicense.mjs).
+   An ES module with a SIDE-EFFECT: importing it wires a global click listener
+   (once) that opens the modal on any [data-ct-license] trigger (the footer link in
+   components/footer.html). Every tool that carries the footer imports this module in its
+   app.mjs, so the footer link works for free; the footer no longer inlines a script.
+   Also callable as `openLicense()` / `CtLicense.open()` (there is no window global
+   any more). Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (e.g. a tool that bundles a wasm codec — a per-tool DATA config hook, read at
+   open time). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. Module-private names carry a "License"
+   qualifier so the build's import-flattening cannot collide with app.mjs top-levels. */
+var LICENSE_REPO = 'https://github.com/codercowboy/claude-tools';
+var LICENSE_REPO_LABEL = LICENSE_REPO.replace(/^https?:\/\//, '');
+var LICENSE_MIT_TEXT = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Jason and Claude (Anthropic)',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
 
-<script type="module">
+var licenseOverlay, licenseDialog, licensePrevFocus, licenseStyleEl;
+
+function escapeLicenseHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function injectLicenseStyles() {
+  if (licenseStyleEl) return;
+  licenseStyleEl = document.createElement('style');
+  licenseStyleEl.textContent =
+    '.jbcl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+    '.jbcl-overlay[hidden]{display:none!important;}' +
+    '@media (prefers-reduced-motion:no-preference){.jbcl-overlay{animation:jbcl-fade .15s ease;}@keyframes jbcl-fade{from{opacity:0}to{opacity:1}}}' +
+    '.jbcl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+    '.jbcl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+    '.jbcl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+    '.jbcl-dialog a{color:LinkText;}' +
+    '.jbcl-lead{margin:0 0 .8rem;}' +
+    '.jbcl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+    '.jbcl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.jbcl-tp li{margin-bottom:.3rem;}' +
+    '.jbcl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+    '.jbcl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+    '.jbcl-close:hover{background:rgba(127,127,127,.18);}' +
+    '.jbcl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+  (document.head || document.documentElement).appendChild(licenseStyleEl);
+}
+
+function buildLicenseDialog() {
+  injectLicenseStyles();
+  licenseOverlay = document.createElement('div');
+  licenseOverlay.className = 'jbcl-overlay';
+  licenseOverlay.hidden = true;
+  licenseOverlay.setAttribute('data-testid', 'license-overlay');
+  licenseOverlay.innerHTML =
+    '<div class="jbcl-dialog" role="dialog" aria-modal="true" aria-labelledby="jbcl-title" data-testid="license-modal">' +
+      '<button type="button" class="jbcl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+      '<h2 id="jbcl-title">License</h2>' +
+      '<div class="jbcl-body"></div>' +
+    '</div>';
+  document.body.appendChild(licenseOverlay);
+  licenseDialog = licenseOverlay.querySelector('.jbcl-dialog');
+  licenseOverlay.querySelector('.jbcl-close').addEventListener('click', closeLicense);
+  licenseOverlay.addEventListener('mousedown', function (e) {
+    if (e.target === licenseOverlay) { e.preventDefault(); closeLicense(); }
+  });
+}
+
+function renderLicenseBody() {
+  var html =
+    '<p class="jbcl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+    '<a href="' + LICENSE_REPO + '" target="_blank" rel="noopener noreferrer">' + LICENSE_REPO_LABEL + '</a></p>' +
+    '<pre class="jbcl-text">' + escapeLicenseHtml(LICENSE_MIT_TEXT) + '</pre>';
+  var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+  if (tp.length) {
+    html += '<h3>Bundled third-party libraries</h3><ul class="jbcl-tp">';
+    tp.forEach(function (d) {
+      var label = escapeLicenseHtml(d.name || '') + (d.version ? ' ' + escapeLicenseHtml(d.version) : '');
+      var lic = d.license ? ' &mdash; ' + escapeLicenseHtml(d.license) : '';
+      var link = d.url ? ' &middot; <a href="' + escapeLicenseHtml(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+      html += '<li>' + label + lic + link + '</li>';
+    });
+    html += '</ul><p class="jbcl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+  } else {
+    html += '<p class="jbcl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+  }
+  licenseOverlay.querySelector('.jbcl-body').innerHTML = html;
+}
+
+function licenseFocusables() {
+  return Array.prototype.slice
+    .call(licenseDialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+    .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+}
+
+function onLicenseKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeLicense(); return; }
+  if (e.key !== 'Tab') return;
+  var f = licenseFocusables();
+  if (!f.length) return;
+  e.preventDefault();
+  var i = f.indexOf(document.activeElement);
+  var n = e.shiftKey ? i - 1 : i + 1;
+  if (n < 0) n = f.length - 1;
+  if (n >= f.length) n = 0;
+  f[n].focus();
+}
+
+function openLicense() {
+  if (!licenseOverlay) buildLicenseDialog();
+  renderLicenseBody();
+  licensePrevFocus = document.activeElement;
+  // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+  var host = document.fullscreenElement || document.body;
+  if (licenseOverlay.parentNode !== host) host.appendChild(licenseOverlay);
+  licenseOverlay.hidden = false;
+  document.addEventListener('keydown', onLicenseKey, true);
+  licenseDialog.scrollTop = 0;
+  licenseOverlay.querySelector('.jbcl-close').focus({ preventScroll: true });
+}
+
+function closeLicense() {
+  if (!licenseOverlay || licenseOverlay.hidden) return;
+  licenseOverlay.hidden = true;
+  document.removeEventListener('keydown', onLicenseKey, true);
+  if (licenseOverlay.parentNode !== document.body) document.body.appendChild(licenseOverlay);
+  if (licensePrevFocus && typeof licensePrevFocus.focus === 'function') { try { licensePrevFocus.focus(); } catch (e) {} }
+  licensePrevFocus = null;
+}
+
+var licenseTriggerWired = false;
+function wireLicenseTrigger() {
+  if (licenseTriggerWired || typeof document === 'undefined') return; // idempotent
+  licenseTriggerWired = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); openLicense(); }
+  });
+}
+wireLicenseTrigger(); // self-wire on module evaluation
+
+class CtLicense {
+  static open = openLicense;
+}
+return { openLicense, CtLicense };
+})();
+const { openLicense, CtLicense } = __ct_components_CtLicense;
+
+
   // =====================================================================
   // 1. DOM references
   // =====================================================================
@@ -2196,21 +2234,21 @@ button {
     trashBtn.title = 'Remove color'; // icon-only button: hover tooltip alongside aria-label
     trashBtn.textContent = '🗑';
     trashBtn.addEventListener('click', async () => {
-      if (await ctConfirm('Remove this color?')) removeColorById(color.id);
+      if (await confirmDialog('Remove this color?')) removeColorById(color.id);
     });
     li.appendChild(trashBtn);
 
     return li;
   }
 
-  // Shared ctCopy/ctFlash (tools/include/copy.js, pasted above as a classic
+  // Shared copy/flash (tools/include/copy.js, pasted above as a classic
   // <script>).
   async function handleCopyClick(btn, text) {
     if (!text) return; // nothing to copy (defensive; Copy-all is disabled when empty)
-    const ok = await ctCopy(text);
+    const ok = await copy(text);
     if (!ok) return;
     const current = btn.dataset.ctcFlashOriginal ?? btn.textContent;
-    ctFlash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
+    flash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
   }
 
   // =====================================================================
@@ -2218,13 +2256,13 @@ button {
   // =====================================================================
   // Per docs/conventions.md "Destructive actions require confirmation", both
   // the per-row trash button (above, in buildRow) and Remove all use the
-  // shared ctConfirm(message) component (tools/include/confirm.js, pasted
+  // shared confirmDialog(message) component (tools/include/confirm.js, pasted
   // above as a classic <script>) rather than a bespoke modal —
   // removeColorById(id)/removeAllColors() remain direct, non-modal calls
-  // (used here only after ctConfirm resolves true, and by tests).
+  // (used here only after confirmDialog resolves true, and by tests).
   removeAllBtn.addEventListener('click', async () => {
     if (state.colors.length === 0) return;
-    if (await ctConfirm('Remove all colors?')) removeAllColors();
+    if (await confirmDialog('Remove all colors?')) removeAllColors();
   });
 
   rgbaCopyAllBtn.addEventListener('click', () => handleCopyClick(rgbaCopyAllBtn, rgbaOutputEl.value));
@@ -2233,7 +2271,7 @@ button {
   // =====================================================================
   // 11a. Help modal — docs/conventions.md "First-load help popup (all
   // tools)". Purely informational (what the tool does + how to use it), so
-  // it's its own small dedicated dialog rather than ctConfirm (which is a
+  // it's its own small dedicated dialog rather than confirmDialog (which is a
   // yes/no destructive-action confirm). Markup is static in the document
   // (shown/hidden via [hidden]) rather than built/torn down per open/close.
   // Structure/focus-handling mirrors tools/hat-picker's and
@@ -2336,7 +2374,7 @@ button {
     hexOutput,
 
     // Direct, non-modal removal — used by tests that don't need to drive the
-    // shared ctConfirm dialog (see section 11), same pattern as
+    // shared confirmDialog dialog (see section 11), same pattern as
     // tools/hat-picker's window.__hatPicker.removeEntry/clear.
     removeColorById,
     removeAllColors,
@@ -2392,6 +2430,7 @@ button {
     });
   });
   stageResizeObserver.observe(stage);
+
 </script>
 </body>
 </html>

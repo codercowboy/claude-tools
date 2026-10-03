@@ -48,7 +48,7 @@
 
   * { box-sizing: border-box; }
 
-  <<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
 </head>
 <body>
 <div class="app">
@@ -146,16 +146,16 @@
   </div>
 </div>
 
-<<ct:include footer.html>>
-
-<script>
-<<ct:include copy.js>>
-</script>
+<<ct:lib components/footer.html>>
 
 <script>
   window.__INFLATION_CPI__ = <<ct:inline cpi-data.json>>;
 </script>
 
-<script type="module"><<ct:inline app.mjs>></script>
+<script type="module">
+<<ct:module components/CtClipboardUtil.mjs>>
+<<ct:module components/CtLicense.mjs>>
+<<ct:inline app.mjs>>
+</script>
 </body>
 </html>

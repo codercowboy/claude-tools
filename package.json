@@ -27,8 +27,9 @@
     "build:check": "node scripts/build-all.mjs --check",
     "postinstall": "node scripts/install-all.mjs",
     "install:all": "node scripts/install-all.mjs",
+    "test:lib": "node --test src/lib/tests/",
     "test:all": "node scripts/test-all.mjs",
-    "serve": "node scripts/serve.mjs src/tools"
+    "serve": "node scripts/serve.mjs src"
   },
   "bin": {
     "ct": "scripts/ct.mjs"
@@ -58,7 +59,7 @@
     "tools"
   ],
   "optionalDependencies": {
-    "@codercowboy/claude-tpm": "file:../../tpm-workspace/claude-tpm",
+    "@codercowboy/claude-tpm": "file:../../tpm-workspace/claude-tpm-0.1.0",
     "jason-code": "file:../../jason-code"
   }
 }

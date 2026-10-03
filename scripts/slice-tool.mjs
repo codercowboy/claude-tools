@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 /*
  * slice-tool.mjs — migration aid: slice a hand-authored single-file tool into
- * the build-assembled `source/` layout (see docs/conventions.md § Build-assembled
- * tools). Detects the pasted shared-include blocks and the tool's own CSS/JS and
- * rewrites them as <<ct:include …>> / <<ct:inline …>> tokens, then SELF-CHECKS
- * that expanding the tokens reproduces the original byte-for-byte before writing
+ * the build-assembled `source/` layout (see docs/conventions.md § Build-assembled tools).
+ * Detects the pasted shared-include blocks and the tool's own CSS/JS and rewrites
+ * them as <<ct:include …>> / <<ct:inline …>> tokens, then SELF-CHECKS that
+ * expanding the tokens reproduces the original byte-for-byte before writing
  * anything. If it can't, it throws and writes nothing — slice that tool by hand.
+ *
+ * LEGACY: the flat-include library it checked blocks against (the old
+ * flat-include lib) is retired, so this only works when $JC_INCLUDE_DIR
+ * (see build-tool.mjs resolveIncludeDir) points at an include dir.
  *
  * Usage:
  *   node scripts/slice-tool.mjs --dir=src/tools/foo          # write source/
@@ -14,9 +18,14 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { resolveIncludeDir } from './build-tool.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const INCLUDE_DIR = join(REPO, 'src', 'tools', 'jbc-include');
+const INCLUDE_DIR = resolveIncludeDir(REPO);
+if (!INCLUDE_DIR && !process.argv.includes('--help')) {
+  console.error('slice-tool: legacy flat-include dir is retired; set $JC_INCLUDE_DIR to use this migration aid.');
+  process.exit(1);
+}
 
 // Shared include blocks: [name, beginNeedle, endNeedle].
 const INCLUDES = [
@@ -49,9 +58,15 @@ export function sliceTool(toolDir, { dry = false } = {}) {
     const blk = findBlock(html, begin, end);
     if (!blk) continue;
     if (html.split(blk).length !== 2) throw new Error(`${label}: include ${name} block not unique`);
-    // sanity: block body should match the canonical include body
+    // sanity: block body should match the canonical include body. Skip the strict
+    // equality check for a canonical file that carries {{project.*}} tokens or a
+    // nested <<ct:include|inline …>> (e.g. footer.html): its shipped block holds
+    // the SUBSTITUTED project values and the EXPANDED nested include, so it can
+    // never equal the tokenized canonical text. It's still tokenized/inlined
+    // normally, and the byte-for-byte SELF-CHECK below still proves losslessness.
     const canon = readFileSync(join(INCLUDE_DIR, name), 'utf8');
-    if (canon.trim() !== blk.trim()) throw new Error(`${label}: ${name} block differs from canonical include`);
+    const canonHasTokens = /\{\{project\./.test(canon) || /<<ct:(include|inline) [\w.-]+>>/.test(canon);
+    if (!canonHasTokens && canon.trim() !== blk.trim()) throw new Error(`${label}: ${name} block differs from canonical include`);
     html = html.split(blk).join(`<<ct:include ${name}>>`);
     tokenText[name] = blk;
     includesUsed.push(name);

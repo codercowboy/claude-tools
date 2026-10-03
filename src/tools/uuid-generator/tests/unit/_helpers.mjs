@@ -2,9 +2,9 @@
 // Dev/test-only — never referenced by index.html.
 //
 // The shared memoized logic loader now lives in the shared test-support module
-// (../../../test-support/unit.mjs); this file re-exports it and keeps the
+// (../../../../lib/test-support/unit.mjs); this file re-exports it and keeps the
 // tool-specific fixture helpers below.
-import { loadLogic as loadSharedLogic } from '../../../test-support/unit.mjs';
+import { loadLogic as loadSharedLogic } from '../../../../lib/test-support/unit.mjs';
 
 // loadLogic() -> Promise of source/logic.mjs's module namespace (memoized).
 export function loadLogic() {

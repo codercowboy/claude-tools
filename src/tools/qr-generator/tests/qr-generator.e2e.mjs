@@ -36,8 +36,8 @@ import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
 import QRCode from 'qrcode';
 // Shared test-support (imported, never inlined into the shipped index.html).
-import { toolUrl, helpSeenKey, seedHelpSeen } from '../../test-support/setup.mjs';
-import { assertLicenseModal } from '../../test-support/shared-ui.mjs';
+import { toolUrl, helpSeenKey, seedHelpSeen } from '../../../lib/test-support/setup.mjs';
+import { assertLicenseModal } from '../../../lib/test-support/shared-ui.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TOOL_URL = toolUrl(import.meta.url);
@@ -1126,8 +1126,8 @@ test.describe('Help modal: opens scrolled to the top', () => {
 
 // ===========================================================================
 // 10c. License modal (shared src/tools/include/license.js, inlined via the
-// footer). Footer trigger [data-testid="footer-license-link"] (or
-// window.ctLicense()) opens an accessible modal (role=dialog, aria-modal,
+// footer). Footer trigger [data-testid="footer-license-link"] (self-wired by
+// CtLicense; no window.ctLicense global) opens an accessible modal (role=dialog, aria-modal,
 // initial focus on the ✕, Esc/backdrop/✕ all dismiss + return focus to the
 // footer link). Mirrors the Help-modal block's style above. This tool declares
 // no window.ctThirdParty, so the body shows the "100% vanilla" note.

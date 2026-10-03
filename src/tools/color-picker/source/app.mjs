@@ -887,21 +887,21 @@
     trashBtn.title = 'Remove color'; // icon-only button: hover tooltip alongside aria-label
     trashBtn.textContent = '🗑';
     trashBtn.addEventListener('click', async () => {
-      if (await ctConfirm('Remove this color?')) removeColorById(color.id);
+      if (await confirmDialog('Remove this color?')) removeColorById(color.id);
     });
     li.appendChild(trashBtn);
 
     return li;
   }
 
-  // Shared ctCopy/ctFlash (tools/include/copy.js, pasted above as a classic
+  // Shared copy/flash (tools/include/copy.js, pasted above as a classic
   // <script>).
   async function handleCopyClick(btn, text) {
     if (!text) return; // nothing to copy (defensive; Copy-all is disabled when empty)
-    const ok = await ctCopy(text);
+    const ok = await copy(text);
     if (!ok) return;
     const current = btn.dataset.ctcFlashOriginal ?? btn.textContent;
-    ctFlash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
+    flash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
   }
 
   // =====================================================================
@@ -909,13 +909,13 @@
   // =====================================================================
   // Per docs/conventions.md "Destructive actions require confirmation", both
   // the per-row trash button (above, in buildRow) and Remove all use the
-  // shared ctConfirm(message) component (tools/include/confirm.js, pasted
+  // shared confirmDialog(message) component (tools/include/confirm.js, pasted
   // above as a classic <script>) rather than a bespoke modal —
   // removeColorById(id)/removeAllColors() remain direct, non-modal calls
-  // (used here only after ctConfirm resolves true, and by tests).
+  // (used here only after confirmDialog resolves true, and by tests).
   removeAllBtn.addEventListener('click', async () => {
     if (state.colors.length === 0) return;
-    if (await ctConfirm('Remove all colors?')) removeAllColors();
+    if (await confirmDialog('Remove all colors?')) removeAllColors();
   });
 
   rgbaCopyAllBtn.addEventListener('click', () => handleCopyClick(rgbaCopyAllBtn, rgbaOutputEl.value));
@@ -924,7 +924,7 @@
   // =====================================================================
   // 11a. Help modal — docs/conventions.md "First-load help popup (all
   // tools)". Purely informational (what the tool does + how to use it), so
-  // it's its own small dedicated dialog rather than ctConfirm (which is a
+  // it's its own small dedicated dialog rather than confirmDialog (which is a
   // yes/no destructive-action confirm). Markup is static in the document
   // (shown/hidden via [hidden]) rather than built/torn down per open/close.
   // Structure/focus-handling mirrors tools/hat-picker's and
@@ -1027,7 +1027,7 @@
     hexOutput,
 
     // Direct, non-modal removal — used by tests that don't need to drive the
-    // shared ctConfirm dialog (see section 11), same pattern as
+    // shared confirmDialog dialog (see section 11), same pattern as
     // tools/hat-picker's window.__hatPicker.removeEntry/clear.
     removeColorById,
     removeAllColors,

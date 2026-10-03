@@ -510,9 +510,9 @@
       if (t) lines.push(t);
     }
     if (lines.length === 0) return;
-    const ok = await ctCopy(lines.join('\n'));
+    const ok = await copy(lines.join('\n'));
     if (!ok) return;
-    ctFlash(runsCopyAllBtn, { label: 'Copied!', revertTo: 'Copy all' });
+    flash(runsCopyAllBtn, { label: 'Copied!', revertTo: 'Copy all' });
   });
 
   // Delegated copy for the expression copy button (and any future ones).
@@ -524,9 +524,9 @@
     if (!el) return;
     const text = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') ? el.value : el.textContent;
     if (!text) return;
-    const ok = await ctCopy(text);
+    const ok = await copy(text);
     if (!ok) return;
-    ctFlash(btn, { label: '✅', revertTo: '📋' });
+    flash(btn, { label: '✅', revertTo: '📋' });
   });
 
   // =====================================================================

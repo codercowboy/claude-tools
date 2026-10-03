@@ -14,7 +14,7 @@
     --focus: #7c3aed;
     --radius: 10px;
 
-    /* ctConfirm theming — reuse this tool's tokens */
+    /* confirm-dialog theming — reuse this tool's tokens */
     --ctc-accent: var(--accent);
     --ctc-accent-fg: var(--accent-contrast);
     --ctc-bg: var(--panel);
@@ -251,14 +251,14 @@
     touch-action: manipulation;
   }
 
-  /* Excludes .ctc-btn (the pasted ctConfirm "Yes"/"Cancel" buttons — that
+  /* Excludes .ctc-btn (the pasted confirmDialog "Yes"/"Cancel" buttons — that
      component owns its own hover styling and must not be repainted by this
      generic rule) and .btn-primary (Roll again — handled explicitly below,
      .btn-primary:hover:not(:disabled)) so neither gets washed out on hover.
      Fixes an adversarial-review finding: this selector's specificity, 0,2,1,
      previously beat .ctc-btn--yes:hover's filter-only rule, 0,2,0,
      repainting the filled accent "Yes" button near-white while its text
-     stayed white, i.e. invisible. docs/conventions.md's ctConfirm
+     stayed white, i.e. invisible. docs/conventions.md's confirmDialog
      hover-specificity note.
      NOTE: adding just `:not(.ctc-btn)` bumps this rule's specificity from
      0,2,1 to 0,3,1 — enough to newly OUT-SPECIFY .btn-primary:hover's 0,3,0

@@ -556,7 +556,7 @@
 
   // =====================================================================
   // 8d. Help modal -- purely informational (what the tool does + how to use
-  // it), so it's its own small dedicated dialog rather than ctConfirm
+  // it), so it's its own small dedicated dialog rather than confirmDialog
   // (which is a yes/no destructive-action confirm). Markup is static in the
   // document (shown/hidden via [hidden]) rather than built/torn down per
   // open/close. Structure/focus-handling mirrors tools/hat-picker's Help
@@ -695,7 +695,7 @@
   // harmony 'random', N=6, no seeds) is applied consistently.
   const restoreDefaultsBtn = document.getElementById('restoreDefaultsBtn');
   restoreDefaultsBtn.addEventListener('click', async () => {
-    const ok = await ctConfirm('Restore all defaults? This clears your seed colors, saved palettes, pins, roll history, and settings on this device. This can\'t be undone.');
+    const ok = await confirmDialog('Restore all defaults? This clears your seed colors, saved palettes, pins, roll history, and settings on this device. This can\'t be undone.');
     if (!ok) return;
     try {
       localStorage.removeItem(STORAGE_KEY);
@@ -1174,10 +1174,6 @@
     }
   }
 
-  function prefersReducedMotion() {
-    return matchMedia('(prefers-reduced-motion: reduce)').matches;
-  }
-
   function updateDemoToggleUI(detailEl) {
     const btn = detailEl && detailEl.querySelector('[data-testid="scheme-demo-toggle"]');
     if (!btn) return;
@@ -1334,7 +1330,7 @@
   function downloadText(filename, mime, text) {
     try {
       // Shared file-download helper (jbc-include/util.js, inlined as a global).
-      jbcUtil.downloadBlob(text, filename, mime);
+      downloadBlob(text, filename, mime);
     } catch { /* download blocked (rare) — copy is the always-available path */ }
   }
 
@@ -1343,9 +1339,7 @@
   // (readable via `exiftool`, macOS Preview's inspector, etc.). Vanilla: build
   // each chunk (len + "tEXt" + keyword\0text + CRC32) and splice them in before
   // the final IEND chunk.
-  // Shared CRC-32 (jbc-include/crc32.js, inlined as the global jbcCrc32 ahead
-  // of this module).
-  const crc32 = jbcCrc32;
+  // Shared CRC-32 (crc32 from the inlined CtByteUtil module).
   function pngTextChunk(keyword, text) {
     const enc = new TextEncoder();
     // tEXt is Latin-1; strip anything outside it so the chunk stays valid.
@@ -1418,7 +1412,7 @@
           outBlob = new Blob([addPngMetadata(bytes, pngMetadataEntries(scheme))], { type: 'image/png' });
         } catch { outBlob = blob; }
         // Shared file-download helper (jbc-include/util.js, inlined as a global).
-        jbcUtil.downloadBlob(outBlob, 'palette.png');
+        downloadBlob(outBlob, 'palette.png');
       }, 'image/png');
     } catch { /* toBlob unsupported — silently no-op */ }
   }
@@ -1758,15 +1752,14 @@
 
   // =====================================================================
   // 11. Copy helper (per-color copy + both copy-all buttons) — shared
-  // ctCopy/ctFlash (tools/include/copy.js, pasted above as a classic
-  // <script>)
+  // copy/flash (from the inlined CtClipboardUtil module)
   // =====================================================================
   async function handleCopyClick(btn, text) {
     if (!text) return;
-    const ok = await ctCopy(text);
+    const ok = await copy(text);
     if (!ok) return;
     const current = btn.dataset.ctcFlashOriginal ?? btn.textContent;
-    ctFlash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
+    flash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
   }
 
   // =====================================================================
@@ -1850,7 +1843,7 @@
   // 11c. Saved-palette shelf — a small named library in its own localStorage
   // key. "Save" stores the open scheme; "Load" shows it as scheme 1 (with its
   // companions re-generated) so you can keep working from it; "Delete" is
-  // guarded by ctConfirm. Names are editable inline (no modal prompt).
+  // guarded by confirmDialog. Names are editable inline (no modal prompt).
   // =====================================================================
   const SAVED_KEY = 'color-designer:saved:v1';
   let savedPalettes = [];
@@ -1916,7 +1909,7 @@
 
   async function deleteSavedPalette(id) {
     const entry = savedPalettes.find((e) => e.id === id);
-    if (entry && await ctConfirm(`Delete saved palette “${entry.name}”?`)) {
+    if (entry && await confirmDialog(`Delete saved palette “${entry.name}”?`)) {
       savedPalettes = savedPalettes.filter((e) => e.id !== id);
       persistSaved();
       renderSavedShelf();

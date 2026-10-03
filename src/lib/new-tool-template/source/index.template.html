@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>__TOOL_TITLE__</title>
+  <meta name="description" content="__TOOL_DESC__">
+  <meta name="theme-color" content="#2563eb">
+
+  <!-- Open Graph + Twitter Card (see html-single-file/web-craft.md § Link previews).
+       og:image points at a real sibling preview.png (~1200×630) — the one sanctioned
+       exception to no-external-assets; the page itself never loads it. -->
+  <meta property="og:title"       content="__TOOL_TITLE__">
+  <meta property="og:description" content="__TOOL_DESC__">
+  <meta property="og:type"        content="website">
+  <meta property="og:site_name"   content="{{project.name}}">
+  <meta property="og:image"       content="preview.png">
+  <meta name="twitter:card"       content="summary_large_image">
+
+  <style>
+    /* Shared universal fixes first (the [hidden] guard, <select> iOS fix,
+       touch-action, .visually-hidden), then the tool's own palette on top. */
+    <<jbc:include base.css>>
+    <<jbc:include controls.css>>
+    <<jbc:inline styles.css>>
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>__TOOL_TITLE__</h1>
+        <p class="tagline">__TOOL_DESC__</p>
+      </div>
+      <button type="button" class="icon-btn" data-testid="help-btn"
+              aria-label="Help" title="Help">?</button>
+    </header>
+
+    <label for="input">Input</label>
+    <textarea id="input" data-testid="input" placeholder="Type or paste text…"></textarea>
+    <p class="stats" data-testid="stats" aria-live="polite"></p>
+
+    <label for="output">Output</label>
+    <textarea id="output" data-testid="output" readonly></textarea>
+  </main>
+
+  <!-- Help modal: guarded by base.css's [hidden]{display:none!important}, since
+       .modal sets display:flex (see ethos.md § the [hidden] cascade trap). -->
+  <div class="modal" data-testid="help-modal" role="dialog" aria-modal="true"
+       aria-labelledby="help-title" hidden>
+    <div class="modal__dialog">
+      <button type="button" class="modal-close-x" data-testid="modal-close-x"
+              aria-label="Close">&times;</button>
+      <h2 id="help-title">About __TOOL_TITLE__</h2>
+      <p>__TOOL_DESC__</p>
+      <p>Type in the top box; the result appears below. This is a skeleton —
+         replace this copy, the transform, and the styles with your real tool.</p>
+    </div>
+  </div>
+
+  <<jbc:include footer.html>>
+
+  <script type="module">
+    <<jbc:inline app.mjs>>
+  </script>
+</body>
+</html>

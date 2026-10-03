@@ -15,7 +15,7 @@
     --radius: 8px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
-    /* ctConfirm theming — reuse this tool's own tokens so "Yes" renders as a
+    /* confirm dialog theming — reuse this tool's own tokens so "Yes" renders as a
        clear filled primary button (not the bare AccentColor fallback, which
        can look near-white and match Cancel). */
     --ctc-accent: var(--accent);
@@ -71,7 +71,7 @@
     touch-action: manipulation;
   }
 
-  /* Excludes .ctc-btn (the pasted ctConfirm "Yes"/"Cancel" buttons — that
+  /* Excludes .ctc-btn (the pasted confirm dialog "Yes"/"Cancel" buttons — that
      component owns its own hover styling and must not be repainted by this
      generic rule), the active Choose Color toggle (handled explicitly
      below, .choose-color-btn.active:hover), and .modal-close-x (the pinned

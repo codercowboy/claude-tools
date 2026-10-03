@@ -12,8 +12,8 @@ import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 // Shared test-support (imported, never inlined into the shipped index.html).
-import { toolUrl, helpSeenKey, seedHelpSeen } from '../../test-support/setup.mjs';
-import { assertLicenseModal } from '../../test-support/shared-ui.mjs';
+import { toolUrl, helpSeenKey, seedHelpSeen } from '../../../lib/test-support/setup.mjs';
+import { assertLicenseModal } from '../../../lib/test-support/shared-ui.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const INDEX_HTML_PATH = path.resolve(__dirname, '../index.html');
@@ -472,8 +472,8 @@ test.describe('License modal (shared footer surface)', () => {
     await assertLicenseModal(page);
   });
 
-  test('window.ctLicense() opens the modal programmatically', async ({ page }) => {
-    await page.evaluate(() => window.ctLicense());
+  test('footer License link opens the modal', async ({ page }) => {
+    await page.getByTestId('footer-license-link').click();
     await expect(page.getByTestId('license-modal')).toBeVisible();
     await expect(page.getByTestId('license-modal')).toContainText('MIT License');
   });

@@ -10,8 +10,8 @@
 
 import { test, expect } from '@playwright/test';
 // Shared test-support (imported, never inlined into the shipped index.html).
-import { toolUrl, helpSeenKey, seedHelpSeen } from '../../test-support/setup.mjs';
-import { assertLicenseModal } from '../../test-support/shared-ui.mjs';
+import { toolUrl, helpSeenKey, seedHelpSeen } from '../../../lib/test-support/setup.mjs';
+import { assertLicenseModal } from '../../../lib/test-support/shared-ui.mjs';
 
 const TOOL_URL = toolUrl(import.meta.url);
 
@@ -509,7 +509,7 @@ test.describe('footer License modal', () => {
     await expect(page.getByTestId('license-close-x')).toBeVisible();
     await expect(modal).toContainText('100% vanilla');
     await expect(modal).toContainText('no runtime dependencies');
-    expect(await page.evaluate(() => typeof window.ctLicense)).toBe('function');
+    await expect(page.locator('[data-ct-license]')).toHaveCount(1);
   });
 
   // Focus into the dialog (the ✕) + Esc / ✕ / backdrop close with focus return

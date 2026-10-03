@@ -102,12 +102,12 @@
       const ALPHAS = ['hex', 'base62', 'base64url', 'custom'];
       if (p.mode === 'inspect') state.mode = 'inspect';
       if (TYPES.includes(p.type)) state.type = p.type;
-      if (Number.isFinite(p.count)) state.count = clampInt(p.count, 1, 1000, 10);
+      if (Number.isFinite(p.count)) state.count = clampIntFloor(p.count, 1, 1000, 10);
       state.uppercase = !!p.uppercase;
       state.hyphens = p.hyphens !== false;
       if (WRAPS.includes(p.wrap)) state.wrap = p.wrap;
-      if (Number.isFinite(p.nanoidSize)) state.nanoidSize = clampInt(p.nanoidSize, 1, 256, 21);
-      if (Number.isFinite(p.tokenLength)) state.tokenLength = clampInt(p.tokenLength, 1, 512, 32);
+      if (Number.isFinite(p.nanoidSize)) state.nanoidSize = clampIntFloor(p.nanoidSize, 1, 256, 21);
+      if (Number.isFinite(p.tokenLength)) state.tokenLength = clampIntFloor(p.tokenLength, 1, 512, 32);
       if (ALPHAS.includes(p.tokenAlphabet)) state.tokenAlphabet = p.tokenAlphabet;
       if (typeof p.customAlphabet === 'string') state.customAlphabet = p.customAlphabet;
       state.tokenUppercase = !!p.tokenUppercase;
@@ -115,7 +115,8 @@
     } catch (err) { /* start with defaults */ }
   }
 
-  function clampInt(v, min, max, fallback) {
+  // Local: floor(Number(v)) semantics, differs from lib CtUtil.clampInt (parseInt); kept for behavior parity.
+  function clampIntFloor(v, min, max, fallback) {
     let n = Math.floor(Number(v));
     if (!Number.isFinite(n)) return fallback;
     if (n < min) n = min;
@@ -194,7 +195,7 @@
   }
 
   function generateBatch() {
-    const n = clampInt(countInputEl.value, 1, 1000, state.count);
+    const n = clampIntFloor(countInputEl.value, 1, 1000, state.count);
     state.count = n;
     if (countInputEl.value !== String(n)) countInputEl.value = String(n);
     const now = Date.now();
@@ -258,14 +259,14 @@
     const idx = Number(btn.dataset.idx);
     const val = state.values[idx];
     if (val == null) return;
-    const ok = await ctCopy(val);
-    if (ok) ctFlash(btn, { label: '✅', revertTo: '📋' });
+    const ok = await copy(val);
+    if (ok) flash(btn, { label: '✅', revertTo: '📋' });
   });
 
   copyAllBtn.addEventListener('click', async () => {
     if (!state.values.length) return;
-    const ok = await ctCopy(state.values.join('\n'));
-    if (ok) ctFlash(copyAllBtn, { label: 'Copied!', revertTo: 'Copy all' });
+    const ok = await copy(state.values.join('\n'));
+    if (ok) flash(copyAllBtn, { label: 'Copied!', revertTo: 'Copy all' });
   });
 
   // =====================================================================
@@ -327,8 +328,8 @@
     canonBtn.setAttribute('aria-label', 'Copy canonical form');
     canonBtn.textContent = '📋';
     canonBtn.addEventListener('click', async () => {
-      const ok = await ctCopy(info.canonical);
-      if (ok) ctFlash(canonBtn, { label: '✅', revertTo: '📋' });
+      const ok = await copy(info.canonical);
+      if (ok) flash(canonBtn, { label: '✅', revertTo: '📋' });
     });
     canonRow.appendChild(canonVal);
     canonRow.appendChild(canonBtn);
@@ -402,7 +403,7 @@
   typeButtons.forEach((b) => b.addEventListener('click', () => setType(b.dataset.type)));
 
   countInputEl.addEventListener('change', () => {
-    state.count = clampInt(countInputEl.value, 1, 1000, state.count);
+    state.count = clampIntFloor(countInputEl.value, 1, 1000, state.count);
     countInputEl.value = String(state.count);
     saveState();
   });
@@ -412,14 +413,14 @@
   wrapSelectEl.addEventListener('change', () => { state.wrap = wrapSelectEl.value; saveState(); regenerateFormatOnly(); });
 
   nanoidSizeInputEl.addEventListener('change', () => {
-    state.nanoidSize = clampInt(nanoidSizeInputEl.value, 1, 256, state.nanoidSize);
+    state.nanoidSize = clampIntFloor(nanoidSizeInputEl.value, 1, 256, state.nanoidSize);
     nanoidSizeInputEl.value = String(state.nanoidSize);
     saveState();
     generateBatch();
   });
 
   tokenLengthInputEl.addEventListener('change', () => {
-    state.tokenLength = clampInt(tokenLengthInputEl.value, 1, 512, state.tokenLength);
+    state.tokenLength = clampIntFloor(tokenLengthInputEl.value, 1, 512, state.tokenLength);
     tokenLengthInputEl.value = String(state.tokenLength);
     saveState();
     generateBatch();
@@ -457,8 +458,7 @@
     document.activeElement?.blur(); // dismiss mobile keyboard on commit
   });
 
-  // Shared trailing-edge debounce (jbc-include/util.js, inlined global).
-  const debounce = jbcUtil.debounce;
+  // Shared trailing-edge debounce (lib utils/CtUtil.mjs).
   const debouncedInspect = debounce(() => { renderInspect(); saveState(); }, 120);
   inspectInputEl.addEventListener('input', debouncedInspect);
 

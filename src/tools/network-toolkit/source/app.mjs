@@ -483,16 +483,16 @@
     const tag = el.tagName;
     const text = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') ? el.value : el.textContent;
     if (!text) return;
-    const ok = await ctCopy(text);
+    const ok = await copy(text);
     if (!ok) return;
-    ctFlash(btn, { label: '✅', revertTo: '📋' });
+    flash(btn, { label: '✅', revertTo: '📋' });
   });
 
   async function copyLines(triggerBtn, lines) {
     if (!lines || lines.length === 0) return;
-    const ok = await ctCopy(lines.join('\n'));
+    const ok = await copy(lines.join('\n'));
     if (!ok) return;
-    ctFlash(triggerBtn, { label: 'Copied!', revertTo: 'Copy all' });
+    flash(triggerBtn, { label: 'Copied!', revertTo: 'Copy all' });
   }
 
   // In-field copy on an EDITABLE input is revealed only when non-empty.
@@ -502,11 +502,11 @@
     if (!btn) return;
     const sync = () => { btn.hidden = inputEl.value.trim() === ''; };
     inputEl.addEventListener('input', sync);
-    inputEl.__ctCopySync = sync;
+    inputEl.__copySync = sync;
     sync();
   }
   function refreshEditableCopy(inputEl) {
-    if (inputEl && typeof inputEl.__ctCopySync === 'function') inputEl.__ctCopySync();
+    if (inputEl && typeof inputEl.__copySync === 'function') inputEl.__copySync();
   }
 
   // =====================================================================

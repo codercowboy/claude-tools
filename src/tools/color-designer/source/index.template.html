@@ -11,7 +11,7 @@
 <meta property="og:image"       content="preview.png">
 <meta name="twitter:card"       content="summary_large_image">
 <style>
-<<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+<<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
 </head>
 <body>
 <div class="app">
@@ -207,22 +207,16 @@
   </div>
 </div>
 
-<<ct:include footer.html>>
+<<ct:lib components/footer.html>>
 
-<script>
-<<ct:include confirm.js>>
-</script>
 
-<script>
-<<ct:include copy.js>>
-</script>
-<script>
-<<ct:include crc32.js>>
-</script>
-<script>
-<<ct:include util.js>>
-</script>
 
-<script type="module"><<ct:inline app.mjs>></script>
+<script type="module">
+<<ct:module utils/CtByteUtil.mjs>>
+<<ct:module utils/CtUtil.mjs>>
+<<ct:module components/CtClipboardUtil.mjs>>
+<<ct:module components/CtConfirm.mjs>>
+<<ct:module components/CtLicense.mjs>>
+<<ct:inline app.mjs>></script>
 </body>
 </html>

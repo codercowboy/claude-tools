@@ -179,11 +179,11 @@
     trashBtn.setAttribute('aria-label', 'Remove row');
     trashBtn.title = 'Remove row';
     trashBtn.textContent = '🗑';
-    // UI path goes through the shared ctConfirm dialog;
+    // UI path goes through the shared confirmDialog dialog;
     // window.__colorConverter.removeRow remains a direct, non-modal function
     // for programmatic/test use (and is what this handler calls on confirm).
     trashBtn.addEventListener('click', async () => {
-      if (await ctConfirm('Remove this color?')) removeRow(row.id);
+      if (await confirmDialog('Remove this color?')) removeRow(row.id);
     });
     li.appendChild(trashBtn);
 
@@ -233,7 +233,6 @@
   // only this row's cached elements.
   // Shared trailing-edge debounce (jbc-include/util.js, inlined as a global).
   // Each row keeps its own debounced handler so an input only defers its own row.
-  const debounce = jbcUtil.debounce;
   function onRowInput(row, inputEl) {
     if (!row._debouncedInput) {
       row._debouncedInput = debounce(() => {
@@ -315,15 +314,15 @@
   }
 
   // =====================================================================
-  // 9. Copy (per-field + copy-all) — shared ctCopy/ctFlash (tools/include/
+  // 9. Copy (per-field + copy-all) — shared copy/flash (tools/include/
   // copy.js, pasted above as a classic <script>)
   // =====================================================================
   async function handleCopyClick(btn, text) {
     if (!text) return; // nothing to copy on an empty/invalid row's output field
-    const ok = await ctCopy(text);
+    const ok = await copy(text);
     if (!ok) return;
     const current = btn.dataset.ctcFlashOriginal ?? btn.textContent;
-    ctFlash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
+    flash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
   }
 
   rgbaCopyAllBtn.addEventListener('click', () => handleCopyClick(rgbaCopyAllBtn, rgbaOutputEl.value));
@@ -338,7 +337,7 @@
 
   // =====================================================================
   // 9b. Help modal — purely informational (what the tool does + how to use
-  // it), so it's its own small dedicated dialog rather than ctConfirm (which
+  // it), so it's its own small dedicated dialog rather than confirmDialog (which
   // is a yes/no destructive-action confirm). Markup is static in the
   // document (shown/hidden via [hidden]) rather than built/torn down per
   // open/close. Structure/focus-handling mirrors tools/hat-picker's Help
@@ -438,11 +437,11 @@
 
   // Clear (paste box), per-row trash, and Remove all are the three
   // destructive actions in this tool. Each is guarded by the shared
-  // ctConfirm dialog (tools/include/confirm.js, pasted above) with an
+  // confirmDialog dialog (components/CtConfirm.mjs) with an
   // action-specific message; the underlying mutation only runs if the user
   // confirms. Per-row trash is wired in buildRow() above.
   clearPasteBtn.addEventListener('click', async () => {
-    if (await ctConfirm('Clear the paste box?')) {
+    if (await confirmDialog('Clear the paste box?')) {
       pasteInputEl.value = ''; // clears only the paste box, never rows
       saveState();
     }
@@ -450,7 +449,7 @@
 
   removeAllBtn.addEventListener('click', async () => {
     if (state.rows.length === 0) return; // defensive; button is disabled when empty
-    if (await ctConfirm('Remove all rows?')) removeAllRows();
+    if (await confirmDialog('Remove all rows?')) removeAllRows();
   });
 
   // The paste box's own draft text is persisted independently of rows/

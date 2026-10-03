@@ -1,0 +1,61 @@
+/* ===== Begin ct-controls ===== */
+/* Shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the jbc:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See web-craft.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use CtClipboardUtil copy/flash for behavior
+   (components/CtClipboardUtil.mjs). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */

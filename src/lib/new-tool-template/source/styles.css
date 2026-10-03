@@ -1,0 +1,122 @@
+/* source/styles.css — __TOOL_TITLE__'s own styles. Inlined by the build AFTER
+   the shared base.css (and controls.css) so tool colors layer on top of the
+   universal fixes. Keep this palette-specific; universal fixes belong in the
+   shared assets, not here. */
+
+:root {
+  --accent: #2563eb;            /* the tool's primary/brand color */
+  --bg: #ffffff;
+  --fg: #1e2430;
+  --muted: #5b6472;
+  --border: #d6dbe4;
+  --focus-ring: #7dd3fc;
+  /* jbcConfirm reads these; set the accent so a "Yes" button reads as a filled
+     primary (see ethos.md § Destructive actions). Harmless if the tool never
+     calls jbcConfirm. */
+  --jbcc-accent: var(--accent);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  color-scheme: light;
+}
+
+.app {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;      /* generous; working textareas widen with the viewport */
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+h1 { font-size: 1.4rem; margin: 0; }
+.tagline { color: var(--muted); margin: 0.25rem 0 1rem; }
+
+label { display: block; font-weight: 600; margin: 1rem 0 0.35rem; }
+
+textarea {
+  width: 100%;
+  min-height: 8rem;
+  padding: 0.6rem 0.7rem;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+}
+textarea:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.stats { color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem; }
+
+button {
+  font: inherit;
+  min-height: 44px;             /* mobile tap target */
+  padding: 0 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: inherit;
+  cursor: pointer;
+}
+button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.icon-btn { width: 44px; padding: 0; font-size: 1.2rem; }
+
+/* --- Help modal --------------------------------------------------------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;              /* paired with the [hidden] guard from base.css */
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+}
+.modal__dialog {
+  position: relative;         /* anchors the ✕ */
+  width: min(32rem, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  padding: 1.5rem 1.5rem 1.25rem;
+  background: var(--bg);
+  border-radius: 12px;
+}
+.modal__dialog h2 { margin-top: 0; }
+
+.modal-close-x {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: inherit;
+  font-size: 1.6rem; line-height: 1; cursor: pointer;
+}
+.modal-close-x:hover { background: rgba(127, 127, 127, 0.18); }
+.modal-close-x:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .modal { animation: modal-fade 0.15s ease-out; }
+  @keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+}
+
+@media (max-width: 480px) {
+  h1 { font-size: 1.2rem; }
+}

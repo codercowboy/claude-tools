@@ -26,7 +26,7 @@
     --danger: #c4362a;
     --focus: #6d3fed;
     --radius: 8px;
-    /* ctConfirm accent (future-proofing; no confirm ships today) */
+    /* confirmDialog accent (future-proofing; no confirm ships today) */
     --ctc-accent: #6d3fed;
     --ctc-accent-contrast: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -54,7 +54,7 @@
 
   * { box-sizing: border-box; }
 
-  <<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
 </head>
 <body>
 <div class="app">
@@ -181,15 +181,14 @@
   </div>
 </div>
 
-<<ct:include footer.html>>
+<<ct:lib components/footer.html>>
 
-<script>
-<<ct:include copy.js>>
+<script type="module">
+<<ct:module components/CtClipboardUtil.mjs>>
+<<ct:module utils/CtUtil.mjs>>
+<<ct:module components/CtConfirm.mjs>>
+<<ct:module components/CtLicense.mjs>>
+<<ct:inline app.mjs>>
 </script>
-<script>
-<<ct:include util.js>>
-</script>
-
-<script type="module"><<ct:inline app.mjs>></script>
 </body>
 </html>

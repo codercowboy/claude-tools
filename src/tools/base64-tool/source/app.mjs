@@ -284,9 +284,7 @@
     }
   }
 
-  // Shared trailing-edge debounce (jbc-include/util.js, inlined as a global).
-  const debounce = jbcUtil.debounce;
-
+  // `debounce` comes from lib utils/CtUtil.mjs (<<ct:module>> in the template).
   const debouncedRenderEncodeOutputs = debounce(() => { renderEncodeOutputs(); }, 150);
   // The encode text-input is persisted (per docs/conventions.md); save on
   // the same debounce cadence as the re-render. The MIME field is not
@@ -354,20 +352,20 @@
   function downloadDecoded() {
     const result = state.decode.last;
     if (!result) return;
-    // Shared file-download helper (jbc-include/util.js, inlined as a global).
-    jbcUtil.downloadBlob(result.bytes, `decoded.${extensionForMime(result.mime)}`, result.mime);
+    // Shared file-download helper (`downloadBlob` from lib utils/CtUtil.mjs).
+    downloadBlob(result.bytes, `decoded.${extensionForMime(result.mime)}`, result.mime);
   }
   decodeDownloadBtn.addEventListener('click', downloadDecoded);
 
   // =====================================================================
-  // 8. Copy buttons (shared pattern) — ctCopy/ctFlash (tools/include/
-  // copy.js, pasted above as a classic <script>)
+  // 8. Copy buttons (shared pattern) — `copy`/`flash` from lib
+  // components/CtClipboardUtil.mjs (<<ct:module>> in the template)
   // =====================================================================
   async function handleCopyClick(btn, text) {
     if (!text) return;
-    const ok = await ctCopy(text);
+    const ok = await copy(text);
     if (!ok) return;
-    ctFlash(btn, { label: '✅', revertTo: '📋' });
+    flash(btn, { label: '✅', revertTo: '📋' });
   }
 
   // Always-on copies (read-only outputs live inside their .ct-field).
@@ -390,12 +388,12 @@
     if (!inputEl || !btn) return;
     const sync = () => { btn.hidden = inputEl.value.trim() === ''; };
     inputEl.addEventListener('input', sync);
-    inputEl.__ctCopySync = sync; // let programmatic value changes refresh it
+    inputEl.__copySync = sync; // let programmatic value changes refresh it
     sync();
   }
 
   function refreshEditableCopy(inputEl) {
-    if (inputEl && typeof inputEl.__ctCopySync === 'function') inputEl.__ctCopySync();
+    if (inputEl && typeof inputEl.__copySync === 'function') inputEl.__copySync();
   }
 
   wireEditableCopy(encodeTextInputEl, encodeTextCopyBtn);

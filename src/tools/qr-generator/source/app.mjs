@@ -91,8 +91,7 @@ const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 // Standard CRC-32 (ISO 3309 / ITU-T V.42), the exact algorithm the PNG spec
 // requires for each chunk's trailing CRC. Shared impl: jbc-include/crc32.js,
-// inlined as the global jbcCrc32 ahead of this module.
-const crc32 = jbcCrc32;
+// the crc32 export of the CtByteUtil module inlined ahead of this one.
 
 // Builds one complete chunk (length + 4-char type + data + CRC) as bytes.
 function buildPngChunk(type, data) {
@@ -431,14 +430,14 @@ if (copyInputBtn) {
   copyInputBtn.addEventListener('click', async () => {
     const text = inputEl.value;
     if (!text) return;
-    const ok = await ctCopy(text);
+    const ok = await copy(text);
     if (!ok) return;
-    ctFlash(copyInputBtn, { label: '✅', revertTo: '📋' });
+    flash(copyInputBtn, { label: '✅', revertTo: '📋' });
   });
 }
 
 // Shared trailing-edge debounce (jbc-include/util.js, inlined as a global).
-const scheduleRender = jbcUtil.debounce(doRender, 150);
+const scheduleRender = debounce(doRender, 150);
 
 [inputEl, ecLevelEl, scaleEl, quietZoneEl, fgEl, bgEl].forEach((el) => {
   el.addEventListener('input', () => {
@@ -460,7 +459,7 @@ downloadPngBtn.addEventListener('click', () => {
   // on best-effort failure); decode it to bytes so the shared download helper
   // (jbc-include/util.js) can save the exact PNG content.
   const bytes = dataUrlToBytes(url);
-  jbcUtil.downloadBlob(new Blob([bytes], { type: 'image/png' }), `qr-code-v${currentMatrix.version}-${ecLevelEl.value}.png`);
+  downloadBlob(new Blob([bytes], { type: 'image/png' }), `qr-code-v${currentMatrix.version}-${ecLevelEl.value}.png`);
 });
 
 downloadSvgBtn.addEventListener('click', () => {
@@ -468,12 +467,12 @@ downloadSvgBtn.addEventListener('click', () => {
   const svg = toSVGString(currentMatrix, currentOptions());
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   // Shared download helper (jbc-include/util.js, inlined as a global).
-  jbcUtil.downloadBlob(blob, `qr-code-v${currentMatrix.version}-${ecLevelEl.value}.svg`);
+  downloadBlob(blob, `qr-code-v${currentMatrix.version}-${ecLevelEl.value}.svg`);
 });
 
 /* ============================================================================
  * Help modal -- purely informational (what the tool does + how to use it),
- * so it's its own small dedicated dialog rather than ctConfirm (which is a
+ * so it's its own small dedicated dialog rather than confirmDialog (which is a
  * yes/no destructive-action confirm). Markup is static in the document
  * (shown/hidden via [hidden]) rather than built/torn down per open/close.
  * Structure/focus-handling mirrors tools/hat-picker and tools/color-designer

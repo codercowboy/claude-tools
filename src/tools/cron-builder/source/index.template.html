@@ -26,7 +26,7 @@
     --danger-bg: #fdeceb;
     --focus: #2f6fed;
     --radius: 8px;
-    /* ctConfirm accents (unused today — no destructive confirms — but set so
+    /* shared confirm component accents (unused today — no destructive confirms — but set so
        the shared component reads correctly if ever adopted). */
     --ctc-accent: #2f6fed;
     --ctc-accent-contrast: #ffffff;
@@ -55,7 +55,7 @@
 
   * { box-sizing: border-box; }
 
-  <<ct:include base.css>><<ct:include controls.css>><<ct:inline styles.css>></style>
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
 </head>
 <body>
 <div class="app">
@@ -171,12 +171,11 @@
   </div>
 </div>
 
-<<ct:include footer.html>>
+<<ct:lib components/footer.html>>
 
-<script>
-<<ct:include copy.js>>
-</script>
-
-<script type="module"><<ct:inline app.mjs>></script>
+<script type="module">
+<<ct:module components/CtClipboardUtil.mjs>>
+<<ct:module components/CtLicense.mjs>>
+<<ct:inline app.mjs>></script>
 </body>
 </html>

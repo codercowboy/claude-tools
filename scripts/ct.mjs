@@ -8,7 +8,7 @@
  *
  *   ct build [--check]   assemble every tool's index.html   (scripts/build-all.mjs)
  *   ct test              run the whole test suite            (scripts/test-all.mjs)
- *   ct serve [dir]       serve the gallery over http://      (scripts/serve.mjs; default src/tools, $PORT or 8080)
+ *   ct serve [dir]       serve the gallery over http://      (scripts/serve.mjs; default src, $PORT or 8080)
  *   ct run               open the built gallery in your default browser
  *   ct install           install every tool's dependencies  (scripts/install-all.mjs)
  *
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPTS = dirname(fileURLToPath(import.meta.url));
 const REPO = dirname(SCRIPTS);
-const GALLERY = join(REPO, 'src', 'tools', 'index.html');
+const GALLERY = join(REPO, 'src', 'gallery', 'index.html');
 
 const [verb, ...rest] = process.argv.slice(2);
 
@@ -64,7 +64,7 @@ Usage: ct <verb>            (or from a clone: node scripts/ct.mjs <verb>)
   build [--check]   assemble every tool's index.html, then the preview gif
                     (build-all.mjs + build-preview-gif.mjs; --check skips the gif)
   test              run the whole test suite              (test-all.mjs)
-  serve [dir]       serve the gallery over http://         (default src/tools, $PORT or 8080)
+  serve [dir]       serve the gallery over http://         (default src → /gallery/, $PORT or 8080)
   run               open the built gallery in your browser
   install           install every tool's dependencies     (install-all.mjs)
 `;
@@ -74,7 +74,7 @@ switch (verb) {
                     ? [['build-all.mjs', rest]]
                     : [['build-all.mjs', rest], ['build-preview-gif.mjs', []]]); break;
   case 'test':    runScript('test-all.mjs', rest); break;
-  case 'serve':   runScript('serve.mjs', rest.length ? rest : [join(REPO, 'src', 'tools')]); break;
+  case 'serve':   runScript('serve.mjs', rest.length ? rest : [join(REPO, 'src')]); break;
   case 'run':     openGallery(); break;
   case 'install': runScript('install-all.mjs', rest); break;
   case undefined:

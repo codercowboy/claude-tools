@@ -1,0 +1,28 @@
+<!-- tpm-session: 0002 · 2026-10-02 · tpm-session-version: 1.0 · files: session-0002-handoff.md, session-0002-punchlist.md, session-0002-log.md -->
+> **Session 0002 memory — three files in this folder.  THIS FILE: handoff.**
+> • **session-0002-handoff.md** — READ FIRST: where we are, next action, what NOT to redo.
+> • **session-0002-punchlist.md** — open/done work items (numbered).
+> • **session-0002-log.md** — append-only ledger: Decisions + Log (log reads **bottom-to-top**).
+
+# HANDOFF — session 0002 — 2026-10-02
+> ⚠️ READ THIS FULLY before doing anything. Unfinished punchlist items below are required reading.
+
+## Where we are / Next / In flight
+**Where we are:** Session 0002 — #1008 lib-cleanup, driving Phase 3 (jbc-include port) via formal tpm-workflow rounds (sonnet subagents). DONE & verified this session: Phase 1 (tooling reconcile — e2e confirmed green once VM contention cleared; also fixed scripts/test-all.mjs to skip src/lib so the new-tool-template isn't mis-discovered as a test target), Phase 2 (retired test-support-old: 27 files repointed to lib/test-support, unit+e2e 9/9, old dir in tmp/safe-to-delete), Phase 3a (ESM-inliner in scripts/build-tool.mjs: new <<ct:module>>+<<ct:lib>> tokens + injectable libDir, per-module IIFE scoping; scripts/tests/esm-inline{,-hardening}.test.mjs = 38 node:test + 26-mutation check; verifier PASS; 9 tools byte-identical). Phase 3b (jbc->ct rename, #1009) was STOPPED mid-flight by the user for VM recovery. Epic scaffold: dev/20261002-lib-cleanup/ (00-epic-plan/ + 01-esm-inliner/ DONE + 02-jbc-to-ct/ incomplete). Roadmap: dev/20261002-lib-cleanup/execution-plan.md.
+**Next action:** ⚠️ READ FIRST: dev/20261002-lib-cleanup/02-jbc-to-ct/RECOVERY.md — the step-by-step recovery for the half-done 3b rename (this is a COLD resume after a VM reboot; the builder subagent is gone). Summary: resolve the Phase-3b partial state (see punchlist #2.5): the 02-jbc-to-ct builder renamed all 20 lib files Jbc*->Ct* (0 Jbc*.mjs remain, 27 lib files touched) but did NOT repoint scripts/tests/esm-inline*.test.mjs (still reference Jbc names) and nothing was verified -> the tree is INCONSISTENT. To recover: (a) re-run the 02-jbc-to-ct builder to finish (it is idempotent-ish: complete the test ripple + internal-import fixes), OR (b) finish the test ripple by hand, then run the gates: grep -rnE 'Jbc|jbcc|data-jbc|jbc-(?!include)' src/lib/utils src/lib/components -> none; node --test scripts/tests/ -> 38/38; node scripts/build-all.mjs --check -> 10/10; confirm jbc-include-old refs preserved. THEN spawn the 02-jbc-to-ct verifier (prompt composed+linted+marked at dev/20261002-lib-cleanup/02-jbc-to-ct/spawn-prompt-verifier-r1.md). After 3b PASS: 3c behavior-diff inventory (USER SIGN-OFF GATE) -> 3d pilot one tool -> 3e fan out 8 -> 3f retire jbc-include-old. Every new round spawn needs a FRESH user Gate A + Gate B (hook-enforced per-session tokens).
+**In flight:** NOTHING running — the Phase 3b builder was stopped (TaskStop, status killed). Partial on-disk state: src/lib/utils + src/lib/components renamed to Ct* (unverified); scripts/tests/ NOT updated; so node --test scripts/tests/ would currently FAIL. build-all --check is unaffected (tools don't consume the new lib). Resume must reconcile this before proceeding. If resumed in a NEW session, the Gate B token for 02-jbc-to-ct is session-scoped — re-confirm Gate B with the user before any respawn.
+
+## What remains
+- #2.3 · Phase 3 (#1008/#1009): jbc-include port — see dev/20261002-lib-cleanup/execution-plan.md (3a ESM-inlining -> 3b rename jbc->ct -> 3c behavior-diff decisions [USER gate] -> 3d pilot -> 3e fan out -> 3f retire jbc-include-old)  [vdz6i9, 2026-10-02T14:48:45-07:00]
+- #2.4 · #1011: update scripts/README.md for claude-tools layout (migrated from jason-code; still describes old jason-code layout)  [dyqcgs, 2026-10-02T14:48:52-07:00]
+- #2.5 · Phase 3b STOPPED mid-flight for VM recovery: src/lib renamed Jbc*->Ct* (20 files, 0 Jbc*.mjs left) BUT scripts/tests/esm-inline*.test.mjs NOT yet repointed (still ref Jbc) -> tree inconsistent + UNVERIFIED. Resume: either finish the test ripple + re-run gates (node --test 38/38, build --check 10/10, grep lib clean), or re-spawn the 02-jbc-to-ct builder to complete its own work. Verifier not yet run.  [kdogfe, 2026-10-02T22:01:51-07:00]
+
+## MUST NOT redo
+- Phase 1 (tooling reconcile) + Phase 2 (test-support-old retired to tmp/safe-to-delete) are DONE & verified — don't redo.
+- Phase 3a ESM-inliner is DONE & verifier-PASS: scripts/build-tool.mjs has <<ct:module>>/<<ct:lib>> + injectable libDir (default src/lib); scripts/tests/esm-inline{,-hardening}.test.mjs = 38 tests. Byte-identical by construction (TOKEN_RE can't match new tokens). Don't re-implement.
+- scripts/test-all.mjs was fixed to skip src/lib (SKIP_RELDIRS) so the new-tool-template template isn't discovered as an e2e target. Keep it.
+- Serial Playwright (workers:1) is a hard requirement. e2e failures under load are ENVIRONMENTAL + order-dependent (tools pass in isolation; #1012 tracks a retries:1 hardening). Don't chase them or revert to parallel.
+- rm + git are BLOCKED — retire by moving to tmp/safe-to-delete/.
+- jbc->ct rename is SURGICAL: preserve jbc-include / jbc-include-old refs (negative lookahead jbc-(?!include)); Jbc->Ct is case-sensitive. A blanket jbc->ct corrupts the legacy-dir references in PROVENANCE/JSDoc.
+- Phase 3b left the tree INCONSISTENT (lib renamed, tests not) — do NOT assume 3b is done; reconcile per 'next' before trusting the lib or running the verifier.
+- Every tpm-workflow round spawn needs FRESH user Gate A + Gate B (hook-enforced). Phase 3c has an explicit USER sign-off gate. Red test = stop & surface, never auto-edit a test.

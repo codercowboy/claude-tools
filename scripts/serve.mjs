@@ -6,7 +6,7 @@
  * e.g. some fetch/permissions). The directory is the first CLI argument, resolved
  * against the current working directory; with no argument it serves the cwd.
  *
- *   node scripts/serve.mjs src/tools   # from the repo root: the whole tools gallery
+ *   node scripts/serve.mjs src         # from the repo root: the whole site (gallery at /gallery/)
  *   npm run serve                      # inside a tool folder: just that tool (cwd)
  *
  * Port: $PORT or 8080.

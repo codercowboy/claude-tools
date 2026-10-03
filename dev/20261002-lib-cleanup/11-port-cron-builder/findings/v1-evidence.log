@@ -1,0 +1,56 @@
+## smoke
+present: true
+errors(0) 
+## grep
+grep exit 1
+## template ct directives
+58:  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+174:<<ct:lib components/footer.html>>
+177:<<ct:module components/CtClipboardUtil.mjs>>
+178:<<ct:module components/CtLicense.mjs>>
+179:<<ct:inline app.mjs>></script>
+## pre-mtime snapshot
+src/tools/cron-builder/index.html
+src/tools/cron-builder/source/app.mjs
+src/tools/cron-builder/source/index.template.html
+src/tools/cron-builder/tests/cron-builder.e2e.mjs
+## rebuild
+✓ src/tools/cron-builder: built index.html (103640 chars)
+## check
+✓ src/gallery: up to date
+✓ src/tools/base64-tool: up to date
+✓ src/tools/color-converter: up to date
+✓ src/tools/color-designer: up to date
+✓ src/tools/color-picker: up to date
+✓ src/tools/cron-builder: up to date
+✓ src/tools/inflation-calculator: up to date
+✓ src/tools/network-toolkit: up to date
+✓ src/tools/qr-generator: up to date
+✓ src/tools/uuid-generator: up to date
+Checked 10 tool(s); 0 failed.
+## unit
+✔ macros expand to their documented 5-field equivalents (0.18425ms)
+✔ macros are case-insensitive and whitespace-trimmed (0.12775ms)
+✔ whitespace between fields is collapsed (0.061292ms)
+✔ parseField / buildField work directly on a single field (0.051208ms)
+ℹ tests 102
+ℹ suites 0
+ℹ pass 102
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 154.285167
+## e2e
+  ✓  29 tests/cron-builder.e2e.mjs:425:5 › feature tests › localStorage persistence › expression + flavor are written to localStorage (156ms)
+  ✓  30 tests/cron-builder.e2e.mjs:435:5 › feature tests › localStorage persistence › flavor + expression are restored on reload (541ms)
+  ✓  31 tests/cron-builder.e2e.mjs:447:5 › feature tests › localStorage persistence › a legacy { seconds:true } stored state loads as Unix-with-seconds (132ms)
+  ✓  32 tests/cron-builder.e2e.mjs:464:3 › feature tests › window.__cronBuilder exposes pure functions and live state (110ms)
+  ✓  33 tests/cron-builder.e2e.mjs:497:3 › footer License modal › footer carries the MIT License trigger; the modal is hidden until opened (110ms)
+  ✓  34 tests/cron-builder.e2e.mjs:503:3 › footer License modal › clicking the footer link opens the modal with the MIT text, ✕ and vanilla note (159ms)
+  ✓  35 tests/cron-builder.e2e.mjs:517:3 › footer License modal › opens, is an accessible dialog with the ✕ focused, and closes via Esc / ✕ / backdrop with focus return (303ms)
+  ✓  36 tests/cron-builder.e2e.mjs:523:3 › footer License modal › a click inside the dialog does not close the modal (173ms)
+  ✓  37 tests/cron-builder.e2e.mjs:544:3 › mobile viewport (375px) › the page does not scroll horizontally and every card fits (132ms)
+  ✓  38 tests/cron-builder.e2e.mjs:557:3 › mobile viewport (375px) › still edits and re-derives on mobile (104ms)
+
+  38 passed (10.4s)
