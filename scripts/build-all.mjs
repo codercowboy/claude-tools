@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /*
- * build-all.mjs — build (or --check) every build-assembled tool in the repo.
+ * build-all.mjs — build (or --check) every build-assembled tool in the repo,
+ * or just the one(s) named on the command line.
  *
  * Discovers each dir under src/tools/* that has opted in (it has
  * `source/index.template.html`) and runs the shared builder on it.
@@ -10,12 +11,17 @@
  * default `src/tools`). The landing gallery (src/gallery) is built as its own
  * section.
  *
+ * Optional positional tool-name filter(s): `build-all.mjs color-picker` builds
+ * only that tool; `build-all.mjs gallery` builds only the gallery. With none,
+ * everything is built. This is what `ct build <tool>` and
+ * `npm run build -- <tool>` forward to.
+ *
  * Root package.json wires:
  *   npm run build         # assemble every tool's index.html
  *   npm run build:check   # exit 1 if any committed index.html is out of date
  */
 import { readdirSync, existsSync, statSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runBuild } from './build-tool.mjs';
 
@@ -25,20 +31,39 @@ const ROOTS = (process.env.JC_BUILD_ROOTS || 'src/tools')
 // The landing gallery is its own buildable section (src/gallery/source -> src/gallery/index.html).
 const GALLERY = 'src/gallery';
 const check = process.argv.includes('--check');
+// Bare (non-flag) args are tool-name filters; none => build everything.
+const only = new Set(process.argv.slice(2).filter((a) => !a.startsWith('-')));
+const wantAll = only.size === 0;
 
 const toolDirs = [];
-// The gallery section itself.
+// The gallery section itself (named 'gallery' for the filter).
 const galleryDir = join(REPO_ROOT, GALLERY);
-if (existsSync(join(galleryDir, 'source', 'index.template.html'))) toolDirs.push(galleryDir);
+if ((wantAll || only.has('gallery')) &&
+    existsSync(join(galleryDir, 'source', 'index.template.html'))) {
+  toolDirs.push(galleryDir);
+}
 // Each build-assembled tool under src/tools/*.
 for (const rel of ROOTS) {
   const base = join(REPO_ROOT, rel);
   if (!existsSync(base)) continue;
   for (const name of readdirSync(base)) {
     const dir = join(base, name);
-    if (statSync(dir).isDirectory() && existsSync(join(dir, 'source', 'index.template.html'))) {
+    if ((wantAll || only.has(name)) &&
+        statSync(dir).isDirectory() &&
+        existsSync(join(dir, 'source', 'index.template.html'))) {
       toolDirs.push(dir);
     }
+  }
+}
+
+// A named filter that matched nothing is a typo, not a no-op — fail loudly.
+if (!wantAll) {
+  const matched = new Set(toolDirs.map((d) => basename(d)));
+  const missing = [...only].filter((n) => !matched.has(n));
+  if (missing.length) {
+    console.error(`No build-assembled tool matched: ${missing.join(', ')}`);
+    console.error('(a tool is build-assembled only once it has source/index.template.html)');
+    process.exit(1);
   }
 }
 

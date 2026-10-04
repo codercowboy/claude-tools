@@ -1,0 +1,2138 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Network Toolkit</title>
+<meta property="og:title"       content="Network Toolkit">
+<meta property="og:description" content="Transfer-time, CIDR/subnet, IP conversion, and netmask &harr; prefix calculators — all local in your browser, no DNS or network calls.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6f7;
+    --panel: #ffffff;
+    --panel-alt: #eef2f2;
+    --border: #d3dad9;
+    --border-strong: #b3bebc;
+    --text: #16201e;
+    --text-muted: #5f6d6a;
+    --accent: #0d8f7f;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --focus: #0d8f7f;
+    --radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #12191a;
+      --panel: #1b2324;
+      --panel-alt: #232d2e;
+      --border: #32403f;
+      --border-strong: #465554;
+      --text: #e7edec;
+      --text-muted: #93a29f;
+      --accent: #3fd6bf;
+      --accent-contrast: #06201c;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --focus: #3fd6bf;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  /* ===== Begin ct-base ===== */
+/* Shared single-file-tool base styles — inlined by the build
+   near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
+   This is the single source of truth: edit here, run `npm run build`. See
+   the html-single-file conventions (web-craft.md).
+   It sits near the TOP of the <style> block (after any reset) so a tool's own
+   later rules can still layer colors on top; for <select>, keep the tool's fill as
+   `background-color` (not the `background` shorthand, which would wipe the chevron). */
+html { touch-action: manipulation; } /* double-tap won't zoom the page; pinch-zoom + scroll still work. Gesture canvases keep their own touch-action:none. */
+[hidden] { display: none !important; } /* an author `display:` rule must never defeat the hidden attribute */
+.visually-hidden { /* screen-reader-only (kept in the a11y tree, unlike display:none) */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* iOS/Safari sizes a native <select> from font-size and ignores height/min-height
+   (renders ~half as tall as inputs). Opt out of the native control so the box model
+   applies, and supply our own chevron (appearance:none removes the native one). */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  font-size: 16px; /* >=16px also stops iOS zoom-on-focus */
+  padding-right: 2rem; /* room for the chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.6 6 6.4l5-4.8' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.72rem;
+}
+/* ===== end ct-base ===== */
+/* ===== Begin ct-controls ===== */
+/* Shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the jbc:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See web-craft.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use CtClipboardUtil copy/flash for behavior
+   (components/CtClipboardUtil.mjs). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 { font-size: 1.35rem; margin: 0 0 0.3rem; }
+  h2 { margin: 0; font-size: 1.15rem; }
+  h3 { margin: 0; }
+
+  .subtitle { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+
+  label { font-size: 0.9rem; font-weight: 600; }
+
+  input[type="text"],
+  input[type="number"] {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.55rem 0.7rem;
+    width: 100%;
+  }
+
+  /* Selects keep base.css's chevron: fill with background-COLOR (never the
+     `background` shorthand) and keep padding-right 2rem via longhands (never a
+     horizontal padding shorthand). The spelled-out unit names need real width. */
+  select {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding-block: 0.55rem;
+    padding-left: 0.7rem;
+    padding-right: 2rem;
+    width: 100%;
+    min-width: 15rem;
+  }
+
+  input:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+  button:hover:not(:disabled):not(.ctc-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  output:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header { display: flex; flex-direction: column; gap: 0.2rem; }
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .header-titles { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; line-height: 1;
+  }
+
+  /* ---------- Card panels ---------- */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.15rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .card-head { display: flex; flex-direction: column; gap: 0.25rem; }
+  .card-blurb { margin: 0; color: var(--text-muted); font-size: 0.85rem; line-height: 1.45; }
+  .sub-heading { font-size: 0.95rem; margin-top: 0.3rem; }
+  .hint { margin: 0; color: var(--text-muted); font-size: 0.8rem; line-height: 1.4; }
+
+  .field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .field.grow { flex: 1 1 auto; min-width: 0; }
+  .field-prefix { flex: 0 0 auto; width: 9rem; }
+
+  .controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+  }
+
+  .base-toggle { display: inline-flex; gap: 0.4rem; }
+  .base-toggle button { font-weight: 600; }
+  .base-toggle button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+  .base-toggle button[aria-pressed="true"]:hover:not(:disabled):not(.ctc-btn) {
+    background: var(--accent);
+  }
+
+  .transfer-inputs { display: flex; flex-direction: column; gap: 0.75rem; }
+
+  .source-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+  }
+
+  .actions-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+  .error {
+    margin: 0;
+    padding: 0.55rem 0.75rem;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- In-field copy button (controls.css supplies the base) ---------- */
+  .ct-field > input,
+  .ct-field > .out-value { padding-right: 2.6rem; }
+  .ct-copy-btn { font-size: 0.95rem; }
+
+  /* ---------- Output rows (label left, value field right) ---------- */
+  .out-rows { display: flex; flex-direction: column; gap: 0.5rem; }
+  .out-row {
+    display: grid;
+    grid-template-columns: minmax(8rem, 12rem) 1fr;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .out-row .out-label { font-weight: 600; font-size: 0.85rem; }
+  .out-row .out-note { color: var(--text-muted); font-size: 0.78rem; grid-column: 2; margin: 0; }
+
+  .out-value {
+    display: block;
+    min-height: var(--control-h, 44px);
+    padding: 0.6rem 0.7rem;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    user-select: text;
+    box-sizing: border-box;
+  }
+  .out-value--strong { font-size: 1rem; font-weight: 700; color: var(--accent); }
+  @media (prefers-color-scheme: dark) {
+    .out-value--strong { color: var(--accent); }
+  }
+
+  /* ---------- Card 1 — reference table ---------- */
+  .ref-block { display: flex; flex-direction: column; gap: 0.4rem; }
+  .ref-title { font-weight: 600; font-size: 0.9rem; }
+  .ref-scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+  .ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  .ref-table th, .ref-table td {
+    text-align: left;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .ref-table thead th {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .ref-table td:first-child { font-weight: 600; white-space: nowrap; }
+  .ref-table td:last-child {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .ref-table tbody tr:last-child td { border-bottom: 0; }
+
+  /* ---------- Card 3 — converter rows ---------- */
+  .conv-rows {
+    display: grid;
+    grid-template-columns: minmax(6rem, 8rem) 1fr;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+  }
+  .conv-row { display: contents; }
+  .conv-row > label { font-weight: 600; font-size: 0.85rem; }
+  .conv-row .ct-field > input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+  }
+
+  /* ---------- Help modal ---------- */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 34rem;
+    max-height: min(85vh, 700px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    padding: 1.25rem 3rem 1.1rem 1.4rem;
+  }
+  .modal-close-x {
+    position: absolute;
+    top: .5rem; right: .5rem;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; border: 0; border-radius: 8px;
+    background: transparent; color: inherit;
+    font-size: 1.6rem; line-height: 1; cursor: pointer;
+  }
+  .modal-close-x:hover:not(:disabled):not(.ctc-btn) { background: rgba(127, 127, 127, .18); }
+  .modal-close-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.2rem; }
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.5rem; }
+  .help-dialog code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: var(--panel-alt);
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+  }
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade { from { opacity: 0; } to { opacity: 1; } }
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 640px) {
+    .source-row .field { flex: 1 1 100%; }
+    .field-prefix { width: 100%; }
+    select { min-width: 0; }
+    .base-toggle { flex: 1 1 100%; }
+    .base-toggle button { flex: 1 1 0; }
+    .out-row { grid-template-columns: 1fr; }
+    .out-row .out-note { grid-column: 1; }
+    .conv-rows { grid-template-columns: 1fr; gap: 0.15rem 0; }
+    .conv-row > label { margin-top: 0.4rem; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Network Toolkit</h1>
+        <p class="subtitle">Transfer-time, CIDR/subnet, IP conversion, and netmask &harr; prefix — all local, nothing leaves your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <!-- ==================== Card 1 — Transfer time & rate =============== -->
+  <section class="card" data-testid="card-transfer" aria-labelledby="transfer-heading">
+    <div class="card-head">
+      <h2 id="transfer-heading">Transfer Time &amp; Rate Calculator</h2>
+      <p class="card-blurb">How long does an amount of data take at a given speed? Enter an amount and a speed; the reference table shows 1&nbsp;MB → 1&nbsp;PB at that speed.</p>
+    </div>
+
+    <div class="controls-row">
+      <div class="base-toggle" role="group" aria-label="Prefix base">
+        <button type="button" data-testid="transfer-base-1000" id="transfer-base-1000" aria-pressed="true">Decimal (1000)</button>
+        <button type="button" data-testid="transfer-base-1024" id="transfer-base-1024" aria-pressed="false">Binary (1024)</button>
+      </div>
+    </div>
+    <p class="hint">Decimal = 1000 per prefix (how network rates are quoted); Binary = 1024. bit ↔ byte is always ×8.</p>
+
+    <div class="transfer-inputs">
+      <div class="source-row">
+        <div class="field grow">
+          <label for="transfer-size">Amount to transfer</label>
+          <div class="ct-field">
+            <input type="text" inputmode="decimal" id="transfer-size" data-testid="transfer-size" value="1" autocomplete="off">
+            <button type="button" class="ct-copy-btn" data-copy-target="transfer-size" data-testid="transfer-size-copy" aria-label="Copy amount" title="Copy amount" hidden>📋</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="transfer-size-unit">Unit</label>
+          <select id="transfer-size-unit" data-testid="transfer-size-unit"></select>
+        </div>
+      </div>
+
+      <div class="source-row">
+        <div class="field grow">
+          <label for="transfer-rate">Speed</label>
+          <div class="ct-field">
+            <input type="text" inputmode="decimal" id="transfer-rate" data-testid="transfer-rate" value="100" autocomplete="off">
+            <button type="button" class="ct-copy-btn" data-copy-target="transfer-rate" data-testid="transfer-rate-copy" aria-label="Copy speed" title="Copy speed" hidden>📋</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="transfer-rate-unit">Speed unit</label>
+          <select id="transfer-rate-unit" data-testid="transfer-rate-unit"></select>
+        </div>
+      </div>
+    </div>
+
+    <p class="error" data-testid="transfer-error" role="alert" aria-live="polite" hidden></p>
+
+    <div class="out-rows">
+      <div class="out-row">
+        <span class="out-label">Time</span>
+        <div class="ct-field">
+          <output class="out-value out-value--strong" data-testid="transfer-time"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="transfer-time" data-testid="transfer-time-copy" aria-label="Copy transfer time" title="Copy transfer time">📋</button>
+        </div>
+      </div>
+      <div class="out-row">
+        <span class="out-label">Exact seconds</span>
+        <div class="ct-field">
+          <output class="out-value" data-testid="transfer-seconds"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="transfer-seconds" data-testid="transfer-seconds-copy" aria-label="Copy exact seconds" title="Copy exact seconds">📋</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ref-block">
+      <div class="ref-head">
+        <span class="ref-title">At this speed…</span>
+      </div>
+      <div class="ref-scroll">
+        <table class="ref-table" data-testid="transfer-ref">
+          <thead>
+            <tr><th scope="col">Amount</th><th scope="col">Time</th></tr>
+          </thead>
+          <tbody data-testid="transfer-ref-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button type="button" id="transfer-copy-all" data-testid="transfer-copy-all" title="Copy all transfer results" aria-label="Copy all transfer results">Copy all</button>
+    </div>
+  </section>
+
+  <!-- ==================== Card 2 — CIDR / subnet ===================== -->
+  <section class="card" data-testid="card-cidr" aria-labelledby="cidr-heading">
+    <div class="card-head">
+      <h2 id="cidr-heading">CIDR / Subnet Calculator</h2>
+      <p class="card-blurb">Enter an IPv4 address and a prefix; get the netmask, network &amp; broadcast, usable host range, and counts.</p>
+    </div>
+
+    <div class="source-row">
+      <div class="field grow">
+        <label for="cidr-ip">IPv4 address</label>
+        <div class="ct-field">
+          <input type="text" id="cidr-ip" data-testid="cidr-ip" value="192.168.1.10" autocomplete="off" spellcheck="false" inputmode="decimal">
+          <button type="button" class="ct-copy-btn" data-copy-target="cidr-ip" data-testid="cidr-ip-copy" aria-label="Copy address" title="Copy address" hidden>📋</button>
+        </div>
+      </div>
+      <div class="field field-prefix">
+        <label for="cidr-prefix">Prefix (/0–32)</label>
+        <input type="number" id="cidr-prefix" data-testid="cidr-prefix" value="24" min="0" max="32" step="1" inputmode="numeric">
+      </div>
+    </div>
+
+    <p class="error" data-testid="cidr-error" role="alert" aria-live="polite" hidden></p>
+
+    <div class="out-rows" data-testid="cidr-results"></div>
+
+    <div class="actions-row">
+      <button type="button" id="cidr-copy-all" data-testid="cidr-copy-all" title="Copy all subnet results" aria-label="Copy all subnet results">Copy all</button>
+    </div>
+  </section>
+
+  <!-- ==================== Card 3 — IP converter ====================== -->
+  <section class="card" data-testid="card-ipconv" aria-labelledby="ipconv-heading">
+    <div class="card-head">
+      <h2 id="ipconv-heading">IP Converter</h2>
+      <p class="card-blurb">Edit any representation and the rest update. IPv4 dotted ⇄ integer ⇄ hex ⇄ binary; IPv6 compressed ⇄ expanded ⇄ hex.</p>
+    </div>
+
+    <h3 class="sub-heading">IPv4</h3>
+    <p class="error" data-testid="ipv4-error" role="alert" aria-live="polite" hidden></p>
+    <div class="conv-rows">
+      <div class="conv-row">
+        <label for="ipv4-dotted">Dotted</label>
+        <div class="ct-field">
+          <input type="text" id="ipv4-dotted" data-testid="ipv4-dotted" value="192.168.1.10" autocomplete="off" spellcheck="false" inputmode="decimal">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv4-dotted" data-testid="ipv4-dotted-copy" aria-label="Copy dotted" title="Copy dotted">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv4-int">Integer</label>
+        <div class="ct-field">
+          <input type="text" id="ipv4-int" data-testid="ipv4-int" autocomplete="off" spellcheck="false" inputmode="numeric">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv4-int" data-testid="ipv4-int-copy" aria-label="Copy integer" title="Copy integer">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv4-hex">Hex</label>
+        <div class="ct-field">
+          <input type="text" id="ipv4-hex" data-testid="ipv4-hex" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv4-hex" data-testid="ipv4-hex-copy" aria-label="Copy hex" title="Copy hex">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv4-bin">Binary</label>
+        <div class="ct-field">
+          <input type="text" id="ipv4-bin" data-testid="ipv4-bin" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv4-bin" data-testid="ipv4-bin-copy" aria-label="Copy binary" title="Copy binary">📋</button>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="sub-heading">IPv6</h3>
+    <p class="error" data-testid="ipv6-error" role="alert" aria-live="polite" hidden></p>
+    <div class="conv-rows">
+      <div class="conv-row">
+        <label for="ipv6-compressed">Compressed</label>
+        <div class="ct-field">
+          <input type="text" id="ipv6-compressed" data-testid="ipv6-compressed" value="2001:db8::1" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv6-compressed" data-testid="ipv6-compressed-copy" aria-label="Copy compressed" title="Copy compressed">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv6-expanded">Expanded</label>
+        <div class="ct-field">
+          <input type="text" id="ipv6-expanded" data-testid="ipv6-expanded" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv6-expanded" data-testid="ipv6-expanded-copy" aria-label="Copy expanded" title="Copy expanded">📋</button>
+        </div>
+      </div>
+      <div class="conv-row">
+        <label for="ipv6-hex">Hex</label>
+        <div class="ct-field">
+          <input type="text" id="ipv6-hex" data-testid="ipv6-hex" autocomplete="off" spellcheck="false">
+          <button type="button" class="ct-copy-btn" data-copy-target="ipv6-hex" data-testid="ipv6-hex-copy" aria-label="Copy hex" title="Copy hex">📋</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Card 4 — Netmask <-> prefix ================ -->
+  <section class="card" data-testid="card-netmask" aria-labelledby="netmask-heading">
+    <div class="card-head">
+      <h2 id="netmask-heading">Netmask ⇄ Prefix</h2>
+      <p class="card-blurb">Convert a dotted netmask to a /prefix and back. Non-contiguous masks are rejected.</p>
+    </div>
+
+    <div class="source-row">
+      <div class="field grow">
+        <label for="netmask-mask">Netmask</label>
+        <div class="ct-field">
+          <input type="text" id="netmask-mask" data-testid="netmask-mask" value="255.255.255.0" autocomplete="off" spellcheck="false" inputmode="decimal">
+          <button type="button" class="ct-copy-btn" data-copy-target="netmask-mask" data-testid="netmask-mask-copy" aria-label="Copy netmask" title="Copy netmask">📋</button>
+        </div>
+      </div>
+      <div class="field field-prefix">
+        <label for="netmask-prefix">Prefix</label>
+        <input type="number" id="netmask-prefix" data-testid="netmask-prefix" value="24" min="0" max="32" step="1" inputmode="numeric">
+      </div>
+    </div>
+
+    <p class="error" data-testid="netmask-error" role="alert" aria-live="polite" hidden></p>
+
+    <div class="out-rows">
+      <div class="out-row">
+        <span class="out-label">Prefix</span>
+        <div class="ct-field">
+          <output class="out-value" data-testid="netmask-out-prefix"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="netmask-out-prefix" data-testid="netmask-out-prefix-copy" aria-label="Copy prefix" title="Copy prefix">📋</button>
+        </div>
+      </div>
+      <div class="out-row">
+        <span class="out-label">Netmask</span>
+        <div class="ct-field">
+          <output class="out-value" data-testid="netmask-out-mask"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="netmask-out-mask" data-testid="netmask-out-mask-copy" aria-label="Copy netmask" title="Copy netmask">📋</button>
+        </div>
+      </div>
+      <div class="out-row">
+        <span class="out-label">Wildcard</span>
+        <div class="ct-field">
+          <output class="out-value" data-testid="netmask-out-wildcard"></output>
+          <button type="button" class="ct-copy-btn" data-copy-target="netmask-out-wildcard" data-testid="netmask-out-wildcard-copy" aria-label="Copy wildcard" title="Copy wildcard">📋</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">Network Toolkit</h2>
+    <p>Four independent networking calculators. Everything runs locally in your browser — there are <strong>no DNS lookups, no pings, and no network requests of any kind</strong>. Nothing you type is ever sent anywhere.</p>
+    <ul>
+      <li><strong>Transfer Time &amp; Rate.</strong> Enter an amount and a speed to get the transfer time, plus a table of how long 1&nbsp;MB → 1&nbsp;PB take at that speed. Amounts and speeds accept any bit or byte unit; <strong>bit ↔ byte is always ×8</strong>. The <strong>Decimal (1000)</strong> / <strong>Binary (1024)</strong> toggle sets the prefix base — network rates are conventionally decimal (Mbps = 1,000,000&nbsp;bit/s), while file sizes are often binary; pick whichever you mean.</li>
+      <li><strong>CIDR / Subnet.</strong> An IPv4 address + prefix gives netmask, wildcard, network, broadcast, first/last usable host, and host counts. <code>/31</code> (point-to-point) has 2 usable hosts and <code>/32</code> has 1 — broadcast isn't meaningful there.</li>
+      <li><strong>IP Converter.</strong> Edit any field and the rest follow. IPv4: dotted ⇄ integer ⇄ hex ⇄ binary. IPv6: compressed ⇄ expanded ⇄ hex, with <code>::</code> zero-compression and embedded-IPv4 input.</li>
+      <li><strong>Netmask ⇄ Prefix.</strong> Dotted mask to <code>/prefix</code> and back. A non-contiguous mask (e.g. <code>255.0.255.0</code>) is rejected.</li>
+      <li><strong>Copy buttons (📋).</strong> Each value has an in-field copy button; each card has a <strong>Copy all</strong>.</li>
+    </ul>
+    <p class="help-note">Your inputs and unit choices are remembered on this device, so reopening the tool picks up where you left off.</p>
+  </div>
+</div>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<!---- end footer -->
+
+
+<script type="module">
+/* ct:module components/CtClipboardUtil.mjs */
+const __ct_components_CtClipboardUtil = (() => {
+// ===== Begin CtClipboardUtil (ES module) =====
+/*
+ * CtClipboardUtil — copy-to-clipboard + button-flash helpers (ES module; was copy.js)
+ * ---------------------------------------------------------------------------
+ * import { copy, flash } from '<rel>/jbc-include/components/CtClipboardUtil.mjs';
+ * (or `CtClipboardUtil.copy` / `CtClipboardUtil.flash` via the aggregator class
+ * at the bottom — statics REFERENCE the named bindings, single implementation.)
+ *
+ * Formerly the pasteable IIFE copy.js exposing the jbcCopy / jbcFlash window globals;
+ * those globals are GONE. `copy` = ex-jbcCopy, `flash` = ex-jbcFlash — bodies
+ * unchanged. The `.ctc-flash` CSS still self-injects on the first `flash()` call
+ * (ensureStyles) and the `window.ctCopyStyles = false` opt-out is still honored.
+ *
+ * copy(text) -> Promise<boolean>
+ * flash(el, opts?) -> void
+ *
+ *     btn.addEventListener('click', async () => {
+ *       if (!text) return;
+ *       const ok = await copy(text);
+ *       if (!ok) return;
+ *       flash(btn, { label: '✅', revertTo: '📋' });
+ *     });
+ *
+ * copy(text):
+ * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
+ *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
+ *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
+ *   Clipboard API is unavailable or denied.
+ * - Always RESOLVES — never rejects/throws. Resolves `true` on success,
+ *   `false` if every copy path failed (denied permission, unsupported
+ *   browser, etc.) — callers check the boolean rather than try/catch.
+ *
+ * flash(el, opts?):
+ * - Transient "copied" feedback on a button: swaps `el.textContent` to
+ *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
+ *   reverts and clears the timer.
+ * - Revert target: `opts.revertTo` if given (for icon-only buttons that
+ *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
+ *   current text — captured once and reused if `flash` is called again on
+ *   the same element before the previous flash reverted (rapid re-clicks
+ *   don't lose the true original label).
+ * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
+ *   decorative scale pulse (see STYLING below) — no functional behavior
+ *   depends on it.
+ *
+ * STYLING:
+ * - The only visual injected is the optional `.ctc-flash` pulse animation,
+ *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
+ *   text swap + revert timing are unaffected either way).
+ * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
+ *   `flash` call and no styles are injected.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtClipboardUtil.mjs
+ */
+
+
+function copy(text) {
+  text = String(text == null ? '' : text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      function () { return true; },
+      function () { return fallbackCopy(text); }
+    );
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+var STYLE_ID = 'ctc-copy-style';
+function ensureStyles() {
+  if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = [
+    '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+    '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+    '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+    '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+var flashTimeouts = new WeakMap();
+function flash(el, opts) {
+  opts = opts || {};
+  var ms = opts.ms != null ? opts.ms : 1000;
+  var label = opts.label != null ? opts.label : '✅';
+
+  ensureStyles();
+  clearTimeout(flashTimeouts.get(el));
+
+  var original;
+  if (opts.revertTo != null) {
+    original = opts.revertTo;
+  } else if (el.dataset.ctcFlashOriginal != null) {
+    original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+  } else {
+    original = el.textContent;
+  }
+  el.dataset.ctcFlashOriginal = original;
+
+  el.textContent = label;
+  el.classList.remove('ctc-flash');
+  void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+  el.classList.add('ctc-flash');
+
+  var t = setTimeout(function () {
+    el.textContent = original;
+    el.classList.remove('ctc-flash');
+    delete el.dataset.ctcFlashOriginal;
+    flashTimeouts.delete(el);
+  }, ms);
+  flashTimeouts.set(el, t);
+}
+
+/** Aggregator (decision #3): statics REFERENCE the named exports above. */
+class CtClipboardUtil {
+  static copy = copy;
+  static flash = flash;
+}
+// ===== end CtClipboardUtil =====
+return { copy, flash, CtClipboardUtil };
+})();
+const { copy, flash, CtClipboardUtil } = __ct_components_CtClipboardUtil;
+
+/* ct:module components/CtLicense.mjs */
+const __ct_components_CtLicense = (() => {
+/* CtLicense — shared License modal (components/CtLicense.mjs).
+   An ES module with a SIDE-EFFECT: importing it wires a global click listener
+   (once) that opens the modal on any [data-ct-license] trigger (the footer link in
+   components/footer.html). Every tool that carries the footer imports this module in its
+   app.mjs, so the footer link works for free; the footer no longer inlines a script.
+   Also callable as `openLicense()` / `CtLicense.open()` (there is no window global
+   any more). Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (e.g. a tool that bundles a wasm codec — a per-tool DATA config hook, read at
+   open time). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. Module-private names carry a "License"
+   qualifier so the build's import-flattening cannot collide with app.mjs top-levels. */
+var LICENSE_REPO = 'https://github.com/codercowboy/claude-tools';
+var LICENSE_REPO_LABEL = LICENSE_REPO.replace(/^https?:\/\//, '');
+var LICENSE_MIT_TEXT = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Jason and Claude (Anthropic)',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+
+var licenseOverlay, licenseDialog, licensePrevFocus, licenseStyleEl;
+
+function escapeLicenseHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function injectLicenseStyles() {
+  if (licenseStyleEl) return;
+  licenseStyleEl = document.createElement('style');
+  licenseStyleEl.textContent =
+    '.jbcl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+    '.jbcl-overlay[hidden]{display:none!important;}' +
+    '@media (prefers-reduced-motion:no-preference){.jbcl-overlay{animation:jbcl-fade .15s ease;}@keyframes jbcl-fade{from{opacity:0}to{opacity:1}}}' +
+    '.jbcl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+    '.jbcl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+    '.jbcl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+    '.jbcl-dialog a{color:LinkText;}' +
+    '.jbcl-lead{margin:0 0 .8rem;}' +
+    '.jbcl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+    '.jbcl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.jbcl-tp li{margin-bottom:.3rem;}' +
+    '.jbcl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+    '.jbcl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+    '.jbcl-close:hover{background:rgba(127,127,127,.18);}' +
+    '.jbcl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+  (document.head || document.documentElement).appendChild(licenseStyleEl);
+}
+
+function buildLicenseDialog() {
+  injectLicenseStyles();
+  licenseOverlay = document.createElement('div');
+  licenseOverlay.className = 'jbcl-overlay';
+  licenseOverlay.hidden = true;
+  licenseOverlay.setAttribute('data-testid', 'license-overlay');
+  licenseOverlay.innerHTML =
+    '<div class="jbcl-dialog" role="dialog" aria-modal="true" aria-labelledby="jbcl-title" data-testid="license-modal">' +
+      '<button type="button" class="jbcl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+      '<h2 id="jbcl-title">License</h2>' +
+      '<div class="jbcl-body"></div>' +
+    '</div>';
+  document.body.appendChild(licenseOverlay);
+  licenseDialog = licenseOverlay.querySelector('.jbcl-dialog');
+  licenseOverlay.querySelector('.jbcl-close').addEventListener('click', closeLicense);
+  licenseOverlay.addEventListener('mousedown', function (e) {
+    if (e.target === licenseOverlay) { e.preventDefault(); closeLicense(); }
+  });
+}
+
+function renderLicenseBody() {
+  var html =
+    '<p class="jbcl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+    '<a href="' + LICENSE_REPO + '" target="_blank" rel="noopener noreferrer">' + LICENSE_REPO_LABEL + '</a></p>' +
+    '<pre class="jbcl-text">' + escapeLicenseHtml(LICENSE_MIT_TEXT) + '</pre>';
+  var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+  if (tp.length) {
+    html += '<h3>Bundled third-party libraries</h3><ul class="jbcl-tp">';
+    tp.forEach(function (d) {
+      var label = escapeLicenseHtml(d.name || '') + (d.version ? ' ' + escapeLicenseHtml(d.version) : '');
+      var lic = d.license ? ' &mdash; ' + escapeLicenseHtml(d.license) : '';
+      var link = d.url ? ' &middot; <a href="' + escapeLicenseHtml(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+      html += '<li>' + label + lic + link + '</li>';
+    });
+    html += '</ul><p class="jbcl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+  } else {
+    html += '<p class="jbcl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+  }
+  licenseOverlay.querySelector('.jbcl-body').innerHTML = html;
+}
+
+function licenseFocusables() {
+  return Array.prototype.slice
+    .call(licenseDialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+    .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+}
+
+function onLicenseKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeLicense(); return; }
+  if (e.key !== 'Tab') return;
+  var f = licenseFocusables();
+  if (!f.length) return;
+  e.preventDefault();
+  var i = f.indexOf(document.activeElement);
+  var n = e.shiftKey ? i - 1 : i + 1;
+  if (n < 0) n = f.length - 1;
+  if (n >= f.length) n = 0;
+  f[n].focus();
+}
+
+function openLicense() {
+  if (!licenseOverlay) buildLicenseDialog();
+  renderLicenseBody();
+  licensePrevFocus = document.activeElement;
+  // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+  var host = document.fullscreenElement || document.body;
+  if (licenseOverlay.parentNode !== host) host.appendChild(licenseOverlay);
+  licenseOverlay.hidden = false;
+  document.addEventListener('keydown', onLicenseKey, true);
+  licenseDialog.scrollTop = 0;
+  licenseOverlay.querySelector('.jbcl-close').focus({ preventScroll: true });
+}
+
+function closeLicense() {
+  if (!licenseOverlay || licenseOverlay.hidden) return;
+  licenseOverlay.hidden = true;
+  document.removeEventListener('keydown', onLicenseKey, true);
+  if (licenseOverlay.parentNode !== document.body) document.body.appendChild(licenseOverlay);
+  if (licensePrevFocus && typeof licensePrevFocus.focus === 'function') { try { licensePrevFocus.focus(); } catch (e) {} }
+  licensePrevFocus = null;
+}
+
+var licenseTriggerWired = false;
+function wireLicenseTrigger() {
+  if (licenseTriggerWired || typeof document === 'undefined') return; // idempotent
+  licenseTriggerWired = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); openLicense(); }
+  });
+}
+wireLicenseTrigger(); // self-wire on module evaluation
+
+class CtLicense {
+  static open = openLicense;
+}
+return { openLicense, CtLicense };
+})();
+const { openLicense, CtLicense } = __ct_components_CtLicense;
+
+
+  // =====================================================================
+  // Network Toolkit — app (DOM wiring, render, persistence).
+  // The pure engine is inlined below; nothing here touches localStorage or
+  // the DOM inside logic.mjs.
+  // =====================================================================
+
+  // =====================================================================
+  // Network Toolkit — pure logic (DOM-free, unit-tested)
+  //
+  // No document / window / localStorage in this file. app.mjs inlines it at
+  // build time; tests/unit/*.test.mjs import it directly. Every function is
+  // pure and throws Error(friendly message) on invalid input — the UI catches
+  // and never crashes. This is correctness-critical code; keep it exact.
+  // =====================================================================
+
+  // ---------------------------------------------------------------------
+  // Number formatting
+  // ---------------------------------------------------------------------
+  // Clean display string for a Number: no thousands grouping, trailing zeros
+  // trimmed, ~12 significant figures for non-integers, exponential only for
+  // very large (|n| >= 1e21) or very small (0 < |n| < 1e-7) magnitudes.
+  function formatNumber(n) {
+    if (typeof n !== 'number' || !Number.isFinite(n)) return '';
+    if (n === 0) return '0';
+    const abs = Math.abs(n);
+    if (abs >= 1e21 || abs < 1e-7) {
+      return n.toExponential().replace('e+', 'e').replace('E', 'e');
+    }
+    if (Number.isInteger(n) && abs < 1e21) {
+      return n.toFixed(0);
+    }
+    let s = n.toPrecision(12);
+    if (/e/i.test(s)) s = expToPlain(s);
+    if (s.includes('.')) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s;
+  }
+
+  // "1.234e+12" / "5e-7" -> plain decimal string.
+  function expToPlain(s) {
+    const m = /^(-?)(\d+)(?:\.(\d+))?e([+-]?\d+)$/i.exec(s);
+    if (!m) return s;
+    const sign = m[1];
+    const intPart = m[2];
+    const fracPart = m[3] || '';
+    const exp = parseInt(m[4], 10);
+    const digits = intPart + fracPart;
+    const pointPos = intPart.length + exp;
+    let out;
+    if (pointPos <= 0) {
+      out = '0.' + '0'.repeat(-pointPos) + digits;
+    } else if (pointPos >= digits.length) {
+      out = digits + '0'.repeat(pointPos - digits.length);
+    } else {
+      out = digits.slice(0, pointPos) + '.' + digits.slice(pointPos);
+    }
+    return sign + out;
+  }
+
+  // A length of time in seconds -> readable "1h 12m 30s" (or "500 ms" / "12 µs"
+  // below a second). Whole-second granularity at and above 1 second.
+  function humanizeSeconds(sec) {
+    if (typeof sec !== 'number' || !Number.isFinite(sec) || sec < 0) return '';
+    if (sec === 0) return '0s';
+    if (sec < 1) {
+      const ms = sec * 1e3;
+      if (ms >= 1) return formatNumber(roundSig(ms, 4)) + ' ms';
+      const us = sec * 1e6;
+      if (us >= 1) return formatNumber(roundSig(us, 4)) + ' µs';
+      return formatNumber(roundSig(sec * 1e9, 4)) + ' ns';
+    }
+    const units = [
+      ['y', 31557600], // Julian year: 365.25 days
+      ['d', 86400],
+      ['h', 3600],
+      ['m', 60],
+      ['s', 1],
+    ];
+    let rem = Math.floor(sec);
+    const parts = [];
+    for (const [label, s] of units) {
+      if (rem >= s) {
+        const v = Math.floor(rem / s);
+        rem -= v * s;
+        parts.push(v + label);
+      }
+    }
+    return parts.join(' ');
+  }
+
+  function roundSig(n, sig) {
+    if (n === 0) return 0;
+    const d = Math.ceil(Math.log10(Math.abs(n)));
+    const power = sig - d;
+    const mag = Math.pow(10, power);
+    return Math.round(n * mag) / mag;
+  }
+
+  // ---------------------------------------------------------------------
+  // Card 1 — Transfer time & rate
+  // ---------------------------------------------------------------------
+  // Two families (byte = 8 bits, bit) and prefix powers (base .. Peta).
+  // `base` ∈ {1024, 1000} applies between adjacent prefix powers of the SAME
+  // family; bit ↔ byte is always ×8 regardless of base.
+  const SIZE_UNITS = [
+    { key: 'B',  name: 'Byte',      abbr: 'B',  family: 'byte', power: 0 },
+    { key: 'KB', name: 'Kilobyte',  abbr: 'KB', family: 'byte', power: 1 },
+    { key: 'MB', name: 'Megabyte',  abbr: 'MB', family: 'byte', power: 2 },
+    { key: 'GB', name: 'Gigabyte',  abbr: 'GB', family: 'byte', power: 3 },
+    { key: 'TB', name: 'Terabyte',  abbr: 'TB', family: 'byte', power: 4 },
+    { key: 'PB', name: 'Petabyte',  abbr: 'PB', family: 'byte', power: 5 },
+    { key: 'b',  name: 'bit',       abbr: 'b',  family: 'bit',  power: 0 },
+    { key: 'Kb', name: 'Kilobit',   abbr: 'Kb', family: 'bit',  power: 1 },
+    { key: 'Mb', name: 'Megabit',   abbr: 'Mb', family: 'bit',  power: 2 },
+    { key: 'Gb', name: 'Gigabit',   abbr: 'Gb', family: 'bit',  power: 3 },
+    { key: 'Tb', name: 'Terabit',   abbr: 'Tb', family: 'bit',  power: 4 },
+    { key: 'Pb', name: 'Petabit',   abbr: 'Pb', family: 'bit',  power: 5 },
+  ];
+  const SIZE_UNIT_BY_KEY = Object.fromEntries(SIZE_UNITS.map((u) => [u.key, u]));
+
+  // Order shown in the amount dropdown: byte family then bit family.
+  const SIZE_UNIT_ORDER = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'b', 'Kb', 'Mb', 'Gb', 'Tb', 'Pb'];
+
+  const RATE_UNITS = [
+    { key: 'bps',  name: 'bit per second',      abbr: 'bps',  family: 'bit',  power: 0 },
+    { key: 'Kbps', name: 'Kilobit per second',  abbr: 'Kbps', family: 'bit',  power: 1 },
+    { key: 'Mbps', name: 'Megabit per second',  abbr: 'Mbps', family: 'bit',  power: 2 },
+    { key: 'Gbps', name: 'Gigabit per second',  abbr: 'Gbps', family: 'bit',  power: 3 },
+    { key: 'Tbps', name: 'Terabit per second',  abbr: 'Tbps', family: 'bit',  power: 4 },
+    { key: 'Bps',  name: 'Byte per second',     abbr: 'B/s',  family: 'byte', power: 0 },
+    { key: 'KBps', name: 'Kilobyte per second', abbr: 'KB/s', family: 'byte', power: 1 },
+    { key: 'MBps', name: 'Megabyte per second', abbr: 'MB/s', family: 'byte', power: 2 },
+    { key: 'GBps', name: 'Gigabyte per second', abbr: 'GB/s', family: 'byte', power: 3 },
+    { key: 'TBps', name: 'Terabyte per second', abbr: 'TB/s', family: 'byte', power: 4 },
+  ];
+  const RATE_UNIT_BY_KEY = Object.fromEntries(RATE_UNITS.map((u) => [u.key, u]));
+
+  const REFERENCE_SIZES = [
+    { label: '1 MB', unitKey: 'MB' },
+    { label: '1 GB', unitKey: 'GB' },
+    { label: '1 TB', unitKey: 'TB' },
+    { label: '1 PB', unitKey: 'PB' },
+  ];
+
+  function normalizeBase(base) {
+    return base === 1000 ? 1000 : 1024;
+  }
+
+  // Convert a (value, size unit) into a bit count.
+  function sizeToBits(value, unitKey, base) {
+    const u = SIZE_UNIT_BY_KEY[unitKey];
+    if (!u) throw new Error('Unknown size unit.');
+    const perFamily = u.family === 'byte' ? 8 : 1;
+    return Number(value) * perFamily * Math.pow(normalizeBase(base), u.power);
+  }
+
+  // Convert a (value, rate unit) into bits-per-second.
+  function rateToBitsPerSec(value, rateUnitKey, base) {
+    const u = RATE_UNIT_BY_KEY[rateUnitKey];
+    if (!u) throw new Error('Unknown speed unit.');
+    const perFamily = u.family === 'byte' ? 8 : 1;
+    return Number(value) * perFamily * Math.pow(normalizeBase(base), u.power);
+  }
+
+  // Seconds to transfer `size` `sizeUnit` at `rate` `rateUnit`.
+  function transferTime(size, sizeUnit, rate, rateUnit, base) {
+    const sizeNum = Number(size);
+    const rateNum = Number(rate);
+    if (!Number.isFinite(sizeNum) || sizeNum < 0) throw new Error('Enter a transfer amount of zero or more.');
+    if (!Number.isFinite(rateNum) || rateNum <= 0) throw new Error('Enter a speed greater than zero.');
+    const bits = sizeToBits(sizeNum, sizeUnit, base);
+    const bitsPerSec = rateToBitsPerSec(rateNum, rateUnit, base);
+    return bits / bitsPerSec;
+  }
+
+  // For each reference size (1 MB … 1 PB), the seconds it takes at this speed.
+  function referenceTransferTimes(rate, rateUnit, base) {
+    const rateNum = Number(rate);
+    if (!Number.isFinite(rateNum) || rateNum <= 0) throw new Error('Enter a speed greater than zero.');
+    const bitsPerSec = rateToBitsPerSec(rateNum, rateUnit, base);
+    return REFERENCE_SIZES.map((r) => ({
+      label: r.label,
+      seconds: sizeToBits(1, r.unitKey, base) / bitsPerSec,
+    }));
+  }
+
+  // ---------------------------------------------------------------------
+  // IPv4 core
+  // ---------------------------------------------------------------------
+  // Canonical IPv4 value is an unsigned 32-bit integer (Number, 0..2^32-1).
+  function ipv4ToInt(dotted) {
+    const s = String(dotted == null ? '' : dotted).trim();
+    if (s === '') throw new Error('Enter an IPv4 address, like 192.168.0.1.');
+    const parts = s.split('.');
+    if (parts.length !== 4) throw new Error('An IPv4 address has four parts, like 192.168.0.1.');
+    let v = 0;
+    for (const part of parts) {
+      if (!/^\d{1,3}$/.test(part)) throw new Error('Each part of an IPv4 address is a number 0–255.');
+      const n = Number(part);
+      if (n > 255) throw new Error('Each part of an IPv4 address is a number 0–255.');
+      v = v * 256 + n;
+    }
+    return v >>> 0;
+  }
+
+  function intToIpv4(int) {
+    const n = Number(int);
+    if (!Number.isInteger(n) || n < 0 || n > 0xFFFFFFFF) {
+      throw new Error('Enter a whole number from 0 to 4294967295.');
+    }
+    return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.');
+  }
+
+  function ipv4ToHex(int) {
+    const n = Number(int);
+    if (!Number.isInteger(n) || n < 0 || n > 0xFFFFFFFF) {
+      throw new Error('Enter a whole number from 0 to 4294967295.');
+    }
+    return '0x' + (n >>> 0).toString(16).padStart(8, '0');
+  }
+
+  // Dotted binary, one octet per group: "11000000.10101000.00000001.00000001".
+  function ipv4ToBinary(int) {
+    const n = Number(int);
+    if (!Number.isInteger(n) || n < 0 || n > 0xFFFFFFFF) {
+      throw new Error('Enter a whole number from 0 to 4294967295.');
+    }
+    return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]
+      .map((b) => b.toString(2).padStart(8, '0'))
+      .join('.');
+  }
+
+  function parseIpv4Decimal(str) {
+    const s = String(str == null ? '' : str).trim().replace(/[_\s]/g, '');
+    if (s === '') throw new Error('Enter a whole number from 0 to 4294967295.');
+    if (!/^\d+$/.test(s)) throw new Error('Enter a whole number from 0 to 4294967295.');
+    const n = Number(s);
+    if (!Number.isInteger(n) || n < 0 || n > 0xFFFFFFFF) {
+      throw new Error('Enter a whole number from 0 to 4294967295.');
+    }
+    return n >>> 0;
+  }
+
+  function parseIpv4Hex(str) {
+    let s = String(str == null ? '' : str).trim().replace(/[_\s]/g, '');
+    if (s === '') throw new Error('Enter a hex value like 0xC0A80001.');
+    s = s.replace(/^0x/i, '');
+    if (!/^[0-9a-fA-F]{1,8}$/.test(s)) throw new Error('Enter a hex value like 0xC0A80001 (up to 8 digits).');
+    return parseInt(s, 16) >>> 0;
+  }
+
+  // Accepts dotted binary ("11000000.10101000...") or a plain up-to-32-bit
+  // binary string.
+  function parseIpv4Binary(str) {
+    let s = String(str == null ? '' : str).trim();
+    if (s === '') throw new Error('Enter a binary value like 11000000.10101000.00000001.00000001.');
+    if (s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length !== 4) throw new Error('Dotted binary needs four 8-bit groups.');
+      let v = 0;
+      for (const p of parts) {
+        if (!/^[01]{1,8}$/.test(p)) throw new Error('Each binary group is 1–8 bits (0 or 1).');
+        v = v * 256 + parseInt(p, 2);
+      }
+      return v >>> 0;
+    }
+    s = s.replace(/[_\s]/g, '');
+    if (!/^[01]{1,32}$/.test(s)) throw new Error('Enter up to 32 binary digits (0 or 1).');
+    return parseInt(s, 2) >>> 0;
+  }
+
+  // ---------------------------------------------------------------------
+  // Card 2 — CIDR / subnet
+  // ---------------------------------------------------------------------
+  function cidrInfo(ip, prefix) {
+    const ipInt = ipv4ToInt(ip);
+    const p = Number(prefix);
+    if (!Number.isInteger(p) || p < 0 || p > 32) throw new Error('Prefix length must be a whole number from 0 to 32.');
+
+    const maskInt = p === 0 ? 0 : (0xFFFFFFFF << (32 - p)) >>> 0;
+    const wildcardInt = (~maskInt) >>> 0;
+    const networkInt = (ipInt & maskInt) >>> 0;
+    const broadcastInt = (networkInt | wildcardInt) >>> 0;
+    const totalHosts = Math.pow(2, 32 - p);
+
+    let firstHostInt, lastHostInt, usableHosts;
+    if (p === 32) {
+      firstHostInt = lastHostInt = networkInt;
+      usableHosts = 1;
+    } else if (p === 31) {
+      // RFC 3021 point-to-point: both addresses usable, none reserved.
+      firstHostInt = networkInt;
+      lastHostInt = broadcastInt;
+      usableHosts = 2;
+    } else {
+      firstHostInt = (networkInt + 1) >>> 0;
+      lastHostInt = (broadcastInt - 1) >>> 0;
+      usableHosts = totalHosts - 2;
+    }
+
+    return {
+      prefix: p,
+      address: intToIpv4(ipInt),
+      netmask: intToIpv4(maskInt),
+      wildcard: intToIpv4(wildcardInt),
+      network: intToIpv4(networkInt),
+      broadcast: intToIpv4(broadcastInt),
+      firstHost: intToIpv4(firstHostInt),
+      lastHost: intToIpv4(lastHostInt),
+      usableHosts,
+      totalHosts,
+      cidr: intToIpv4(networkInt) + '/' + p,
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // Card 4 — Netmask <-> prefix
+  // ---------------------------------------------------------------------
+  function prefixToMask(prefix) {
+    const p = Number(prefix);
+    if (!Number.isInteger(p) || p < 0 || p > 32) throw new Error('Prefix length must be a whole number from 0 to 32.');
+    const int = p === 0 ? 0 : (0xFFFFFFFF << (32 - p)) >>> 0;
+    return intToIpv4(int);
+  }
+
+  function maskToPrefix(mask) {
+    const int = ipv4ToInt(mask); // validates dotted form
+    // A valid mask is contiguous 1-bits then 0-bits. Then the inverse is a run
+    // of low 1-bits, i.e. (inv & (inv+1)) === 0.
+    const inv = (~int) >>> 0;
+    if ((((inv & (inv + 1)) >>> 0)) !== 0) {
+      throw new Error('That isn’t a valid subnet mask — the 1-bits must be contiguous (e.g. 255.255.255.0).');
+    }
+    let count = 0;
+    let n = int >>> 0;
+    while (n) { count += n & 1; n >>>= 1; }
+    return count;
+  }
+
+  // ---------------------------------------------------------------------
+  // Card 3 — IPv6
+  // ---------------------------------------------------------------------
+  // Canonical IPv6 value is a 128-bit BigInt (0 .. 2^128-1).
+  const IPV6_MAX = (1n << 128n) - 1n;
+
+  function ipv6ToBigInt(input) {
+    let s = String(input == null ? '' : input).trim();
+    if (s === '') throw new Error('Enter an IPv6 address, like 2001:db8::1.');
+    // Strip a zone id (%eth0) — not preserved.
+    const pct = s.indexOf('%');
+    if (pct >= 0) s = s.slice(0, pct);
+    s = s.toLowerCase();
+
+    const firstDouble = s.indexOf('::');
+    if (firstDouble >= 0 && firstDouble !== s.lastIndexOf('::')) {
+      throw new Error('An IPv6 address may contain “::” only once.');
+    }
+
+    const toGroups = (part) => {
+      if (part === '') return [];
+      const raw = part.split(':');
+      const groups = [];
+      for (let i = 0; i < raw.length; i++) {
+        const g = raw[i];
+        if (g === '') throw new Error('Invalid IPv6 address — check the colons.');
+        if (g.includes('.')) {
+          if (i !== raw.length - 1) throw new Error('An embedded IPv4 part must be at the end of the address.');
+          const v4 = ipv4ToInt(g);
+          groups.push((v4 >>> 16) & 0xffff);
+          groups.push(v4 & 0xffff);
+        } else {
+          if (!/^[0-9a-f]{1,4}$/.test(g)) throw new Error('“' + raw[i] + '” isn’t a valid IPv6 group (1–4 hex digits).');
+          groups.push(parseInt(g, 16));
+        }
+      }
+      return groups;
+    };
+
+    let allGroups;
+    if (firstDouble >= 0) {
+      const headGroups = toGroups(s.slice(0, firstDouble));
+      const tailGroups = toGroups(s.slice(firstDouble + 2));
+      const missing = 8 - headGroups.length - tailGroups.length;
+      if (missing < 1) throw new Error('“::” must stand in for at least one group of zeros.');
+      allGroups = [...headGroups, ...Array(missing).fill(0), ...tailGroups];
+    } else {
+      allGroups = toGroups(s);
+      if (allGroups.length !== 8) throw new Error('An IPv6 address needs 8 groups, or use “::” to fill zeros.');
+    }
+    if (allGroups.length !== 8) throw new Error('Invalid IPv6 address.');
+
+    let v = 0n;
+    for (const g of allGroups) v = (v << 16n) | BigInt(g);
+    return v;
+  }
+
+  function bigIntToGroups(v) {
+    if (typeof v !== 'bigint' || v < 0n || v > IPV6_MAX) throw new Error('IPv6 value out of range.');
+    const groups = [];
+    for (let i = 0; i < 8; i++) groups.push(Number((v >> BigInt((7 - i) * 16)) & 0xffffn));
+    return groups;
+  }
+
+  function bigIntToIpv6Expanded(v) {
+    return bigIntToGroups(v).map((g) => g.toString(16).padStart(4, '0')).join(':');
+  }
+
+  // RFC 5952 canonical form: lowercase, no leading zeros, leftmost-longest run
+  // of >= 2 zero groups compressed to "::".
+  function bigIntToIpv6Compressed(v) {
+    const groups = bigIntToGroups(v);
+    let bestStart = -1, bestLen = 0, curStart = -1, curLen = 0;
+    for (let i = 0; i < 8; i++) {
+      if (groups[i] === 0) {
+        if (curStart < 0) { curStart = i; curLen = 1; } else { curLen++; }
+        if (curLen > bestLen) { bestLen = curLen; bestStart = curStart; }
+      } else {
+        curStart = -1; curLen = 0;
+      }
+    }
+    const parts = groups.map((g) => g.toString(16));
+    if (bestLen >= 2) {
+      const before = parts.slice(0, bestStart);
+      const after = parts.slice(bestStart + bestLen);
+      return before.join(':') + '::' + after.join(':');
+    }
+    return parts.join(':');
+  }
+
+  function ipv6Expand(input) { return bigIntToIpv6Expanded(ipv6ToBigInt(input)); }
+  function ipv6Compress(input) { return bigIntToIpv6Compressed(ipv6ToBigInt(input)); }
+  function ipv6ToHex(input) { return '0x' + ipv6ToBigInt(input).toString(16).padStart(32, '0'); }
+
+  function hexToIpv6BigInt(str) {
+    let s = String(str == null ? '' : str).trim().replace(/[_\s]/g, '');
+    if (s === '') throw new Error('Enter a hex value like 0x20010db8000000000000000000000001.');
+    s = s.replace(/^0x/i, '');
+    if (!/^[0-9a-fA-F]{1,32}$/.test(s)) throw new Error('Enter up to 32 hex digits.');
+    const v = BigInt('0x' + s);
+    if (v > IPV6_MAX) throw new Error('Value is larger than 128 bits.');
+    return v;
+  }
+  function hexToIpv6(str) { return bigIntToIpv6Compressed(hexToIpv6BigInt(str)); }
+
+  export {
+    // formatting
+    formatNumber, expToPlain, humanizeSeconds,
+    // card 1 — transfer / rate
+    SIZE_UNITS, SIZE_UNIT_BY_KEY, SIZE_UNIT_ORDER,
+    RATE_UNITS, RATE_UNIT_BY_KEY, REFERENCE_SIZES,
+    sizeToBits, rateToBitsPerSec, transferTime, referenceTransferTimes,
+    // card 3 — IPv4
+    ipv4ToInt, intToIpv4, ipv4ToHex, ipv4ToBinary,
+    parseIpv4Decimal, parseIpv4Hex, parseIpv4Binary,
+    // card 2 — CIDR
+    cidrInfo,
+    // card 4 — netmask
+    prefixToMask, maskToPrefix,
+    // card 3 — IPv6
+    IPV6_MAX, ipv6ToBigInt, bigIntToIpv6Expanded, bigIntToIpv6Compressed,
+    ipv6Expand, ipv6Compress, ipv6ToHex, hexToIpv6BigInt, hexToIpv6,
+  };
+
+  // =====================================================================
+  // 1. State & persistence
+  // =====================================================================
+  const DEFAULTS = {
+    transfer: { size: '1', sizeUnit: 'GB', rate: '100', rateUnit: 'Mbps', base: 1000 },
+    cidr: { ip: '192.168.1.10', prefix: '24' },
+    ipv4: { dotted: '192.168.1.10' },
+    ipv6: { compressed: '2001:db8::1' },
+    netmask: { mask: '255.255.255.0', prefix: '24' },
+  };
+
+  const state = {
+    transfer: { ...DEFAULTS.transfer },
+    ipv4: { int: 0 },      // canonical unsigned 32-bit int
+    ipv6: { value: 0n },   // canonical 128-bit BigInt
+  };
+
+  const STORAGE_KEY = 'network-toolkit:v1';
+  const HELP_SEEN_KEY = 'network-toolkit:help-seen:v1';
+
+  function hasSeenHelp() {
+    try { return localStorage.getItem(HELP_SEEN_KEY) === '1'; }
+    catch (err) { return true; }
+  }
+  function markHelpSeen() {
+    try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch (err) { /* best-effort */ }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        transfer: {
+          size: transferSizeEl.value,
+          sizeUnit: state.transfer.sizeUnit,
+          rate: transferRateEl.value,
+          rateUnit: state.transfer.rateUnit,
+          base: state.transfer.base,
+        },
+        cidr: { ip: cidrIpEl.value, prefix: cidrPrefixEl.value },
+        ipv4: { dotted: ipv4Fields.dotted.value },
+        ipv6: { compressed: ipv6Fields.compressed.value },
+        netmask: { mask: netmaskMaskEl.value, prefix: netmaskPrefixEl.value },
+      }));
+    } catch (err) { /* best-effort: in-memory only */ }
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return structuredDefaults();
+      const p = JSON.parse(raw) || {};
+      const t = p.transfer || {};
+      const c = p.cidr || {};
+      const v4 = p.ipv4 || {};
+      const v6 = p.ipv6 || {};
+      const nm = p.netmask || {};
+      return {
+        transfer: {
+          size: typeof t.size === 'string' ? t.size : DEFAULTS.transfer.size,
+          sizeUnit: SIZE_UNIT_BY_KEY[t.sizeUnit] ? t.sizeUnit : DEFAULTS.transfer.sizeUnit,
+          rate: typeof t.rate === 'string' ? t.rate : DEFAULTS.transfer.rate,
+          rateUnit: RATE_UNIT_BY_KEY[t.rateUnit] ? t.rateUnit : DEFAULTS.transfer.rateUnit,
+          base: t.base === 1024 ? 1024 : 1000,
+        },
+        cidr: {
+          ip: typeof c.ip === 'string' ? c.ip : DEFAULTS.cidr.ip,
+          prefix: typeof c.prefix === 'string' ? c.prefix : DEFAULTS.cidr.prefix,
+        },
+        ipv4: { dotted: typeof v4.dotted === 'string' ? v4.dotted : DEFAULTS.ipv4.dotted },
+        ipv6: { compressed: typeof v6.compressed === 'string' ? v6.compressed : DEFAULTS.ipv6.compressed },
+        netmask: {
+          mask: typeof nm.mask === 'string' ? nm.mask : DEFAULTS.netmask.mask,
+          prefix: typeof nm.prefix === 'string' ? nm.prefix : DEFAULTS.netmask.prefix,
+        },
+      };
+    } catch (err) {
+      return structuredDefaults();
+    }
+  }
+  function structuredDefaults() {
+    return {
+      transfer: { ...DEFAULTS.transfer },
+      cidr: { ...DEFAULTS.cidr },
+      ipv4: { ...DEFAULTS.ipv4 },
+      ipv6: { ...DEFAULTS.ipv6 },
+      netmask: { ...DEFAULTS.netmask },
+    };
+  }
+
+  // =====================================================================
+  // 2. DOM references
+  // =====================================================================
+  const helpButtonEl = document.getElementById('help-button');
+  const helpOverlayEl = document.querySelector('[data-testid="help-overlay"]');
+  const helpDialogEl = document.querySelector('[data-testid="help-modal"]');
+  const helpCloseXBtn = helpDialogEl.querySelector('[data-testid="modal-close-x"]');
+
+  // Card 1
+  const transferSizeEl = document.getElementById('transfer-size');
+  const transferSizeUnitEl = document.getElementById('transfer-size-unit');
+  const transferRateEl = document.getElementById('transfer-rate');
+  const transferRateUnitEl = document.getElementById('transfer-rate-unit');
+  const transferBase1000Btn = document.getElementById('transfer-base-1000');
+  const transferBase1024Btn = document.getElementById('transfer-base-1024');
+  const transferErrorEl = document.querySelector('[data-testid="transfer-error"]');
+  const transferTimeEl = document.querySelector('[data-testid="transfer-time"]');
+  const transferSecondsEl = document.querySelector('[data-testid="transfer-seconds"]');
+  const transferRefBodyEl = document.querySelector('[data-testid="transfer-ref-body"]');
+  const transferCopyAllBtn = document.getElementById('transfer-copy-all');
+
+  // Card 2
+  const cidrIpEl = document.getElementById('cidr-ip');
+  const cidrPrefixEl = document.getElementById('cidr-prefix');
+  const cidrErrorEl = document.querySelector('[data-testid="cidr-error"]');
+  const cidrResultsEl = document.querySelector('[data-testid="cidr-results"]');
+  const cidrCopyAllBtn = document.getElementById('cidr-copy-all');
+
+  // Card 3
+  const ipv4Fields = {
+    dotted: document.getElementById('ipv4-dotted'),
+    int: document.getElementById('ipv4-int'),
+    hex: document.getElementById('ipv4-hex'),
+    bin: document.getElementById('ipv4-bin'),
+  };
+  const ipv4ErrorEl = document.querySelector('[data-testid="ipv4-error"]');
+  const ipv6Fields = {
+    compressed: document.getElementById('ipv6-compressed'),
+    expanded: document.getElementById('ipv6-expanded'),
+    hex: document.getElementById('ipv6-hex'),
+  };
+  const ipv6ErrorEl = document.querySelector('[data-testid="ipv6-error"]');
+
+  // Card 4
+  const netmaskMaskEl = document.getElementById('netmask-mask');
+  const netmaskPrefixEl = document.getElementById('netmask-prefix');
+  const netmaskErrorEl = document.querySelector('[data-testid="netmask-error"]');
+  const netmaskOutPrefixEl = document.querySelector('[data-testid="netmask-out-prefix"]');
+  const netmaskOutMaskEl = document.querySelector('[data-testid="netmask-out-mask"]');
+  const netmaskOutWildcardEl = document.querySelector('[data-testid="netmask-out-wildcard"]');
+
+  // small error helpers
+  function showErr(el, msg) { el.textContent = msg; el.hidden = false; }
+  function hideErr(el) { el.hidden = true; el.textContent = ''; }
+
+  // =====================================================================
+  // 3. Card 1 — Transfer time & rate
+  // =====================================================================
+  function unitLabel(u) { return `${u.name} (${u.abbr})`; }
+
+  function populateTransferSelects() {
+    transferSizeUnitEl.innerHTML = '';
+    for (const key of SIZE_UNIT_ORDER) {
+      const u = SIZE_UNIT_BY_KEY[key];
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = unitLabel(u);
+      transferSizeUnitEl.appendChild(opt);
+    }
+    transferSizeUnitEl.value = state.transfer.sizeUnit;
+
+    transferRateUnitEl.innerHTML = '';
+    for (const u of RATE_UNITS) {
+      const opt = document.createElement('option');
+      opt.value = u.key;
+      opt.textContent = unitLabel(u);
+      transferRateUnitEl.appendChild(opt);
+    }
+    transferRateUnitEl.value = state.transfer.rateUnit;
+  }
+
+  function renderTransfer() {
+    hideErr(transferErrorEl);
+    const sizeRaw = transferSizeEl.value.trim();
+    const rateRaw = transferRateEl.value.trim();
+    const base = state.transfer.base;
+
+    // Reference table depends only on the speed — render whenever the rate is valid.
+    let refDone = false;
+    if (rateRaw !== '' && Number.isFinite(Number(rateRaw)) && Number(rateRaw) > 0) {
+      try {
+        const refs = referenceTransferTimes(rateRaw, state.transfer.rateUnit, base);
+        transferRefBodyEl.innerHTML = '';
+        for (const r of refs) {
+          const tr = document.createElement('tr');
+          const td1 = document.createElement('td');
+          td1.textContent = r.label;
+          const td2 = document.createElement('td');
+          td2.textContent = humanizeSeconds(r.seconds);
+          tr.append(td1, td2);
+          transferRefBodyEl.appendChild(tr);
+        }
+        refDone = true;
+      } catch (err) { /* fall through */ }
+    }
+    if (!refDone) transferRefBodyEl.innerHTML = '';
+
+    if (sizeRaw === '' && rateRaw === '') {
+      transferTimeEl.textContent = '';
+      transferSecondsEl.textContent = '';
+      return;
+    }
+    let seconds;
+    try {
+      seconds = transferTime(sizeRaw, state.transfer.sizeUnit, rateRaw, state.transfer.rateUnit, base);
+    } catch (err) {
+      showErr(transferErrorEl, err.message);
+      transferTimeEl.textContent = '';
+      transferSecondsEl.textContent = '';
+      return;
+    }
+    transferTimeEl.textContent = humanizeSeconds(seconds);
+    transferSecondsEl.textContent = formatNumber(seconds) + ' s';
+  }
+
+  transferSizeEl.addEventListener('input', () => { renderTransfer(); saveState(); });
+  transferRateEl.addEventListener('input', () => { renderTransfer(); saveState(); });
+  transferSizeUnitEl.addEventListener('change', () => {
+    state.transfer.sizeUnit = transferSizeUnitEl.value;
+    renderTransfer(); saveState();
+  });
+  transferRateUnitEl.addEventListener('change', () => {
+    state.transfer.rateUnit = transferRateUnitEl.value;
+    renderTransfer(); saveState();
+  });
+  function setTransferBase(base) {
+    state.transfer.base = base === 1024 ? 1024 : 1000;
+    transferBase1000Btn.setAttribute('aria-pressed', String(state.transfer.base === 1000));
+    transferBase1024Btn.setAttribute('aria-pressed', String(state.transfer.base === 1024));
+    renderTransfer(); saveState();
+  }
+  transferBase1000Btn.addEventListener('click', () => setTransferBase(1000));
+  transferBase1024Btn.addEventListener('click', () => setTransferBase(1024));
+
+  transferCopyAllBtn.addEventListener('click', () => {
+    const lines = [];
+    const time = transferTimeEl.textContent.trim();
+    const secs = transferSecondsEl.textContent.trim();
+    if (time) lines.push(`Time: ${time}`);
+    if (secs) lines.push(`Exact seconds: ${secs}`);
+    for (const tr of transferRefBodyEl.querySelectorAll('tr')) {
+      const cells = tr.querySelectorAll('td');
+      if (cells.length === 2) lines.push(`${cells[0].textContent.trim()}: ${cells[1].textContent.trim()}`);
+    }
+    copyLines(transferCopyAllBtn, lines);
+  });
+
+  // =====================================================================
+  // 4. Card 2 — CIDR / subnet
+  // =====================================================================
+  // Fixed row set (label, testid, key into cidrInfo result, optional formatter).
+  const CIDR_ROWS = [
+    ['Network', 'cidr-network', 'network'],
+    ['Netmask', 'cidr-netmask', 'netmask'],
+    ['Wildcard', 'cidr-wildcard', 'wildcard'],
+    ['Broadcast', 'cidr-broadcast', 'broadcast'],
+    ['First host', 'cidr-first', 'firstHost'],
+    ['Last host', 'cidr-last', 'lastHost'],
+    ['Usable hosts', 'cidr-usable', 'usableHosts'],
+    ['Total addresses', 'cidr-total', 'totalHosts'],
+    ['CIDR', 'cidr-cidr', 'cidr'],
+  ];
+
+  function buildCidrRows() {
+    cidrResultsEl.innerHTML = '';
+    for (const [label, testid] of CIDR_ROWS) {
+      const row = document.createElement('div');
+      row.className = 'out-row';
+      const lab = document.createElement('span');
+      lab.className = 'out-label';
+      lab.textContent = label;
+      const field = document.createElement('div');
+      field.className = 'ct-field';
+      const out = document.createElement('output');
+      out.className = 'out-value';
+      out.setAttribute('data-testid', testid);
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'ct-copy-btn';
+      copy.setAttribute('data-copy-target', testid);
+      copy.setAttribute('data-testid', testid + '-copy');
+      copy.setAttribute('aria-label', 'Copy ' + label);
+      copy.setAttribute('title', 'Copy ' + label);
+      copy.textContent = '📋';
+      field.append(out, copy);
+      row.append(lab, field);
+      cidrResultsEl.appendChild(row);
+    }
+    // A note row for /31, /32 edge cases.
+    const noteRow = document.createElement('div');
+    noteRow.className = 'out-row';
+    const note = document.createElement('p');
+    note.className = 'out-note';
+    note.setAttribute('data-testid', 'cidr-note');
+    note.hidden = true;
+    noteRow.appendChild(note);
+    cidrResultsEl.appendChild(noteRow);
+  }
+
+  function renderCidr() {
+    hideErr(cidrErrorEl);
+    let info;
+    try {
+      info = cidrInfo(cidrIpEl.value, cidrPrefixEl.value);
+    } catch (err) {
+      showErr(cidrErrorEl, err.message);
+      for (const [, testid] of CIDR_ROWS) {
+        const el = cidrResultsEl.querySelector(`[data-testid="${testid}"]`);
+        if (el) el.textContent = '';
+      }
+      const note = cidrResultsEl.querySelector('[data-testid="cidr-note"]');
+      if (note) note.hidden = true;
+      return;
+    }
+    for (const [, testid, key] of CIDR_ROWS) {
+      const el = cidrResultsEl.querySelector(`[data-testid="${testid}"]`);
+      if (!el) continue;
+      const v = info[key];
+      el.textContent = typeof v === 'number' ? formatNumber(v) : String(v);
+    }
+    const note = cidrResultsEl.querySelector('[data-testid="cidr-note"]');
+    if (note) {
+      if (info.prefix === 32) {
+        note.textContent = '/32 is a single host — network, broadcast, and host are the same address.';
+        note.hidden = false;
+      } else if (info.prefix === 31) {
+        note.textContent = '/31 (RFC 3021) is a point-to-point link — both addresses are usable; there is no reserved broadcast.';
+        note.hidden = false;
+      } else {
+        note.textContent = '';
+        note.hidden = true;
+      }
+    }
+  }
+
+  cidrIpEl.addEventListener('input', () => { renderCidr(); saveState(); });
+  cidrPrefixEl.addEventListener('input', () => { renderCidr(); saveState(); });
+
+  cidrCopyAllBtn.addEventListener('click', () => {
+    const lines = [];
+    for (const [label, testid] of CIDR_ROWS) {
+      const el = cidrResultsEl.querySelector(`[data-testid="${testid}"]`);
+      const v = el ? el.textContent.trim() : '';
+      if (v) lines.push(`${label}: ${v}`);
+    }
+    copyLines(cidrCopyAllBtn, lines);
+  });
+
+  // =====================================================================
+  // 5. Card 3 — IP converter (single source of truth per family)
+  // =====================================================================
+  function renderIpv4(exceptEl) {
+    const int = state.ipv4.int;
+    if (ipv4Fields.dotted !== exceptEl) ipv4Fields.dotted.value = intToIpv4(int);
+    if (ipv4Fields.int !== exceptEl) ipv4Fields.int.value = String(int >>> 0);
+    if (ipv4Fields.hex !== exceptEl) ipv4Fields.hex.value = ipv4ToHex(int);
+    if (ipv4Fields.bin !== exceptEl) ipv4Fields.bin.value = ipv4ToBinary(int);
+    for (const k of Object.keys(ipv4Fields)) refreshEditableCopy(ipv4Fields[k]);
+  }
+
+  const IPV4_PARSERS = {
+    dotted: ipv4ToInt,
+    int: parseIpv4Decimal,
+    hex: parseIpv4Hex,
+    bin: parseIpv4Binary,
+  };
+
+  for (const key of Object.keys(ipv4Fields)) {
+    ipv4Fields[key].addEventListener('input', () => {
+      if (ipv4Fields[key].value.trim() === '') { hideErr(ipv4ErrorEl); return; }
+      let int;
+      try {
+        int = IPV4_PARSERS[key](ipv4Fields[key].value);
+      } catch (err) {
+        showErr(ipv4ErrorEl, err.message);
+        return;
+      }
+      hideErr(ipv4ErrorEl);
+      state.ipv4.int = int >>> 0;
+      renderIpv4(ipv4Fields[key]);
+      refreshEditableCopy(ipv4Fields[key]);
+      saveState();
+    });
+  }
+
+  function renderIpv6(exceptEl) {
+    const v = state.ipv6.value;
+    if (ipv6Fields.compressed !== exceptEl) ipv6Fields.compressed.value = bigIntToIpv6Compressed(v);
+    if (ipv6Fields.expanded !== exceptEl) ipv6Fields.expanded.value = bigIntToIpv6Expanded(v);
+    if (ipv6Fields.hex !== exceptEl) ipv6Fields.hex.value = '0x' + v.toString(16).padStart(32, '0');
+    for (const k of Object.keys(ipv6Fields)) refreshEditableCopy(ipv6Fields[k]);
+  }
+
+  const IPV6_PARSERS = {
+    compressed: ipv6ToBigInt,
+    expanded: ipv6ToBigInt,
+    hex: hexToIpv6BigInt,
+  };
+
+  for (const key of Object.keys(ipv6Fields)) {
+    ipv6Fields[key].addEventListener('input', () => {
+      if (ipv6Fields[key].value.trim() === '') { hideErr(ipv6ErrorEl); return; }
+      let v;
+      try {
+        v = IPV6_PARSERS[key](ipv6Fields[key].value);
+      } catch (err) {
+        showErr(ipv6ErrorEl, err.message);
+        return;
+      }
+      hideErr(ipv6ErrorEl);
+      state.ipv6.value = v;
+      renderIpv6(ipv6Fields[key]);
+      refreshEditableCopy(ipv6Fields[key]);
+      saveState();
+    });
+  }
+
+  // =====================================================================
+  // 6. Card 4 — Netmask <-> prefix
+  // =====================================================================
+  function renderNetmaskOutputs(prefix) {
+    netmaskOutPrefixEl.textContent = '/' + prefix;
+    netmaskOutMaskEl.textContent = prefixToMask(prefix);
+    const maskInt = ipv4ToInt(prefixToMask(prefix));
+    netmaskOutWildcardEl.textContent = intToIpv4((~maskInt) >>> 0);
+  }
+  function clearNetmaskOutputs() {
+    netmaskOutPrefixEl.textContent = '';
+    netmaskOutMaskEl.textContent = '';
+    netmaskOutWildcardEl.textContent = '';
+  }
+
+  function renderFromMask() {
+    hideErr(netmaskErrorEl);
+    if (netmaskMaskEl.value.trim() === '') { clearNetmaskOutputs(); return; }
+    let prefix;
+    try {
+      prefix = maskToPrefix(netmaskMaskEl.value);
+    } catch (err) {
+      showErr(netmaskErrorEl, err.message);
+      clearNetmaskOutputs();
+      return;
+    }
+    netmaskPrefixEl.value = String(prefix);
+    renderNetmaskOutputs(prefix);
+  }
+
+  function renderFromPrefix() {
+    hideErr(netmaskErrorEl);
+    const raw = netmaskPrefixEl.value.trim();
+    if (raw === '') { clearNetmaskOutputs(); return; }
+    let mask;
+    try {
+      mask = prefixToMask(raw);
+    } catch (err) {
+      showErr(netmaskErrorEl, err.message);
+      clearNetmaskOutputs();
+      return;
+    }
+    netmaskMaskEl.value = mask;
+    refreshEditableCopy(netmaskMaskEl);
+    renderNetmaskOutputs(Number(raw));
+  }
+
+  netmaskMaskEl.addEventListener('input', () => { renderFromMask(); saveState(); });
+  netmaskPrefixEl.addEventListener('input', () => { renderFromPrefix(); saveState(); });
+
+  // =====================================================================
+  // 7. Copy buttons (delegated; covers dynamically-built CIDR buttons)
+  // =====================================================================
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.ct-copy-btn');
+    if (!btn) return;
+    const targetId = btn.getAttribute('data-copy-target');
+    const el = document.querySelector(`[data-testid="${targetId}"]`);
+    if (!el) return;
+    const tag = el.tagName;
+    const text = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') ? el.value : el.textContent;
+    if (!text) return;
+    const ok = await copy(text);
+    if (!ok) return;
+    flash(btn, { label: '✅', revertTo: '📋' });
+  });
+
+  async function copyLines(triggerBtn, lines) {
+    if (!lines || lines.length === 0) return;
+    const ok = await copy(lines.join('\n'));
+    if (!ok) return;
+    flash(triggerBtn, { label: 'Copied!', revertTo: 'Copy all' });
+  }
+
+  // In-field copy on an EDITABLE input is revealed only when non-empty.
+  function wireEditableCopy(inputEl) {
+    if (!inputEl) return;
+    const btn = inputEl.parentElement?.querySelector('.ct-copy-btn');
+    if (!btn) return;
+    const sync = () => { btn.hidden = inputEl.value.trim() === ''; };
+    inputEl.addEventListener('input', sync);
+    inputEl.__copySync = sync;
+    sync();
+  }
+  function refreshEditableCopy(inputEl) {
+    if (inputEl && typeof inputEl.__copySync === 'function') inputEl.__copySync();
+  }
+
+  // =====================================================================
+  // 8. Help modal
+  // =====================================================================
+  let helpPreviouslyFocused = null;
+  function getHelpFocusable() {
+    return Array.from(
+      helpDialogEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter((el) => !el.disabled && el.getClientRects().length > 0);
+  }
+  function onHelpKeydown(e) {
+    if (e.key === 'Escape') { e.preventDefault(); closeHelp(); return; }
+    if (e.key !== 'Tab') return;
+    const focusable = getHelpFocusable();
+    if (focusable.length === 0) return;
+    e.preventDefault();
+    const idx = focusable.indexOf(document.activeElement);
+    let next = e.shiftKey ? idx - 1 : idx + 1;
+    if (next < 0) next = focusable.length - 1;
+    if (next >= focusable.length) next = 0;
+    focusable[next].focus();
+  }
+  function openHelp() {
+    helpPreviouslyFocused = document.activeElement;
+    helpOverlayEl.hidden = false;
+    document.addEventListener('keydown', onHelpKeydown, true);
+    helpDialogEl.scrollTop = 0;
+    helpCloseXBtn.focus({ preventScroll: true });
+  }
+  function closeHelp() {
+    if (helpOverlayEl.hidden) return;
+    helpOverlayEl.hidden = true;
+    document.removeEventListener('keydown', onHelpKeydown, true);
+    if (helpPreviouslyFocused && typeof helpPreviouslyFocused.focus === 'function') {
+      try { helpPreviouslyFocused.focus(); } catch (e) { /* ignore */ }
+    }
+    helpPreviouslyFocused = null;
+  }
+  helpButtonEl.addEventListener('click', () => openHelp());
+  helpCloseXBtn.addEventListener('click', () => closeHelp());
+  helpOverlayEl.addEventListener('mousedown', (e) => {
+    if (e.target !== helpOverlayEl) return;
+    e.preventDefault();
+    closeHelp();
+  });
+
+  // =====================================================================
+  // 9. Init — restore persisted state, render every card
+  // =====================================================================
+  (function init() {
+    const loaded = loadState();
+
+    // Card 1
+    state.transfer.sizeUnit = loaded.transfer.sizeUnit;
+    state.transfer.rateUnit = loaded.transfer.rateUnit;
+    state.transfer.base = loaded.transfer.base;
+    transferSizeEl.value = loaded.transfer.size;
+    transferRateEl.value = loaded.transfer.rate;
+    transferBase1000Btn.setAttribute('aria-pressed', String(state.transfer.base === 1000));
+    transferBase1024Btn.setAttribute('aria-pressed', String(state.transfer.base === 1024));
+    populateTransferSelects();
+    renderTransfer();
+
+    // Card 2
+    cidrIpEl.value = loaded.cidr.ip;
+    cidrPrefixEl.value = loaded.cidr.prefix;
+    buildCidrRows();
+    renderCidr();
+
+    // Card 3 — IPv4: seed canonical int from the persisted dotted value.
+    try { state.ipv4.int = ipv4ToInt(loaded.ipv4.dotted) >>> 0; }
+    catch (err) { state.ipv4.int = ipv4ToInt(DEFAULTS.ipv4.dotted) >>> 0; }
+    renderIpv4(null);
+
+    // Card 3 — IPv6: seed canonical BigInt from the persisted compressed value.
+    try { state.ipv6.value = ipv6ToBigInt(loaded.ipv6.compressed); }
+    catch (err) { state.ipv6.value = ipv6ToBigInt(DEFAULTS.ipv6.compressed); }
+    renderIpv6(null);
+
+    // Card 4
+    netmaskMaskEl.value = loaded.netmask.mask;
+    netmaskPrefixEl.value = loaded.netmask.prefix;
+    renderFromMask(); // derives prefix + outputs from the mask (canonical)
+
+    // In-field copy reveal on editable inputs.
+    wireEditableCopy(transferSizeEl);
+    wireEditableCopy(transferRateEl);
+    wireEditableCopy(cidrIpEl);
+    for (const k of Object.keys(ipv4Fields)) wireEditableCopy(ipv4Fields[k]);
+    for (const k of Object.keys(ipv6Fields)) wireEditableCopy(ipv6Fields[k]);
+    wireEditableCopy(netmaskMaskEl);
+
+    if (!hasSeenHelp()) {
+      markHelpSeen();
+      openHelp();
+    }
+  })();
+
+  // =====================================================================
+  // 10. Test hook — inert namespace
+  // =====================================================================
+  window.__networkToolkit = {
+    // pure — formatting
+    formatNumber, expToPlain, humanizeSeconds,
+    // pure — transfer / rate
+    SIZE_UNITS, SIZE_UNIT_BY_KEY, SIZE_UNIT_ORDER, RATE_UNITS, RATE_UNIT_BY_KEY, REFERENCE_SIZES,
+    sizeToBits, rateToBitsPerSec, transferTime, referenceTransferTimes,
+    // pure — IPv4
+    ipv4ToInt, intToIpv4, ipv4ToHex, ipv4ToBinary, parseIpv4Decimal, parseIpv4Hex, parseIpv4Binary,
+    // pure — CIDR
+    cidrInfo,
+    // pure — netmask
+    prefixToMask, maskToPrefix,
+    // pure — IPv6
+    IPV6_MAX, ipv6ToBigInt, bigIntToIpv6Expanded, bigIntToIpv6Compressed,
+    ipv6Expand, ipv6Compress, ipv6ToHex, hexToIpv6BigInt, hexToIpv6,
+    // deterministic entry points
+    renderTransfer, renderCidr, setTransferBase, renderFromMask, renderFromPrefix,
+    // live state
+    state,
+  };
+</script>
+</body>
+</html>

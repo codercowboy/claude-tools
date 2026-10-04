@@ -37,17 +37,18 @@ Simply download this project's source code from github, and open [`src/tools/ind
 Want to rebuild the tools, run the tests, or use `claude-tools` as a baseline for your own project? You'll need [Node.js](https://nodejs.org) 20+. Everything runs through `ct`, the repo's small command runner, driven straight from a clone with `npx`.
 
 ```bash
-# Clone and install (this pulls each tool's dev/test deps into its own node_modules)
+# Clone and install - one root node_modules holds all the dev/test deps
 git clone https://github.com/codercowboy/claude-tools.git
 cd claude-tools
 npm install
+npx playwright install chromium   # the browser the e2e tests drive
 
 # Then drive it with ct:
-npx ct build      # assemble every tool's index.html from its source/ (the committed ones are already built)
-npx ct test       # run the whole test suite
-npx ct serve      # serve the gallery at http://localhost:8080
-npx ct run        # open the built gallery in your default browser
-npx ct install    # (re)install every tool's dependencies
+npx ct build [tool]   # assemble every tool's index.html (or just one) from source/
+npx ct dist           # build, then assemble a deployable dist/ (gallery + one folder per tool)
+npx ct test  [tool]   # run the whole suite (or one tool's unit + e2e)
+npx ct serve [tool]   # serve a tool (or the whole gallery) at http://localhost:8080
+npx ct run            # open the built gallery in your default browser
 ```
 
 `npx ct` with no verb prints the menu. You only need `npx ct build` after editing a tool's `source/` - the committed `index.html` files are already built.
@@ -56,11 +57,13 @@ npx ct install    # (re)install every tool's dependencies
 
 The built tools are static `index.html` files with everything inlined, so once you're happy with one you can drop it on any static host - GitHub Pages, an S3 bucket, Netlify, a folder on your own web server - and it'll run there the same way it runs from `file://`. Nothing to configure, no backend to stand up.
 
+For the whole set at once, `npx ct dist` assembles a `dist/` folder - the gallery at `dist/index.html`, each tool under its own `dist/<tool>/` - that you can deploy as-is to a static host like GitHub Pages. It's a copy of the built files, so the source tree is left alone.
+
 ## Why it works
 
 Each tool is authored in pieces under a `source/` folder and assembled by a small Node build (`scripts/build-tool.mjs`) into the single committed `index.html`. The result inlines all its own CSS and JS, so there's nothing to fetch at runtime and nothing to install to use it. There are zero packaged runtime dependencies - the only dev dependency is the test harness, and it never ships in the tool.
 
-The full write-up - the build pipeline, the per-tool packages, the shared includes, the two-layer testing, and the dependency breakdown and toolkit - lives in [Technical details](docs/technical.md).
+The full write-up - the build pipeline, the single root install, the shared includes, the two-layer testing, and the dependency breakdown and toolkit - lives in [Technical details](docs/technical.md).
 
 ## Alternatives
 

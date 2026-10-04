@@ -1,0 +1,1348 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inflation Calculator</title>
+<meta property="og:title"       content="Inflation Calculator">
+<meta property="og:description" content="See what a US dollar amount from one year is worth in another, using bundled BLS CPI-U data — cumulative inflation and average annual rate, all local in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-alt: #f0f0f4;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #1f7a4d;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --focus: #1f7a4d;
+    --radius: 8px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-alt: #2a2a30;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #4cc98a;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --focus: #4cc98a;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  /* ===== Begin ct-base ===== */
+/* Shared single-file-tool base styles — inlined by the build
+   near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
+   This is the single source of truth: edit here, run `npm run build`. See
+   the html-single-file conventions (web-craft.md).
+   It sits near the TOP of the <style> block (after any reset) so a tool's own
+   later rules can still layer colors on top; for <select>, keep the tool's fill as
+   `background-color` (not the `background` shorthand, which would wipe the chevron). */
+html { touch-action: manipulation; } /* double-tap won't zoom the page; pinch-zoom + scroll still work. Gesture canvases keep their own touch-action:none. */
+[hidden] { display: none !important; } /* an author `display:` rule must never defeat the hidden attribute */
+.visually-hidden { /* screen-reader-only (kept in the a11y tree, unlike display:none) */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* iOS/Safari sizes a native <select> from font-size and ignores height/min-height
+   (renders ~half as tall as inputs). Opt out of the native control so the box model
+   applies, and supply our own chevron (appearance:none removes the native one). */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  font-size: 16px; /* >=16px also stops iOS zoom-on-focus */
+  padding-right: 2rem; /* room for the chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.6 6 6.4l5-4.8' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.72rem;
+}
+/* ===== end ct-base ===== */
+/* ===== Begin ct-controls ===== */
+/* Shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the jbc:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See web-craft.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use CtClipboardUtil copy/flash for behavior
+   (components/CtClipboardUtil.mjs). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */
+  /* ===== Inflation Calculator — tool colors & layout ===== */
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+
+  .app {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 0;
+  }
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .header-titles h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
+  .subtitle { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+
+  .help-button {
+    flex: none;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 1.2rem; font-weight: 600;
+    cursor: pointer;
+  }
+  .help-button:hover { background: var(--panel-alt); }
+  .help-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .card {
+    margin-top: 1.25rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+
+  /* ---- Inputs ---- */
+  .inputs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .field label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+
+  input[type="text"], select {
+    width: 100%;
+    padding-block: 0.5rem;
+    padding-inline: 0.75rem;
+    font-size: 1rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background-color: var(--panel);
+    color: var(--text);
+  }
+  input[type="text"]:focus-visible, select:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 1px;
+  }
+  select {
+    padding-right: 2rem;            /* room for the base.css chevron (longhand!) */
+    min-width: 6.5rem;
+    cursor: pointer;
+  }
+
+  .amount-field .ct-field > input { font-size: 1.15rem; }
+
+  .years-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 0.75rem;
+  }
+  .swap-btn {
+    align-self: end;
+    height: var(--control-h);
+    width: 44px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--panel-alt);
+    color: var(--text);
+    font-size: 1.2rem;
+    cursor: pointer;
+  }
+  .swap-btn:hover { background: var(--border); }
+  .swap-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- Result ---- */
+  .error {
+    margin: 1rem 0 0;
+    color: var(--danger);
+    background: var(--danger-bg);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .result {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .result-label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.25rem; }
+  .result-value {
+    display: block;
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--accent);
+    word-break: break-word;
+    min-height: 1.1em;
+  }
+  .result .ct-field { max-width: max-content; padding-right: 0; }
+  .result .ct-field > .ct-copy-btn { position: static; height: auto; width: auto; padding: 0.25rem; margin-left: 0.35rem; vertical-align: middle; }
+
+  .sentence {
+    margin: 0.75rem 0 0;
+    font-size: 1.05rem;
+    color: var(--text);
+    min-height: 1.2em;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+  .stat {
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.85rem;
+  }
+  .stat-label { font-size: 0.8rem; color: var(--text-muted); }
+  .stat-value { font-size: 1.35rem; font-weight: 700; margin-top: 0.15rem; min-height: 1.2em; }
+
+  .trend {
+    margin-top: 1.25rem;
+    color: var(--accent);
+  }
+  .trend svg { display: block; width: 100%; height: 40px; }
+  .trend-caption { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+  .data-note {
+    margin-top: 1.25rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .data-note a { color: var(--accent); }
+
+  /* ---- Modal ---- */
+  .help-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem; z-index: 50;
+  }
+  .help-dialog {
+    position: relative;
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    max-width: 540px; width: 100%;
+    max-height: 85vh; overflow-y: auto;
+    padding: 1.5rem 1.5rem 1.25rem;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  }
+  .help-dialog h2 { margin-top: 0; padding-right: 2.5rem; }
+  .help-dialog ul { padding-left: 1.2rem; }
+  .help-dialog li { margin-bottom: 0.5rem; }
+  .help-note { color: var(--text-muted); font-size: 0.85rem; }
+
+  .modal-close-x {
+    position: absolute; top: .5rem; right: .5rem; width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center; padding: 0; border: 0;
+    border-radius: 8px; background: transparent; color: inherit; font-size: 1.6rem;
+    line-height: 1; cursor: pointer;
+  }
+  .modal-close-x:hover { background: rgba(127,127,127,.18); }
+  .modal-close-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ---- Wide screens: two-column input, roomier card ---- */
+  @media (min-width: 620px) {
+    .inputs { grid-template-columns: 1fr; }
+  }
+  @media (min-width: 720px) {
+    .app { max-width: 900px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Inflation Calculator</h1>
+        <p class="subtitle">What a US dollar amount from one year is worth in another — bundled BLS CPI-U data, all local in your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <section class="card" aria-labelledby="calc-heading">
+    <h2 id="calc-heading" class="visually-hidden">Inflation calculator</h2>
+
+    <div class="inputs">
+      <div class="field amount-field">
+        <label for="amount-input">Amount (USD)</label>
+        <div class="ct-field">
+          <input type="text" inputmode="decimal" id="amount-input" data-testid="amount-input" autocomplete="off" value="100">
+          <button type="button" class="ct-copy-btn" data-copy-target="amount-input" data-testid="amount-copy" aria-label="Copy amount" title="Copy amount">📋</button>
+        </div>
+      </div>
+
+      <div class="years-row">
+        <div class="field">
+          <label for="from-year">From year</label>
+          <select id="from-year" data-testid="from-year"></select>
+        </div>
+        <button type="button" id="swap-years" class="swap-btn" data-testid="swap-years" title="Swap years" aria-label="Swap from and to years">⇄</button>
+        <div class="field">
+          <label for="to-year">To year</label>
+          <select id="to-year" data-testid="to-year"></select>
+        </div>
+      </div>
+    </div>
+
+    <p class="error" data-testid="error" role="alert" aria-live="polite" hidden></p>
+
+    <div class="result" aria-live="polite">
+      <div class="result-label">Equivalent amount</div>
+      <div class="ct-field">
+        <output class="result-value" data-testid="result-value"></output>
+        <button type="button" class="ct-copy-btn" data-copy-target="result-value" data-testid="result-copy" aria-label="Copy equivalent amount" title="Copy equivalent amount">📋</button>
+      </div>
+      <p class="sentence" data-testid="result-sentence"></p>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Cumulative inflation</div>
+          <div class="stat-value" data-testid="cumulative"></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Average annual rate</div>
+          <div class="stat-value" data-testid="annual-rate"></div>
+        </div>
+      </div>
+
+      <div class="trend" data-testid="trend" hidden></div>
+      <p class="trend-caption">CPI-U trend across the selected span</p>
+    </div>
+
+    <p class="data-note">
+      Data: U.S. Bureau of Labor Statistics <strong>CPI-U</strong> annual average
+      (series <code>CUUR0000SA0</code>, all items, 1982-84=100), covering
+      <strong data-testid="data-range"></strong>. Public domain (U.S. Government work).
+      Last updated <span data-testid="last-updated"></span>.
+      <a href="https://www.bls.gov/cpi/" target="_blank" rel="noopener noreferrer">bls.gov/cpi</a>
+    </p>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">Inflation Calculator</h2>
+    <p>See how the buying power of the US dollar changes over time. Enter an amount, a <strong>from</strong> year, and a <strong>to</strong> year — everything runs locally in your browser, nothing is sent anywhere.</p>
+    <ul>
+      <li><strong>Equivalent amount.</strong> What your amount from the "from" year would be worth in the "to" year, scaled by the change in the price index.</li>
+      <li><strong>Cumulative inflation.</strong> The total percentage change in prices across the whole span.</li>
+      <li><strong>Average annual rate.</strong> The steady yearly rate (compounded) that produces that same overall change.</li>
+      <li><strong>Swap (⇄).</strong> Flip the two years to look backward instead of forward.</li>
+      <li><strong>Copy (📋).</strong> The amount and the result each have a copy-to-clipboard button.</li>
+    </ul>
+    <p>The tool uses the U.S. Bureau of Labor Statistics <strong>CPI-U</strong> annual-average series (all urban consumers, U.S. city average, all items; 1982-84=100), bundled into the page and covering <strong data-testid="data-range"></strong>. It is public-domain U.S. Government data. Figures are nominal-dollar comparisons and reflect the national average basket, not any one region or household.</p>
+    <p class="help-note">Your amount and year selections are remembered on this device, so reopening the tool picks up where you left off.</p>
+  </div>
+</div>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<!---- end footer -->
+
+
+<script>
+  window.__INFLATION_CPI__ = {
+  "series": "CUUR0000SA0",
+  "seriesTitle": "CPI for All Urban Consumers (CPI-U), U.S. city average, all items",
+  "base": "1982-84=100",
+  "source": "U.S. Bureau of Labor Statistics",
+  "sourceUrl": "https://www.bls.gov/cpi/",
+  "note": "Annual average index (BLS period M13). Public domain (U.S. Government work).",
+  "lastUpdated": "2026-09-07",
+  "data": {
+    "1913": 9.9,
+    "1914": 10.0,
+    "1915": 10.1,
+    "1916": 10.9,
+    "1917": 12.8,
+    "1918": 15.1,
+    "1919": 17.3,
+    "1920": 20.0,
+    "1921": 17.9,
+    "1922": 16.8,
+    "1923": 17.1,
+    "1924": 17.1,
+    "1925": 17.5,
+    "1926": 17.7,
+    "1927": 17.4,
+    "1928": 17.1,
+    "1929": 17.1,
+    "1930": 16.7,
+    "1931": 15.2,
+    "1932": 13.7,
+    "1933": 13.0,
+    "1934": 13.4,
+    "1935": 13.7,
+    "1936": 13.9,
+    "1937": 14.4,
+    "1938": 14.1,
+    "1939": 13.9,
+    "1940": 14.0,
+    "1941": 14.7,
+    "1942": 16.3,
+    "1943": 17.3,
+    "1944": 17.6,
+    "1945": 18.0,
+    "1946": 19.5,
+    "1947": 22.3,
+    "1948": 24.1,
+    "1949": 23.8,
+    "1950": 24.1,
+    "1951": 26.0,
+    "1952": 26.5,
+    "1953": 26.7,
+    "1954": 26.9,
+    "1955": 26.8,
+    "1956": 27.2,
+    "1957": 28.1,
+    "1958": 28.9,
+    "1959": 29.1,
+    "1960": 29.6,
+    "1961": 29.9,
+    "1962": 30.2,
+    "1963": 30.6,
+    "1964": 31.0,
+    "1965": 31.5,
+    "1966": 32.4,
+    "1967": 33.4,
+    "1968": 34.8,
+    "1969": 36.7,
+    "1970": 38.8,
+    "1971": 40.5,
+    "1972": 41.8,
+    "1973": 44.4,
+    "1974": 49.3,
+    "1975": 53.8,
+    "1976": 56.9,
+    "1977": 60.6,
+    "1978": 65.2,
+    "1979": 72.6,
+    "1980": 82.4,
+    "1981": 90.9,
+    "1982": 96.5,
+    "1983": 99.6,
+    "1984": 103.9,
+    "1985": 107.6,
+    "1986": 109.6,
+    "1987": 113.6,
+    "1988": 118.3,
+    "1989": 124.0,
+    "1990": 130.7,
+    "1991": 136.2,
+    "1992": 140.3,
+    "1993": 144.5,
+    "1994": 148.2,
+    "1995": 152.4,
+    "1996": 156.9,
+    "1997": 160.5,
+    "1998": 163.0,
+    "1999": 166.6,
+    "2000": 172.2,
+    "2001": 177.1,
+    "2002": 179.9,
+    "2003": 184.0,
+    "2004": 188.9,
+    "2005": 195.3,
+    "2006": 201.6,
+    "2007": 207.342,
+    "2008": 215.303,
+    "2009": 214.537,
+    "2010": 218.056,
+    "2011": 224.939,
+    "2012": 229.594,
+    "2013": 232.957,
+    "2014": 236.736,
+    "2015": 237.017,
+    "2016": 240.007,
+    "2017": 245.12,
+    "2018": 251.107,
+    "2019": 255.657,
+    "2020": 258.811,
+    "2021": 270.97,
+    "2022": 292.655,
+    "2023": 304.702,
+    "2024": 313.689,
+    "2025": 321.943
+  }
+}
+;
+</script>
+
+<script type="module">
+/* ct:module components/CtClipboardUtil.mjs */
+const __ct_components_CtClipboardUtil = (() => {
+// ===== Begin CtClipboardUtil (ES module) =====
+/*
+ * CtClipboardUtil — copy-to-clipboard + button-flash helpers (ES module; was copy.js)
+ * ---------------------------------------------------------------------------
+ * import { copy, flash } from '<rel>/jbc-include/components/CtClipboardUtil.mjs';
+ * (or `CtClipboardUtil.copy` / `CtClipboardUtil.flash` via the aggregator class
+ * at the bottom — statics REFERENCE the named bindings, single implementation.)
+ *
+ * Formerly the pasteable IIFE copy.js exposing the jbcCopy / jbcFlash window globals;
+ * those globals are GONE. `copy` = ex-jbcCopy, `flash` = ex-jbcFlash — bodies
+ * unchanged. The `.ctc-flash` CSS still self-injects on the first `flash()` call
+ * (ensureStyles) and the `window.ctCopyStyles = false` opt-out is still honored.
+ *
+ * copy(text) -> Promise<boolean>
+ * flash(el, opts?) -> void
+ *
+ *     btn.addEventListener('click', async () => {
+ *       if (!text) return;
+ *       const ok = await copy(text);
+ *       if (!ok) return;
+ *       flash(btn, { label: '✅', revertTo: '📋' });
+ *     });
+ *
+ * copy(text):
+ * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
+ *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
+ *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
+ *   Clipboard API is unavailable or denied.
+ * - Always RESOLVES — never rejects/throws. Resolves `true` on success,
+ *   `false` if every copy path failed (denied permission, unsupported
+ *   browser, etc.) — callers check the boolean rather than try/catch.
+ *
+ * flash(el, opts?):
+ * - Transient "copied" feedback on a button: swaps `el.textContent` to
+ *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
+ *   reverts and clears the timer.
+ * - Revert target: `opts.revertTo` if given (for icon-only buttons that
+ *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
+ *   current text — captured once and reused if `flash` is called again on
+ *   the same element before the previous flash reverted (rapid re-clicks
+ *   don't lose the true original label).
+ * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
+ *   decorative scale pulse (see STYLING below) — no functional behavior
+ *   depends on it.
+ *
+ * STYLING:
+ * - The only visual injected is the optional `.ctc-flash` pulse animation,
+ *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
+ *   text swap + revert timing are unaffected either way).
+ * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
+ *   `flash` call and no styles are injected.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtClipboardUtil.mjs
+ */
+
+
+function copy(text) {
+  text = String(text == null ? '' : text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      function () { return true; },
+      function () { return fallbackCopy(text); }
+    );
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+var STYLE_ID = 'ctc-copy-style';
+function ensureStyles() {
+  if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = [
+    '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+    '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+    '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+    '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+var flashTimeouts = new WeakMap();
+function flash(el, opts) {
+  opts = opts || {};
+  var ms = opts.ms != null ? opts.ms : 1000;
+  var label = opts.label != null ? opts.label : '✅';
+
+  ensureStyles();
+  clearTimeout(flashTimeouts.get(el));
+
+  var original;
+  if (opts.revertTo != null) {
+    original = opts.revertTo;
+  } else if (el.dataset.ctcFlashOriginal != null) {
+    original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+  } else {
+    original = el.textContent;
+  }
+  el.dataset.ctcFlashOriginal = original;
+
+  el.textContent = label;
+  el.classList.remove('ctc-flash');
+  void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+  el.classList.add('ctc-flash');
+
+  var t = setTimeout(function () {
+    el.textContent = original;
+    el.classList.remove('ctc-flash');
+    delete el.dataset.ctcFlashOriginal;
+    flashTimeouts.delete(el);
+  }, ms);
+  flashTimeouts.set(el, t);
+}
+
+/** Aggregator (decision #3): statics REFERENCE the named exports above. */
+class CtClipboardUtil {
+  static copy = copy;
+  static flash = flash;
+}
+// ===== end CtClipboardUtil =====
+return { copy, flash, CtClipboardUtil };
+})();
+const { copy, flash, CtClipboardUtil } = __ct_components_CtClipboardUtil;
+
+/* ct:module components/CtLicense.mjs */
+const __ct_components_CtLicense = (() => {
+/* CtLicense — shared License modal (components/CtLicense.mjs).
+   An ES module with a SIDE-EFFECT: importing it wires a global click listener
+   (once) that opens the modal on any [data-ct-license] trigger (the footer link in
+   components/footer.html). Every tool that carries the footer imports this module in its
+   app.mjs, so the footer link works for free; the footer no longer inlines a script.
+   Also callable as `openLicense()` / `CtLicense.open()` (there is no window global
+   any more). Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (e.g. a tool that bundles a wasm codec — a per-tool DATA config hook, read at
+   open time). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. Module-private names carry a "License"
+   qualifier so the build's import-flattening cannot collide with app.mjs top-levels. */
+var LICENSE_REPO = 'https://github.com/codercowboy/claude-tools';
+var LICENSE_REPO_LABEL = LICENSE_REPO.replace(/^https?:\/\//, '');
+var LICENSE_MIT_TEXT = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Jason and Claude (Anthropic)',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+
+var licenseOverlay, licenseDialog, licensePrevFocus, licenseStyleEl;
+
+function escapeLicenseHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function injectLicenseStyles() {
+  if (licenseStyleEl) return;
+  licenseStyleEl = document.createElement('style');
+  licenseStyleEl.textContent =
+    '.jbcl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+    '.jbcl-overlay[hidden]{display:none!important;}' +
+    '@media (prefers-reduced-motion:no-preference){.jbcl-overlay{animation:jbcl-fade .15s ease;}@keyframes jbcl-fade{from{opacity:0}to{opacity:1}}}' +
+    '.jbcl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+    '.jbcl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+    '.jbcl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+    '.jbcl-dialog a{color:LinkText;}' +
+    '.jbcl-lead{margin:0 0 .8rem;}' +
+    '.jbcl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+    '.jbcl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.jbcl-tp li{margin-bottom:.3rem;}' +
+    '.jbcl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+    '.jbcl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+    '.jbcl-close:hover{background:rgba(127,127,127,.18);}' +
+    '.jbcl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+  (document.head || document.documentElement).appendChild(licenseStyleEl);
+}
+
+function buildLicenseDialog() {
+  injectLicenseStyles();
+  licenseOverlay = document.createElement('div');
+  licenseOverlay.className = 'jbcl-overlay';
+  licenseOverlay.hidden = true;
+  licenseOverlay.setAttribute('data-testid', 'license-overlay');
+  licenseOverlay.innerHTML =
+    '<div class="jbcl-dialog" role="dialog" aria-modal="true" aria-labelledby="jbcl-title" data-testid="license-modal">' +
+      '<button type="button" class="jbcl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+      '<h2 id="jbcl-title">License</h2>' +
+      '<div class="jbcl-body"></div>' +
+    '</div>';
+  document.body.appendChild(licenseOverlay);
+  licenseDialog = licenseOverlay.querySelector('.jbcl-dialog');
+  licenseOverlay.querySelector('.jbcl-close').addEventListener('click', closeLicense);
+  licenseOverlay.addEventListener('mousedown', function (e) {
+    if (e.target === licenseOverlay) { e.preventDefault(); closeLicense(); }
+  });
+}
+
+function renderLicenseBody() {
+  var html =
+    '<p class="jbcl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+    '<a href="' + LICENSE_REPO + '" target="_blank" rel="noopener noreferrer">' + LICENSE_REPO_LABEL + '</a></p>' +
+    '<pre class="jbcl-text">' + escapeLicenseHtml(LICENSE_MIT_TEXT) + '</pre>';
+  var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+  if (tp.length) {
+    html += '<h3>Bundled third-party libraries</h3><ul class="jbcl-tp">';
+    tp.forEach(function (d) {
+      var label = escapeLicenseHtml(d.name || '') + (d.version ? ' ' + escapeLicenseHtml(d.version) : '');
+      var lic = d.license ? ' &mdash; ' + escapeLicenseHtml(d.license) : '';
+      var link = d.url ? ' &middot; <a href="' + escapeLicenseHtml(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+      html += '<li>' + label + lic + link + '</li>';
+    });
+    html += '</ul><p class="jbcl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+  } else {
+    html += '<p class="jbcl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+  }
+  licenseOverlay.querySelector('.jbcl-body').innerHTML = html;
+}
+
+function licenseFocusables() {
+  return Array.prototype.slice
+    .call(licenseDialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+    .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+}
+
+function onLicenseKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeLicense(); return; }
+  if (e.key !== 'Tab') return;
+  var f = licenseFocusables();
+  if (!f.length) return;
+  e.preventDefault();
+  var i = f.indexOf(document.activeElement);
+  var n = e.shiftKey ? i - 1 : i + 1;
+  if (n < 0) n = f.length - 1;
+  if (n >= f.length) n = 0;
+  f[n].focus();
+}
+
+function openLicense() {
+  if (!licenseOverlay) buildLicenseDialog();
+  renderLicenseBody();
+  licensePrevFocus = document.activeElement;
+  // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+  var host = document.fullscreenElement || document.body;
+  if (licenseOverlay.parentNode !== host) host.appendChild(licenseOverlay);
+  licenseOverlay.hidden = false;
+  document.addEventListener('keydown', onLicenseKey, true);
+  licenseDialog.scrollTop = 0;
+  licenseOverlay.querySelector('.jbcl-close').focus({ preventScroll: true });
+}
+
+function closeLicense() {
+  if (!licenseOverlay || licenseOverlay.hidden) return;
+  licenseOverlay.hidden = true;
+  document.removeEventListener('keydown', onLicenseKey, true);
+  if (licenseOverlay.parentNode !== document.body) document.body.appendChild(licenseOverlay);
+  if (licensePrevFocus && typeof licensePrevFocus.focus === 'function') { try { licensePrevFocus.focus(); } catch (e) {} }
+  licensePrevFocus = null;
+}
+
+var licenseTriggerWired = false;
+function wireLicenseTrigger() {
+  if (licenseTriggerWired || typeof document === 'undefined') return; // idempotent
+  licenseTriggerWired = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); openLicense(); }
+  });
+}
+wireLicenseTrigger(); // self-wire on module evaluation
+
+class CtLicense {
+  static open = openLicense;
+}
+return { openLicense, CtLicense };
+})();
+const { openLicense, CtLicense } = __ct_components_CtLicense;
+
+
+  // =====================================================================
+  // Inflation Calculator — app (DOM wiring, render, persistence).
+  // The pure engine is inlined below; nothing here touches localStorage or
+  // the DOM inside logic.mjs. The CPI dataset is bundled into the page and
+  // read from window.__INFLATION_CPI__ — no network request at runtime.
+  // =====================================================================
+
+  // =====================================================================
+  // Inflation Calculator — pure logic (DOM-free, unit-tested)
+  //
+  // No document / window / localStorage in this file. app.mjs inlines it at
+  // build time; tests/unit/*.test.mjs import it directly. Every function is
+  // deterministic given a passed `cpi` map: { year: annualIndex } where the
+  // year keys may be numbers or numeric strings. See DESIGN.md § "Pure logic".
+  // =====================================================================
+
+  // Min / max year present in a CPI map.
+  function dataRange(cpi) {
+    const years = Object.keys(cpi || {})
+      .map((y) => Number(y))
+      .filter((y) => Number.isInteger(y));
+    if (years.length === 0) throw new Error('No CPI data available.');
+    return { minYear: Math.min(...years), maxYear: Math.max(...years) };
+  }
+
+  // The index for a year, or a friendly throw when it's outside the data.
+  function cpiFor(year, cpi) {
+    const y = Number(year);
+    if (!Number.isInteger(y)) throw new Error('Enter a whole year.');
+    const v = cpi[y] != null ? cpi[y] : cpi[String(y)];
+    if (v == null || !Number.isFinite(Number(v))) {
+      const { minYear, maxYear } = dataRange(cpi);
+      throw new Error(`No CPI data for ${y}. Data covers ${minYear}–${maxYear}.`);
+    }
+    return Number(v);
+  }
+
+  // What `amount` (a Number) from `fromYear` is worth in `toYear`.
+  function adjust(amount, fromYear, toYear, cpi) {
+    const n = Number(amount);
+    if (!Number.isFinite(n)) throw new Error('Enter a valid amount.');
+    return n * (cpiFor(toYear, cpi) / cpiFor(fromYear, cpi));
+  }
+
+  // Cumulative inflation over the span, as a percent (e.g. 146.32 for +146.32%).
+  function cumulativeInflation(fromYear, toYear, cpi) {
+    return (cpiFor(toYear, cpi) / cpiFor(fromYear, cpi) - 1) * 100;
+  }
+
+  // Average annual inflation rate (CAGR) over the span, as a percent.
+  // 0 when the years match. Direction-agnostic: n = to - from, so a reversed
+  // span yields the same-magnitude rate as the forward span.
+  function annualRate(fromYear, toYear, cpi) {
+    const from = cpiFor(fromYear, cpi);
+    const to = cpiFor(toYear, cpi);
+    const years = Number(toYear) - Number(fromYear);
+    if (years === 0) return 0;
+    return (Math.pow(to / from, 1 / years) - 1) * 100;
+  }
+
+  // ---------------------------------------------------------------------
+  // Display formatting (shared so the sentence, tiles, and copy all agree)
+  // ---------------------------------------------------------------------
+
+  // USD with thousands grouping and 2 decimals; keeps a leading "-" for
+  // negatives (e.g. "-$5.00"). Non-finite -> "".
+  function formatUSD(n) {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return '';
+    const neg = x < 0;
+    const abs = Math.abs(x);
+    const [intPart, fracPart] = abs.toFixed(2).split('.');
+    const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${neg ? '-' : ''}$${grouped}.${fracPart}`;
+  }
+
+  // A percent with sign and up to 2 decimals (trailing zeros trimmed), e.g.
+  // "+146.32%", "-8.4%", "0%". Non-finite -> "".
+  function formatPercent(n) {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return '';
+    const rounded = Math.round(x * 100) / 100;
+    if (rounded === 0) return '0%';
+    let s = Math.abs(rounded).toFixed(2);
+    if (s.includes('.')) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return `${rounded > 0 ? '+' : '-'}${s}%`;
+  }
+
+  export {
+    dataRange,
+    cpiFor,
+    adjust,
+    cumulativeInflation,
+    annualRate,
+    formatUSD,
+    formatPercent,
+  };
+
+  // ---------------------------------------------------------------------
+  // 0. Bundled data
+  // ---------------------------------------------------------------------
+  const CPI_DOC = (typeof window !== 'undefined' && window.__INFLATION_CPI__) || { data: {} };
+  const CPI = CPI_DOC.data || {};
+  const RANGE = dataRange(CPI); // { minYear, maxYear }
+
+  // ---------------------------------------------------------------------
+  // 1. State & persistence
+  // ---------------------------------------------------------------------
+  const STORAGE_KEY = 'inflation-calculator:v1';
+  const HELP_SEEN_KEY = 'inflation-calculator:help-seen:v1';
+
+  function clampYear(y) {
+    const n = Number(y);
+    if (!Number.isInteger(n)) return null;
+    if (n < RANGE.minYear || n > RANGE.maxYear) return null;
+    return n;
+  }
+
+  const DEFAULTS = {
+    amount: '100',
+    // A friendly, meaningful default span: ~a generation back to the latest year.
+    fromYear: clampYear(2000) || RANGE.minYear,
+    toYear: RANGE.maxYear,
+  };
+
+  const state = { ...DEFAULTS };
+
+  function hasSeenHelp() {
+    try { return localStorage.getItem(HELP_SEEN_KEY) === '1'; }
+    catch (err) { return true; }
+  }
+  function markHelpSeen() {
+    try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch (err) { /* best-effort */ }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        amount: amountInput.value,
+        fromYear: state.fromYear,
+        toYear: state.toYear,
+      }));
+    } catch (err) { /* best-effort: in-memory only */ }
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { ...DEFAULTS };
+      const p = JSON.parse(raw) || {};
+      return {
+        amount: typeof p.amount === 'string' ? p.amount : DEFAULTS.amount,
+        fromYear: clampYear(p.fromYear) || DEFAULTS.fromYear,
+        toYear: clampYear(p.toYear) || DEFAULTS.toYear,
+      };
+    } catch (err) {
+      return { ...DEFAULTS };
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // 2. DOM references
+  // ---------------------------------------------------------------------
+  const amountInput = document.getElementById('amount-input');
+  const fromSelect = document.getElementById('from-year');
+  const toSelect = document.getElementById('to-year');
+  const swapBtn = document.getElementById('swap-years');
+
+  const resultValueEl = document.querySelector('[data-testid="result-value"]');
+  const sentenceEl = document.querySelector('[data-testid="result-sentence"]');
+  const cumulativeEl = document.querySelector('[data-testid="cumulative"]');
+  const annualEl = document.querySelector('[data-testid="annual-rate"]');
+  const errorEl = document.querySelector('[data-testid="error"]');
+  const trendEl = document.querySelector('[data-testid="trend"]');
+
+  const helpButtonEl = document.getElementById('help-button');
+  const helpOverlayEl = document.querySelector('[data-testid="help-overlay"]');
+  const helpDialogEl = document.querySelector('[data-testid="help-modal"]');
+  const helpCloseXBtn = helpDialogEl.querySelector('[data-testid="modal-close-x"]');
+  const dataRangeEls = document.querySelectorAll('[data-testid="data-range"]');
+  const lastUpdatedEl = document.querySelector('[data-testid="last-updated"]');
+
+  // ---------------------------------------------------------------------
+  // 3. Year selects
+  // ---------------------------------------------------------------------
+  function populateYearSelect(select) {
+    select.innerHTML = '';
+    for (let y = RANGE.maxYear; y >= RANGE.minYear; y--) {
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      select.appendChild(opt);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // 4. Trend sparkline (decorative CPI line over the selected span)
+  // ---------------------------------------------------------------------
+  function renderTrend() {
+    const lo = Math.min(state.fromYear, state.toYear);
+    const hi = Math.max(state.fromYear, state.toYear);
+    if (lo === hi) { trendEl.hidden = true; trendEl.innerHTML = ''; return; }
+
+    const W = 100, H = 28, pad = 2;
+    const points = [];
+    for (let y = lo; y <= hi; y++) {
+      const v = CPI[y] != null ? Number(CPI[y]) : Number(CPI[String(y)]);
+      if (Number.isFinite(v)) points.push([y, v]);
+    }
+    if (points.length < 2) { trendEl.hidden = true; trendEl.innerHTML = ''; return; }
+
+    const ys = points.map((p) => p[1]);
+    const minV = Math.min(...ys), maxV = Math.max(...ys);
+    const span = maxV - minV || 1;
+    const n = points.length - 1;
+    const coords = points.map((p, i) => {
+      const x = pad + (i / n) * (W - 2 * pad);
+      const yy = H - pad - ((p[1] - minV) / span) * (H - 2 * pad);
+      return `${x.toFixed(2)},${yy.toFixed(2)}`;
+    });
+
+    trendEl.hidden = false;
+    trendEl.innerHTML =
+      `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false">` +
+      `<polyline fill="none" stroke="currentColor" stroke-width="1.5" ` +
+      `stroke-linejoin="round" stroke-linecap="round" points="${coords.join(' ')}"></polyline>` +
+      `</svg>`;
+  }
+
+  // ---------------------------------------------------------------------
+  // 5. Render
+  // ---------------------------------------------------------------------
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.hidden = false;
+  }
+  function hideError() {
+    errorEl.hidden = true;
+    errorEl.textContent = '';
+  }
+
+  function clearResults() {
+    resultValueEl.textContent = '';
+    sentenceEl.textContent = '';
+    cumulativeEl.textContent = '';
+    annualEl.textContent = '';
+    trendEl.hidden = true;
+    trendEl.innerHTML = '';
+    refreshEditableCopy(amountInput);
+  }
+
+  function render() {
+    refreshEditableCopy(amountInput);
+    const raw = amountInput.value.trim();
+
+    if (raw === '') { hideError(); clearResults(); return; }
+    const amount = Number(raw.replace(/[$,\s]/g, ''));
+    if (!Number.isFinite(amount)) {
+      showError('Enter a valid dollar amount.');
+      clearResults();
+      return;
+    }
+
+    let equivalent, cum, rate;
+    try {
+      equivalent = adjust(amount, state.fromYear, state.toYear, CPI);
+      cum = cumulativeInflation(state.fromYear, state.toYear, CPI);
+      rate = annualRate(state.fromYear, state.toYear, CPI);
+    } catch (err) {
+      showError(err.message);
+      clearResults();
+      return;
+    }
+
+    hideError();
+    resultValueEl.textContent = formatUSD(equivalent);
+    sentenceEl.textContent =
+      `${formatUSD(amount)} in ${state.fromYear} has the same buying power as ` +
+      `${formatUSD(equivalent)} in ${state.toYear}.`;
+    cumulativeEl.textContent = state.fromYear === state.toYear ? '0%' : formatPercent(cum);
+    annualEl.textContent = state.fromYear === state.toYear ? '0%/yr' : `${formatPercent(rate)}/yr`;
+    renderTrend();
+  }
+
+  // ---------------------------------------------------------------------
+  // 6. Events
+  // ---------------------------------------------------------------------
+  amountInput.addEventListener('input', () => { render(); saveState(); });
+
+  fromSelect.addEventListener('change', () => {
+    const y = clampYear(fromSelect.value);
+    if (y != null) state.fromYear = y;
+    render();
+    saveState();
+  });
+  toSelect.addEventListener('change', () => {
+    const y = clampYear(toSelect.value);
+    if (y != null) state.toYear = y;
+    render();
+    saveState();
+  });
+
+  swapBtn.addEventListener('click', () => {
+    const f = state.fromYear;
+    state.fromYear = state.toYear;
+    state.toYear = f;
+    fromSelect.value = String(state.fromYear);
+    toSelect.value = String(state.toYear);
+    render();
+    saveState();
+  });
+
+  // ---------------------------------------------------------------------
+  // 7. Copy buttons (delegated; covers the in-field copy affordances)
+  // ---------------------------------------------------------------------
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.ct-copy-btn');
+    if (!btn) return;
+    const targetId = btn.getAttribute('data-copy-target');
+    const el = document.querySelector(`[data-testid="${targetId}"]`);
+    if (!el) return;
+    const tag = el.tagName;
+    const text = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') ? el.value : el.textContent;
+    if (!text) return;
+    const ok = await copy(text);
+    if (!ok) return;
+    flash(btn, { label: '✅', revertTo: '📋' });
+  });
+
+  // In-field copy on the editable amount is revealed only when non-empty.
+  function wireEditableCopy(inputEl) {
+    if (!inputEl) return;
+    const btn = inputEl.parentElement?.querySelector('.ct-copy-btn');
+    if (!btn) return;
+    const sync = () => { btn.hidden = inputEl.value.trim() === ''; };
+    inputEl.addEventListener('input', sync);
+    inputEl.__copySync = sync;
+    sync();
+  }
+  function refreshEditableCopy(inputEl) {
+    if (inputEl && typeof inputEl.__copySync === 'function') inputEl.__copySync();
+  }
+
+  // ---------------------------------------------------------------------
+  // 8. Help modal (repo modal conventions)
+  // ---------------------------------------------------------------------
+  let helpPreviouslyFocused = null;
+
+  function getHelpFocusable() {
+    return Array.from(
+      helpDialogEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter((el) => !el.disabled && el.getClientRects().length > 0);
+  }
+
+  function onHelpKeydown(e) {
+    if (e.key === 'Escape') { e.preventDefault(); closeHelp(); return; }
+    if (e.key !== 'Tab') return;
+    const focusable = getHelpFocusable();
+    if (focusable.length === 0) return;
+    e.preventDefault();
+    const idx = focusable.indexOf(document.activeElement);
+    let next = e.shiftKey ? idx - 1 : idx + 1;
+    if (next < 0) next = focusable.length - 1;
+    if (next >= focusable.length) next = 0;
+    focusable[next].focus();
+  }
+
+  function openHelp() {
+    helpPreviouslyFocused = document.activeElement;
+    helpOverlayEl.hidden = false;
+    document.addEventListener('keydown', onHelpKeydown, true);
+    helpDialogEl.scrollTop = 0;
+    helpCloseXBtn.focus({ preventScroll: true });
+  }
+
+  function closeHelp() {
+    if (helpOverlayEl.hidden) return;
+    helpOverlayEl.hidden = true;
+    document.removeEventListener('keydown', onHelpKeydown, true);
+    if (helpPreviouslyFocused && typeof helpPreviouslyFocused.focus === 'function') {
+      try { helpPreviouslyFocused.focus(); } catch (e) { /* ignore */ }
+    }
+    helpPreviouslyFocused = null;
+  }
+
+  helpButtonEl.addEventListener('click', () => openHelp());
+  helpCloseXBtn.addEventListener('click', () => closeHelp());
+  helpOverlayEl.addEventListener('mousedown', (e) => {
+    if (e.target !== helpOverlayEl) return;
+    e.preventDefault();
+    closeHelp();
+  });
+
+  // ---------------------------------------------------------------------
+  // 9. Init
+  // ---------------------------------------------------------------------
+  (function init() {
+    populateYearSelect(fromSelect);
+    populateYearSelect(toSelect);
+
+    const loaded = loadState();
+    state.amount = loaded.amount;
+    state.fromYear = loaded.fromYear;
+    state.toYear = loaded.toYear;
+
+    amountInput.value = loaded.amount;
+    fromSelect.value = String(state.fromYear);
+    toSelect.value = String(state.toYear);
+
+    // Data provenance shown in the UI + Help.
+    for (const el of dataRangeEls) el.textContent = `${RANGE.minYear}–${RANGE.maxYear}`;
+    if (lastUpdatedEl && CPI_DOC.lastUpdated) lastUpdatedEl.textContent = CPI_DOC.lastUpdated;
+
+    wireEditableCopy(amountInput);
+    render();
+
+    if (!hasSeenHelp()) { markHelpSeen(); openHelp(); }
+  })();
+
+  // ---------------------------------------------------------------------
+  // 10. Test hook — inert namespace for Playwright / unit-driven tests
+  // ---------------------------------------------------------------------
+  window.__inflationCalculator = {
+    // pure
+    dataRange, cpiFor, adjust, cumulativeInflation, annualRate, formatUSD, formatPercent,
+    // bundled data
+    CPI, CPI_DOC, RANGE,
+    // deterministic entry points
+    setInputs({ amount, fromYear, toYear } = {}) {
+      if (typeof amount === 'string') { amountInput.value = amount; }
+      const f = clampYear(fromYear); if (f != null) { state.fromYear = f; fromSelect.value = String(f); }
+      const t = clampYear(toYear); if (t != null) { state.toYear = t; toSelect.value = String(t); }
+      render();
+      saveState();
+    },
+    render,
+    // live state
+    state,
+  };
+
+</script>
+</body>
+</html>

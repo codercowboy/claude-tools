@@ -1,0 +1,2436 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Color Picker</title>
+<meta property="og:title"       content="Color Picker">
+<meta property="og:description" content="Load an image, pan/zoom, and sample exact pixel colors with a magnifier loupe. Collect them as rgba() and hex.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+/* ===== Begin ct-base ===== */
+/* Shared single-file-tool base styles — inlined by the build
+   near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
+   This is the single source of truth: edit here, run `npm run build`. See
+   the html-single-file conventions (web-craft.md).
+   It sits near the TOP of the <style> block (after any reset) so a tool's own
+   later rules can still layer colors on top; for <select>, keep the tool's fill as
+   `background-color` (not the `background` shorthand, which would wipe the chevron). */
+html { touch-action: manipulation; } /* double-tap won't zoom the page; pinch-zoom + scroll still work. Gesture canvases keep their own touch-action:none. */
+[hidden] { display: none !important; } /* an author `display:` rule must never defeat the hidden attribute */
+.visually-hidden { /* screen-reader-only (kept in the a11y tree, unlike display:none) */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* iOS/Safari sizes a native <select> from font-size and ignores height/min-height
+   (renders ~half as tall as inputs). Opt out of the native control so the box model
+   applies, and supply our own chevron (appearance:none removes the native one). */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  font-size: 16px; /* >=16px also stops iOS zoom-on-focus */
+  padding-right: 2rem; /* room for the chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.6 6 6.4l5-4.8' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.72rem;
+}
+/* ===== end ct-base ===== */
+/* ===== Begin ct-controls ===== */
+/* Shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the jbc:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See web-craft.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use CtClipboardUtil copy/flash for behavior
+   (components/CtClipboardUtil.mjs). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */
+
+
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --focus: #2f6fed;
+    --radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* confirm dialog theming — reuse this tool's own tokens so "Yes" renders as a
+       clear filled primary button (not the bare AccentColor fallback, which
+       can look near-white and match Cancel). */
+    --ctc-accent: var(--accent);
+    --ctc-accent-fg: var(--accent-contrast);
+    --ctc-bg: var(--panel);
+    --ctc-fg: var(--text);
+    --ctc-radius: var(--radius);
+    --ctc-btn-radius: var(--radius);
+    --ctc-focus: var(--focus);
+    --ctc-cancel-border: var(--border-strong);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+    margin: 0;
+  }
+
+  h2 {
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    /* Tells mobile browsers this control only needs tap/pan-through, not
+       double-tap-to-zoom (docs/conventions.md "Double-tap must not zoom the
+       page"). No effect on desktop/mouse input. The image canvas is NOT a
+       <button> and keeps its own touch-action: none (below) for pan/pinch/
+       loupe gestures — untouched by this rule. */
+    touch-action: manipulation;
+  }
+
+  /* Excludes .ctc-btn (the pasted confirm dialog "Yes"/"Cancel" buttons — that
+     component owns its own hover styling and must not be repainted by this
+     generic rule), the active Choose Color toggle (handled explicitly
+     below, .choose-color-btn.active:hover), and .modal-close-x (the pinned
+     ✕ close button — handled explicitly by its own
+     .modal-close-x:hover:not(:disabled) rule) and .ct-copy-btn (the in-field
+     copy buttons — controls.css owns their transparent/opacity hover; this
+     generic light fill would otherwise repaint them) so none gets washed out
+     to a near-white background on hover. Ordinary buttons and the inactive
+     toggle keep this light hover unchanged.
+     (Adversarial-review finding: this selector's specificity, 0,2,1,
+     previously beat both .ctc-btn--yes:hover's filter-only rule, 0,2,0, and
+     .choose-color-btn.active's 0,2,0 — repainting a filled accent button
+     near-white while its text stayed white, i.e. invisible.) */
+  button:hover:not(:disabled):not(.ctc-btn):not(.choose-color-btn.active):not(.modal-close-x):not(.ct-copy-btn) {
+    background: #eef1f8;
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header + Help modal ----------
+     Reference pattern: tools/hat-picker's / tools/color-designer's Help
+     modal (see docs/conventions.md "First-load help popup (all tools)").
+     Markup is static in the document, shown/hidden via [hidden] rather than
+     built/torn down per open. The header row only wraps the title/hint and
+     the new ? button — the existing .toolbar controls below are untouched. */
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .help-button {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(32, 28, 43, 0.55);
+  }
+  /* [hidden] cascade trap (docs/conventions.md): an author display:flex
+     rule out-specifies the UA [hidden]{display:none} rule, so pair it with
+     an explicit !important override. */
+  .help-overlay[hidden] { display: none !important; }
+
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30rem;
+    max-height: min(85vh, 640px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    /* Right padding leaves room for the pinned .modal-close-x (40px wide,
+       inset .5rem from the right edge = 3rem total) so the heading/content
+       never slides under it. */
+    padding: 1.25rem 3rem 1.1rem 1.35rem;
+  }
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.2rem; }
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.9rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.4rem; }
+
+  /* ---------- Modal close ✕ (docs/conventions.md "Every content modal has
+     a close ✕ in its top-right corner") ---------- */
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .modal-close-x:hover:not(:disabled) { background: rgba(127, 127, 127, .18); }
+  .modal-close-x:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .help-note {
+    margin-top: 0.9rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  /* ---------- Toolbar ---------- */
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .choose-color-btn.active {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.4);
+  }
+
+  /* Re-asserts the filled accent state on hover (higher specificity, 0,3,0,
+     than the generic button:hover:not(...) rule, 0,2,1) — belt-and-braces
+     alongside that rule's :not(.choose-color-btn.active) exclusion above, so
+     the active toggle never washes out to a near-white hover background. */
+  .choose-color-btn.active:hover {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border-color: var(--accent);
+  }
+
+  .zoom-indicator {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .load-error {
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    background: #fdecea;
+    color: var(--danger);
+    font-size: 0.9rem;
+  }
+
+  /* ---------- Stage ---------- */
+
+  .stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: repeating-conic-gradient(#e4e4e9 0% 25%, #efeff2 0% 50%) 0 0 / 24px 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .stage.drag-over {
+    outline: 3px solid var(--accent);
+    outline-offset: -3px;
+  }
+
+  .stage canvas#canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .stage canvas#canvas.grabbing {
+    cursor: grabbing;
+  }
+
+  .stage.choose-color canvas#canvas {
+    cursor: crosshair;
+  }
+
+  .empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-muted);
+    pointer-events: none;
+    font-size: 0.95rem;
+  }
+
+  .stage.has-image .empty-state {
+    display: none;
+  }
+
+  /* ---------- Loupe ---------- */
+
+  .loupe {
+    position: fixed;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+    z-index: 1000;
+    transform: translate(-50%, calc(-100% - 22px));
+  }
+
+  .loupe[hidden] {
+    display: none;
+  }
+
+  .loupe canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: #222;
+  }
+
+  /* ---------- Touch relative-drag crosshair (Choose Color on touch) ---------- */
+
+  .touch-hint {
+    position: absolute;
+    /* Bottom-anchored, not top:8px. The touch-aim crosshair starts
+       dead-center of the canvas and the loupe renders OFFSET UP from it
+       (translate(-50%, calc(-100% - 22px)), ~142px) — on a short mobile
+       canvas that swept area covers most of the top of the stage, which
+       used to hide this hint pill entirely. 52px leaves clearance above the
+       one-time touch-toast pill (also bottom-anchored, at bottom: 8px) so
+       neither pill overlaps the other when both show on first activation. */
+    bottom: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 0.35rem 0.7rem;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 0.8rem;
+    border-radius: 999px;
+    pointer-events: none;
+    z-index: 500;
+    max-width: calc(100% - 24px);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .touch-hint[hidden] {
+    display: none;
+  }
+
+  .touch-crosshair {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 600;
+    border-radius: 50%;
+  }
+
+  .touch-crosshair[hidden] {
+    display: none;
+  }
+
+  .touch-crosshair::before,
+  .touch-crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  }
+
+  .touch-crosshair::before {
+    left: 3px;
+    right: 3px;
+    top: 50%;
+    height: 2px;
+    transform: translateY(-1px);
+  }
+
+  .touch-crosshair::after {
+    top: 3px;
+    bottom: 3px;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-1px);
+  }
+
+  .touch-crosshair.pulse {
+    animation: touch-crosshair-pulse 0.6s ease-out;
+  }
+
+  @keyframes touch-crosshair-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(47, 111, 237, 0.55); }
+    70% { box-shadow: 0 0 0 14px rgba(47, 111, 237, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(47, 111, 237, 0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .touch-crosshair.pulse {
+      animation: none;
+    }
+  }
+
+  .touch-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 8px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(20, 20, 24, 0.92);
+    color: #fff;
+    padding: 0.4rem 0.4rem 0.4rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    z-index: 700;
+    max-width: calc(100% - 24px);
+  }
+
+  .touch-toast[hidden] {
+    display: none;
+  }
+
+  .touch-toast button {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.3rem;
+    min-width: 28px;
+    min-height: 28px;
+    border-radius: 50%;
+  }
+
+  .touch-toast button:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  /* ---------- Color list ---------- */
+
+  .color-list-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .color-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .color-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .swatch {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    background-color: var(--swatch-color);
+    background-image: none;
+  }
+
+  .swatch.alpha {
+    background-image:
+      linear-gradient(var(--swatch-color), var(--swatch-color)),
+      repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%);
+    background-size: 100% 100%, 8px 8px;
+    background-repeat: no-repeat, repeat;
+  }
+
+  /* ---------- In-field value fields (controls.css supplies the base) ----------
+     Each sampled color shows its rgba()/hex value in a read-only field with an
+     in-field copy button (docs/conventions.md "Standard control height &
+     in-field copy — controls.css"). `.ct-field` is display:block in the shared
+     include; inside the flex color-row it needs to flex/shrink so the two value
+     fields share the row. The `.ct-copy-btn` is absolutely positioned by
+     controls.css; here we just size its emoji glyph. */
+  .ct-field {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ct-field > input {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.4rem 0.5rem;
+    /* Longhand re-declared AFTER the padding shorthand above so the 2.6rem
+       reserve for the in-field copy icon survives (docs/conventions.md — the
+       padding-shorthand trap). controls.css also sets this, but re-declaring
+       here keeps the reserve robust against this tool's own shorthand. */
+    padding-right: 2.6rem;
+    font: 0.85rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--panel);
+    color: var(--text);
+  }
+
+  .ct-field > input:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .ct-copy-btn { font-size: 0.95rem; }
+
+  .trash-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--control-h, 44px);
+    padding: 0.4rem 0.55rem;
+    line-height: 1;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+  }
+
+  /* ---------- Outputs section ---------- */
+
+  .outputs-section {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .output-col {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .output-col textarea {
+    width: 100%;
+    min-height: 140px;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: #fafafc;
+    resize: vertical;
+  }
+
+  .output-col textarea:focus-visible {
+    outline-offset: -2px;
+  }
+
+  /* .visually-hidden now comes from the pasted ct-base include above. */
+
+  .hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 700px) {
+    .outputs-section {
+      flex-direction: column;
+    }
+
+    /* Roomier padding for buttons on narrow screens. The 44px tap-target
+       HEIGHT is now standardized for all inputs/selects/buttons by the shared
+       controls.css (--control-h) at every width, so this only adjusts padding,
+       not min-height (docs/conventions.md "Standard control height"). */
+    button {
+      padding: 0.6rem 0.9rem;
+    }
+
+    /* Color rows stay on one line even at phone widths: swatch + rgba
+       field + hex field + trash all fit by letting the two .field boxes
+       (each already flex: 1 1 auto; min-width: 0, above) shrink instead of
+       wrapping to their own full-width lines. */
+    .color-row {
+      flex-wrap: nowrap;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .toolbar {
+      gap: 0.5rem;
+    }
+
+    .zoom-indicator {
+      margin-left: 0;
+      flex-basis: 100%;
+    }
+
+    .help-dialog {
+      padding: 1rem 3rem 0.9rem 1rem;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="app-header-row">
+    <div class="header-titles">
+      <h1>Color Picker</h1>
+      <p class="hint">Load an image, pan/zoom to find a pixel, then use Choose Color to sample it.</p>
+    </div>
+    <button
+      id="helpButton"
+      type="button"
+      class="help-button"
+      data-testid="help-button"
+      title="How it works"
+      aria-label="How it works"
+    >?</button>
+  </div>
+
+  <header class="toolbar">
+    <button id="loadBtn" type="button" data-testid="load-btn">Load image</button>
+    <input id="fileInput" type="file" accept="image/*" class="visually-hidden" tabindex="-1">
+    <button id="chooseColorBtn" type="button" class="choose-color-btn" data-testid="choose-color-btn" aria-pressed="false">
+      <span aria-hidden="true">🔍</span> Choose Color
+    </button>
+    <button id="resetViewBtn" type="button" data-testid="reset-view-btn">Reset view</button>
+    <span id="zoomIndicator" class="zoom-indicator" data-testid="zoom-indicator">100%</span>
+  </header>
+
+  <p id="loadError" class="load-error" data-testid="load-error" role="status" hidden></p>
+
+  <div id="stage" class="stage" data-testid="stage">
+    <canvas id="canvas" data-testid="canvas"></canvas>
+    <div id="emptyState" class="empty-state">Drop an image here or use Load image</div>
+    <p id="touchHint" class="touch-hint" data-testid="touch-hint" hidden>Drag to aim &middot; tap to pick</p>
+    <div id="touchCrosshair" class="touch-crosshair" data-testid="touch-crosshair" hidden aria-hidden="true"></div>
+    <div id="loupe" class="loupe" hidden>
+      <canvas id="loupeCanvas"></canvas>
+    </div>
+    <div id="touchToast" class="touch-toast" data-testid="touch-toast" hidden>
+      <span>Drag to aim, tap to pick a color.</span>
+      <button id="touchToastDismiss" type="button" data-testid="touch-toast-dismiss" aria-label="Dismiss hint" title="Dismiss hint">&times;</button>
+    </div>
+  </div>
+
+  <section class="color-list-section">
+    <div class="color-list-header">
+      <h2>Sampled colors</h2>
+      <button id="removeAllBtn" type="button" data-testid="remove-all-btn" disabled>Remove all</button>
+    </div>
+    <ul id="colorList" class="color-list" data-testid="color-list"></ul>
+  </section>
+
+  <section class="outputs-section" data-testid="outputs-section">
+    <div class="output-col" data-testid="rgba-output-col">
+      <label for="rgbaOutput">RGBA (one per line)</label>
+      <textarea id="rgbaOutput" data-testid="rgba-output" readonly aria-label="RGBA output, one per line"></textarea>
+      <button id="rgbaCopyAllBtn" type="button" data-testid="rgba-copy-all" aria-label="Copy all RGBA values" title="Copy all RGBA values" disabled>Copy all</button>
+    </div>
+    <div class="output-col" data-testid="hex-output-col">
+      <label for="hexOutput">HEX (one per line)</label>
+      <textarea id="hexOutput" data-testid="hex-output" readonly aria-label="HEX output, one per line"></textarea>
+      <button id="hexCopyAllBtn" type="button" data-testid="hex-copy-all" aria-label="Copy all HEX values" title="Copy all HEX values" disabled>Copy all</button>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">How Color Picker works</h2>
+    <p>Load an image — click <strong>Load image</strong> to choose a file, or drag and drop one onto the canvas — then scroll or pinch to zoom, and drag to pan around it (<strong>Reset view</strong> returns to the fit-to-frame view).</p>
+    <ul>
+      <li><strong>Sample a pixel.</strong> Turn on <strong>🔍 Choose Color</strong>, then click a spot on the image (or drag to aim the crosshair and tap, on touch) — the magnifier loupe zooms in so you can land on the exact pixel.</li>
+      <li><strong>Collected colors.</strong> Each sample adds a row below with its swatch, rgba() value, and hex value — copy either one, or remove the row with the trash icon.</li>
+      <li><strong>Remove all.</strong> Clears every sampled color, after a confirmation.</li>
+      <li><strong>Copy all.</strong> The RGBA and HEX boxes list every sampled color, one per line — use "Copy all" under each to grab the whole list at once.</li>
+    </ul>
+    <p class="help-note">Your sampled colors are saved on this device, so they're still here next time you open Color Picker.</p>
+  </div>
+</div>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<!---- end footer -->
+
+
+
+<script type="module">
+/* ct:module components/CtConfirm.mjs */
+const __ct_components_CtConfirm = (() => {
+// ===== Begin CtConfirm (ES module) =====
+/*
+ * confirmDialog(message?) -> Promise<boolean>   (ES module; was the jbcConfirm window global)
+ * ---------------------------------------------------------------------------
+ * A tiny, dependency-free confirm dialog for single-file tools.
+ *
+ *     import { confirmDialog } from '<rel>/jbc-include/components/CtConfirm.mjs';
+ *     // (or `CtConfirm.confirm` via the aggregator class at the bottom — the
+ *     //  static REFERENCES the named binding, single implementation. The named
+ *     //  export is `confirmDialog`, NOT `confirm`, so it never shadows window.confirm.)
+ *
+ *     if (await confirmDialog('Remove this color?')) { ...do it... }
+ *
+ * - Returns a Promise<boolean>: true = confirmed, false = cancelled.
+ * - message is optional; null/empty/whitespace becomes "Are you sure?".
+ * - "Yes" is the highlighted default: Enter confirms. Esc / "Cancel" /
+ *   backdrop-click cancel. Focus is trapped and returned to the caller's
+ *   element on close. role="dialog", aria-modal, labelled by the message.
+ *
+ * STYLING — the component adapts to each tool's look:
+ * - It injects only structural CSS; every VISUAL choice reads from a CSS
+ *   variable with a theme-aware system-color fallback, so it looks right with
+ *   no theming AND matches your tool if you set a few variables anywhere in
+ *   scope (e.g. your :root / body theme block):
+ *     --ctc-accent, --ctc-accent-fg   (the "Yes" button)
+ *     --ctc-bg, --ctc-fg              (dialog surface + text)
+ *     --ctc-backdrop                  (overlay behind the dialog)
+ *     --ctc-radius, --ctc-btn-radius  (corner rounding)
+ *     --ctc-shadow, --ctc-font        (dialog shadow + font)
+ *     --ctc-cancel-border, --ctc-focus, --ctc-max-width
+ * - Full opt-out: set `window.ctConfirmStyles = false` BEFORE the first call
+ *   and NO styles are injected — your tool then supplies all `.ctc-*` CSS
+ *   (.ctc-overlay/.ctc-dialog/.ctc-message/.ctc-buttons/.ctc-btn/
+ *   .ctc-btn--cancel/.ctc-btn--yes).
+ *
+ * Formerly a pasteable IIFE script exposing the old `jbcConfirm` window global
+ * (vendored copies called it `ctConfirm`); those globals are GONE — `confirmDialog` =
+ * ex-jbcConfirm, body unchanged. The CSS still self-injects on the first call
+ * (ensureConfirmStyles) and the `window.ctConfirmStyles = false` opt-out is still honored.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtConfirm.mjs
+ */
+
+var CONFIRM_STYLE_ID = 'ctc-style';
+function ensureConfirmStyles() {
+  if (window.ctConfirmStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(CONFIRM_STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = CONFIRM_STYLE_ID;
+  style.textContent = [
+    '.ctc-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;',
+    'align-items:center;justify-content:center;padding:1rem;',
+    'color-scheme:light dark;background:var(--ctc-backdrop,rgba(0,0,0,0.5));}',
+    '.ctc-dialog{box-sizing:border-box;width:100%;',
+    'max-width:var(--ctc-max-width,22rem);padding:1.25rem 1.25rem 1rem;',
+    'background:var(--ctc-bg,Canvas);color:var(--ctc-fg,CanvasText);',
+    'border-radius:var(--ctc-radius,12px);',
+    'box-shadow:var(--ctc-shadow,0 10px 40px rgba(0,0,0,0.3));',
+    'font-family:var(--ctc-font,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);}',
+    '.ctc-message{margin:0 0 1.1rem;font-size:1rem;line-height:1.45;}',
+    '.ctc-buttons{display:flex;justify-content:flex-end;gap:0.6rem;}',
+    '.ctc-btn{box-sizing:border-box;min-height:44px;padding:0.5rem 1.1rem;',
+    'border-radius:var(--ctc-btn-radius,8px);font:inherit;font-weight:600;',
+    'cursor:pointer;border:1px solid transparent;}',
+    '.ctc-btn:focus-visible{outline:2px solid var(--ctc-focus,AccentColor);',
+    'outline-offset:2px;}',
+    '.ctc-btn--cancel{background:transparent;color:inherit;',
+    'border-color:var(--ctc-cancel-border,rgba(128,128,128,0.5));}',
+    '.ctc-btn--cancel:hover{background:rgba(128,128,128,0.15);}',
+    '.ctc-btn--yes{background:var(--ctc-accent,AccentColor);',
+    'color:var(--ctc-accent-fg,AccentColorText);}',
+    '.ctc-btn--yes:hover{filter:brightness(1.08);}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+function confirmDialog(message) {
+  ensureConfirmStyles();
+  var text = (message == null || String(message).trim() === '')
+    ? 'Are you sure?' : String(message);
+
+  return new Promise(function (resolve) {
+    var previouslyFocused = document.activeElement;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'ctc-overlay';
+
+    var dialog = document.createElement('div');
+    dialog.className = 'ctc-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+
+    var msgEl = document.createElement('p');
+    msgEl.className = 'ctc-message';
+    msgEl.textContent = text;
+    var msgId = 'ctc-msg-' + Math.random().toString(36).slice(2);
+    msgEl.id = msgId;
+    dialog.setAttribute('aria-labelledby', msgId);
+
+    var buttons = document.createElement('div');
+    buttons.className = 'ctc-buttons';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'ctc-btn ctc-btn--cancel';
+    cancelBtn.textContent = 'Cancel';
+
+    var yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'ctc-btn ctc-btn--yes';
+    yesBtn.textContent = 'Yes';
+
+    buttons.appendChild(cancelBtn);
+    buttons.appendChild(yesBtn);
+    dialog.appendChild(msgEl);
+    dialog.appendChild(buttons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    var done = false;
+    function close(result) {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKeydown, true);
+      overlay.remove();
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        try { previouslyFocused.focus(); } catch (e) { /* ignore */ }
+      }
+      resolve(result);
+    }
+
+    function onKeydown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        close(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        close(false);
+      } else if (e.key === 'Tab') {
+        // trap focus between the two buttons
+        e.preventDefault();
+        var order = [cancelBtn, yesBtn];
+        var idx = order.indexOf(document.activeElement);
+        var next = e.shiftKey ? idx - 1 : idx + 1;
+        if (next < 0) next = order.length - 1;
+        if (next >= order.length) next = 0;
+        order[next].focus();
+      }
+    }
+
+    document.addEventListener('keydown', onKeydown, true);
+    overlay.addEventListener('mousedown', function (e) {
+      if (e.target === overlay) close(false);
+    });
+    cancelBtn.addEventListener('click', function () { close(false); });
+    yesBtn.addEventListener('click', function () { close(true); });
+
+    yesBtn.focus(); // "Yes" is the default
+  });
+}
+
+/** Aggregator (decision #3): static REFERENCES the named export above. */
+class CtConfirm {
+  static confirm = confirmDialog;
+}
+// ===== end CtConfirm =====
+return { confirmDialog, CtConfirm };
+})();
+const { confirmDialog, CtConfirm } = __ct_components_CtConfirm;
+
+/* ct:module components/CtClipboardUtil.mjs */
+const __ct_components_CtClipboardUtil = (() => {
+// ===== Begin CtClipboardUtil (ES module) =====
+/*
+ * CtClipboardUtil — copy-to-clipboard + button-flash helpers (ES module; was copy.js)
+ * ---------------------------------------------------------------------------
+ * import { copy, flash } from '<rel>/jbc-include/components/CtClipboardUtil.mjs';
+ * (or `CtClipboardUtil.copy` / `CtClipboardUtil.flash` via the aggregator class
+ * at the bottom — statics REFERENCE the named bindings, single implementation.)
+ *
+ * Formerly the pasteable IIFE copy.js exposing the jbcCopy / jbcFlash window globals;
+ * those globals are GONE. `copy` = ex-jbcCopy, `flash` = ex-jbcFlash — bodies
+ * unchanged. The `.ctc-flash` CSS still self-injects on the first `flash()` call
+ * (ensureStyles) and the `window.ctCopyStyles = false` opt-out is still honored.
+ *
+ * copy(text) -> Promise<boolean>
+ * flash(el, opts?) -> void
+ *
+ *     btn.addEventListener('click', async () => {
+ *       if (!text) return;
+ *       const ok = await copy(text);
+ *       if (!ok) return;
+ *       flash(btn, { label: '✅', revertTo: '📋' });
+ *     });
+ *
+ * copy(text):
+ * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
+ *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
+ *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
+ *   Clipboard API is unavailable or denied.
+ * - Always RESOLVES — never rejects/throws. Resolves `true` on success,
+ *   `false` if every copy path failed (denied permission, unsupported
+ *   browser, etc.) — callers check the boolean rather than try/catch.
+ *
+ * flash(el, opts?):
+ * - Transient "copied" feedback on a button: swaps `el.textContent` to
+ *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
+ *   reverts and clears the timer.
+ * - Revert target: `opts.revertTo` if given (for icon-only buttons that
+ *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
+ *   current text — captured once and reused if `flash` is called again on
+ *   the same element before the previous flash reverted (rapid re-clicks
+ *   don't lose the true original label).
+ * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
+ *   decorative scale pulse (see STYLING below) — no functional behavior
+ *   depends on it.
+ *
+ * STYLING:
+ * - The only visual injected is the optional `.ctc-flash` pulse animation,
+ *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
+ *   text swap + revert timing are unaffected either way).
+ * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
+ *   `flash` call and no styles are injected.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtClipboardUtil.mjs
+ */
+
+
+function copy(text) {
+  text = String(text == null ? '' : text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      function () { return true; },
+      function () { return fallbackCopy(text); }
+    );
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+var STYLE_ID = 'ctc-copy-style';
+function ensureStyles() {
+  if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = [
+    '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+    '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+    '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+    '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+var flashTimeouts = new WeakMap();
+function flash(el, opts) {
+  opts = opts || {};
+  var ms = opts.ms != null ? opts.ms : 1000;
+  var label = opts.label != null ? opts.label : '✅';
+
+  ensureStyles();
+  clearTimeout(flashTimeouts.get(el));
+
+  var original;
+  if (opts.revertTo != null) {
+    original = opts.revertTo;
+  } else if (el.dataset.ctcFlashOriginal != null) {
+    original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+  } else {
+    original = el.textContent;
+  }
+  el.dataset.ctcFlashOriginal = original;
+
+  el.textContent = label;
+  el.classList.remove('ctc-flash');
+  void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+  el.classList.add('ctc-flash');
+
+  var t = setTimeout(function () {
+    el.textContent = original;
+    el.classList.remove('ctc-flash');
+    delete el.dataset.ctcFlashOriginal;
+    flashTimeouts.delete(el);
+  }, ms);
+  flashTimeouts.set(el, t);
+}
+
+/** Aggregator (decision #3): statics REFERENCE the named exports above. */
+class CtClipboardUtil {
+  static copy = copy;
+  static flash = flash;
+}
+// ===== end CtClipboardUtil =====
+return { copy, flash, CtClipboardUtil };
+})();
+const { copy, flash, CtClipboardUtil } = __ct_components_CtClipboardUtil;
+
+/* ct:module components/CtLicense.mjs */
+const __ct_components_CtLicense = (() => {
+/* CtLicense — shared License modal (components/CtLicense.mjs).
+   An ES module with a SIDE-EFFECT: importing it wires a global click listener
+   (once) that opens the modal on any [data-ct-license] trigger (the footer link in
+   components/footer.html). Every tool that carries the footer imports this module in its
+   app.mjs, so the footer link works for free; the footer no longer inlines a script.
+   Also callable as `openLicense()` / `CtLicense.open()` (there is no window global
+   any more). Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (e.g. a tool that bundles a wasm codec — a per-tool DATA config hook, read at
+   open time). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. Module-private names carry a "License"
+   qualifier so the build's import-flattening cannot collide with app.mjs top-levels. */
+var LICENSE_REPO = 'https://github.com/codercowboy/claude-tools';
+var LICENSE_REPO_LABEL = LICENSE_REPO.replace(/^https?:\/\//, '');
+var LICENSE_MIT_TEXT = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Jason and Claude (Anthropic)',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+
+var licenseOverlay, licenseDialog, licensePrevFocus, licenseStyleEl;
+
+function escapeLicenseHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function injectLicenseStyles() {
+  if (licenseStyleEl) return;
+  licenseStyleEl = document.createElement('style');
+  licenseStyleEl.textContent =
+    '.jbcl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+    '.jbcl-overlay[hidden]{display:none!important;}' +
+    '@media (prefers-reduced-motion:no-preference){.jbcl-overlay{animation:jbcl-fade .15s ease;}@keyframes jbcl-fade{from{opacity:0}to{opacity:1}}}' +
+    '.jbcl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+    '.jbcl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+    '.jbcl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+    '.jbcl-dialog a{color:LinkText;}' +
+    '.jbcl-lead{margin:0 0 .8rem;}' +
+    '.jbcl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+    '.jbcl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.jbcl-tp li{margin-bottom:.3rem;}' +
+    '.jbcl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+    '.jbcl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+    '.jbcl-close:hover{background:rgba(127,127,127,.18);}' +
+    '.jbcl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+  (document.head || document.documentElement).appendChild(licenseStyleEl);
+}
+
+function buildLicenseDialog() {
+  injectLicenseStyles();
+  licenseOverlay = document.createElement('div');
+  licenseOverlay.className = 'jbcl-overlay';
+  licenseOverlay.hidden = true;
+  licenseOverlay.setAttribute('data-testid', 'license-overlay');
+  licenseOverlay.innerHTML =
+    '<div class="jbcl-dialog" role="dialog" aria-modal="true" aria-labelledby="jbcl-title" data-testid="license-modal">' +
+      '<button type="button" class="jbcl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+      '<h2 id="jbcl-title">License</h2>' +
+      '<div class="jbcl-body"></div>' +
+    '</div>';
+  document.body.appendChild(licenseOverlay);
+  licenseDialog = licenseOverlay.querySelector('.jbcl-dialog');
+  licenseOverlay.querySelector('.jbcl-close').addEventListener('click', closeLicense);
+  licenseOverlay.addEventListener('mousedown', function (e) {
+    if (e.target === licenseOverlay) { e.preventDefault(); closeLicense(); }
+  });
+}
+
+function renderLicenseBody() {
+  var html =
+    '<p class="jbcl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+    '<a href="' + LICENSE_REPO + '" target="_blank" rel="noopener noreferrer">' + LICENSE_REPO_LABEL + '</a></p>' +
+    '<pre class="jbcl-text">' + escapeLicenseHtml(LICENSE_MIT_TEXT) + '</pre>';
+  var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+  if (tp.length) {
+    html += '<h3>Bundled third-party libraries</h3><ul class="jbcl-tp">';
+    tp.forEach(function (d) {
+      var label = escapeLicenseHtml(d.name || '') + (d.version ? ' ' + escapeLicenseHtml(d.version) : '');
+      var lic = d.license ? ' &mdash; ' + escapeLicenseHtml(d.license) : '';
+      var link = d.url ? ' &middot; <a href="' + escapeLicenseHtml(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+      html += '<li>' + label + lic + link + '</li>';
+    });
+    html += '</ul><p class="jbcl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+  } else {
+    html += '<p class="jbcl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+  }
+  licenseOverlay.querySelector('.jbcl-body').innerHTML = html;
+}
+
+function licenseFocusables() {
+  return Array.prototype.slice
+    .call(licenseDialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+    .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+}
+
+function onLicenseKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeLicense(); return; }
+  if (e.key !== 'Tab') return;
+  var f = licenseFocusables();
+  if (!f.length) return;
+  e.preventDefault();
+  var i = f.indexOf(document.activeElement);
+  var n = e.shiftKey ? i - 1 : i + 1;
+  if (n < 0) n = f.length - 1;
+  if (n >= f.length) n = 0;
+  f[n].focus();
+}
+
+function openLicense() {
+  if (!licenseOverlay) buildLicenseDialog();
+  renderLicenseBody();
+  licensePrevFocus = document.activeElement;
+  // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+  var host = document.fullscreenElement || document.body;
+  if (licenseOverlay.parentNode !== host) host.appendChild(licenseOverlay);
+  licenseOverlay.hidden = false;
+  document.addEventListener('keydown', onLicenseKey, true);
+  licenseDialog.scrollTop = 0;
+  licenseOverlay.querySelector('.jbcl-close').focus({ preventScroll: true });
+}
+
+function closeLicense() {
+  if (!licenseOverlay || licenseOverlay.hidden) return;
+  licenseOverlay.hidden = true;
+  document.removeEventListener('keydown', onLicenseKey, true);
+  if (licenseOverlay.parentNode !== document.body) document.body.appendChild(licenseOverlay);
+  if (licensePrevFocus && typeof licensePrevFocus.focus === 'function') { try { licensePrevFocus.focus(); } catch (e) {} }
+  licensePrevFocus = null;
+}
+
+var licenseTriggerWired = false;
+function wireLicenseTrigger() {
+  if (licenseTriggerWired || typeof document === 'undefined') return; // idempotent
+  licenseTriggerWired = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); openLicense(); }
+  });
+}
+wireLicenseTrigger(); // self-wire on module evaluation
+
+class CtLicense {
+  static open = openLicense;
+}
+return { openLicense, CtLicense };
+})();
+const { openLicense, CtLicense } = __ct_components_CtLicense;
+
+
+  // =====================================================================
+  // 1. DOM references
+  // =====================================================================
+  const helpButtonEl = document.getElementById('helpButton');
+  const helpOverlayEl = document.querySelector('[data-testid="help-overlay"]');
+  const helpDialogEl = document.querySelector('[data-testid="help-modal"]');
+  const helpCloseXBtnEl = helpDialogEl.querySelector('[data-testid="modal-close-x"]');
+
+  const loadBtn = document.getElementById('loadBtn');
+  const fileInput = document.getElementById('fileInput');
+  const chooseColorBtn = document.getElementById('chooseColorBtn');
+  const resetViewBtn = document.getElementById('resetViewBtn');
+  const zoomIndicatorEl = document.getElementById('zoomIndicator');
+  const loadErrorEl = document.getElementById('loadError');
+
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const emptyStateEl = document.getElementById('emptyState');
+
+  const loupeEl = document.getElementById('loupe');
+  const loupeCanvas = document.getElementById('loupeCanvas');
+  const loupeCtx = loupeCanvas.getContext('2d');
+
+  const touchHintEl = document.getElementById('touchHint');
+  const touchCrosshairEl = document.getElementById('touchCrosshair');
+  const touchToastEl = document.getElementById('touchToast');
+  const touchToastDismissBtn = document.getElementById('touchToastDismiss');
+
+  const colorListEl = document.getElementById('colorList');
+  const removeAllBtn = document.getElementById('removeAllBtn');
+
+  const rgbaOutputEl = document.getElementById('rgbaOutput');
+  const hexOutputEl = document.getElementById('hexOutput');
+  const rgbaCopyAllBtn = document.getElementById('rgbaCopyAllBtn');
+  const hexCopyAllBtn = document.getElementById('hexCopyAllBtn');
+
+  // Offscreen natural-resolution bitmap: the single source of pixel truth.
+  // Reused across loads (resized/redrawn each time); `state.sourceCanvas`
+  // stays null until the first successful image load, which also gates
+  // the empty-state UI.
+  const sourceCanvasEl = document.createElement('canvas');
+  const sourceCtxEl = sourceCanvasEl.getContext('2d', { willReadFrequently: true });
+
+  // =====================================================================
+  // 2. State
+  // =====================================================================
+  const STORAGE_KEY = 'color-picker:v1';
+  const HELP_SEEN_KEY = 'color-picker:help-seen:v1';
+
+  let nextId = 1;
+
+  const state = {
+    image: null,
+    sourceCanvas: null,
+    sourceCtx: null,
+
+    transform: { scale: 1, offsetX: 0, offsetY: 0 },
+    fitScale: 1,
+
+    mode: 'idle', // 'idle' | 'pan' | 'chooseColor'
+    chooseColorActive: false,
+
+    pointer: {
+      dragging: false,
+      lastX: 0, lastY: 0,
+      pointerId: null,
+      active: new Map(), // pointerId -> {x, y} in CSS space
+      pinch: null,
+      // True for the whole lifetime of a pinch gesture, from beginPinch()
+      // until every pointer involved has been lifted (active size back to
+      // 0) — unlike pinch/active.size, this stays true across BOTH fingers'
+      // pointerup events, so the second finger's release can still be
+      // recognized as pinch-related even though by then the map is back
+      // down to size 1. See onPointerUp.
+      hadPinch: false,
+      // pointerId of a single-pointer drag that was forcibly cancelled
+      // (e.g. by Choose Color being toggled on mid-drag) so that pointer's
+      // eventual pointerup is not mistaken for a fresh sampling click.
+      cancelledDragPointerId: null,
+    },
+
+    colors: [], // [{ id, r, g, b, a }], newest first
+
+    // Touch relative-drag crosshair (DESIGN.md "Touch / mobile"). `active`
+    // means the current Choose Color session is in touch-aim mode (device is
+    // touch-capable) — a rendered crosshair at (cx, cy) that a drag moves
+    // RELATIVELY (by the finger's delta), and a tap (small total movement)
+    // samples. Mouse/non-touch pointer devices never set `active`, so their
+    // behavior (loupe/crosshair follow the cursor absolutely, click samples)
+    // is untouched.
+    touch: {
+      active: false,
+      cx: 0, cy: 0,       // crosshair position, CSS px, canvas-local
+      dragging: false,
+      pointerId: null,
+      lastX: 0, lastY: 0,
+      moved: 0,           // cumulative movement (px) since the current touch gesture started
+    },
+
+    rafScheduled: false,
+  };
+
+  // =====================================================================
+  // 2a. Persistence (localStorage) — docs/conventions.md "Persist UI state"
+  // =====================================================================
+  // Only the collected color list (`state.colors`) is durable, user-built
+  // state worth restoring. The loaded IMAGE is not persisted (image bytes
+  // can be large, and the color list is independent of the image — the
+  // swatch rows and the two derived rgba/hex textareas render fine with no
+  // image loaded). The derived textareas themselves are DERIVED from
+  // state.colors and are never stored — renderColorList()/renderOutputs()
+  // recompute them on restore. Distinct from TOUCH_TOAST_SEEN_KEY below,
+  // which is its own one-time-toast flag, not part of this versioned blob.
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ colors: state.colors }));
+    } catch {
+      // Best-effort: localStorage unavailable (file://, private mode, quota,
+      // browser policy). Degrade silently to in-memory only.
+    }
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { colors: [] };
+      const parsed = JSON.parse(raw);
+      const colors = Array.isArray(parsed.colors)
+        ? parsed.colors.filter((c) => c
+            && Number.isInteger(c.id)
+            && Number.isInteger(c.r) && c.r >= 0 && c.r <= 255
+            && Number.isInteger(c.g) && c.g >= 0 && c.g <= 255
+            && Number.isInteger(c.b) && c.b >= 0 && c.b <= 255
+            && typeof c.a === 'number' && c.a >= 0 && c.a <= 1)
+        : [];
+      return { colors };
+    } catch {
+      return { colors: [] };
+    }
+  }
+
+  // =====================================================================
+  // 3. Coordinate / transform helpers
+  // =====================================================================
+  function cssX(e) { return e.clientX - canvas.getBoundingClientRect().left; }
+  function cssY(e) { return e.clientY - canvas.getBoundingClientRect().top; }
+  function clamp(v, min, max) { return Math.min(Math.max(v, min), max); }
+
+  function computeFitTransform() {
+    const rect = stage.getBoundingClientRect();
+    const iw = state.sourceCanvas.width;
+    const ih = state.sourceCanvas.height;
+    const scale = Math.min(rect.width / iw, rect.height / ih);
+    const offsetX = (rect.width - iw * scale) / 2;
+    const offsetY = (rect.height - ih * scale) / 2;
+    return { scale, offsetX, offsetY };
+  }
+
+  function resizeCanvasForDPR() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = stage.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+    // 1 unit in ctx-space == 1 CSS px from here on; the rest of the code
+    // never touches dpr again.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (state.chooseColorActive && state.touch.active) {
+      // Keep the persisted crosshair inside the (possibly resized) canvas.
+      state.touch.cx = clamp(state.touch.cx, 0, rect.width);
+      state.touch.cy = clamp(state.touch.cy, 0, rect.height);
+      renderTouchAimUI();
+    }
+    scheduleRedraw();
+  }
+
+  // Image-space pixel sampling — the single source of truth for both the
+  // real click path and the test hook. Always reads from the offscreen
+  // natural-resolution source canvas, never the visible (transformed) one.
+  function sampleImagePixel(px, py) {
+    if (!state.sourceCtx || !state.sourceCanvas) return null;
+    if (px < 0 || py < 0 || px >= state.sourceCanvas.width || py >= state.sourceCanvas.height) {
+      return null;
+    }
+    const { data } = state.sourceCtx.getImageData(px, py, 1, 1);
+    // Normalize fully-opaque alpha to exactly 1 so hex-formatting's `a < 1`
+    // cutoff is exact rather than subject to float rounding.
+    const a = data[3] === 255 ? 1 : data[3] / 255;
+    return { r: data[0], g: data[1], b: data[2], a };
+  }
+
+  // CSS-space entry point (real pointer clicks): inverse-maps CSS coords
+  // to image-space, then defers to sampleImagePixel.
+  function sampleAtClient(cssPX, cssPY) {
+    const imgX = (cssPX - state.transform.offsetX) / state.transform.scale;
+    const imgY = (cssPY - state.transform.offsetY) / state.transform.scale;
+    return sampleImagePixel(Math.floor(imgX), Math.floor(imgY));
+  }
+
+  // =====================================================================
+  // 4. Image loading
+  // =====================================================================
+  async function loadImageFromSource(url) {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+
+    sourceCanvasEl.width = img.naturalWidth;
+    sourceCanvasEl.height = img.naturalHeight;
+    sourceCtxEl.drawImage(img, 0, 0);
+
+    state.image = img;
+    state.sourceCanvas = sourceCanvasEl;
+    state.sourceCtx = sourceCtxEl;
+
+    state.transform = computeFitTransform();
+    state.fitScale = state.transform.scale;
+
+    stage.classList.add('has-image');
+    hideLoadError();
+    scheduleRedraw();
+    updateZoomIndicator();
+    return img;
+  }
+
+  function showLoadError(message) {
+    loadErrorEl.textContent = message;
+    loadErrorEl.hidden = false;
+  }
+
+  function hideLoadError() {
+    loadErrorEl.hidden = true;
+    loadErrorEl.textContent = '';
+  }
+
+  async function handleFile(file) {
+    if (!file || !file.type || !file.type.startsWith('image/')) {
+      showLoadError('Please choose an image file.');
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      await loadImageFromSource(objectUrl);
+    } catch (err) {
+      showLoadError('Could not load that image.');
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  loadBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files && fileInput.files[0];
+    fileInput.value = ''; // allow re-choosing the same file later
+    if (file) await handleFile(file);
+  });
+
+  stage.addEventListener('dragover', (e) => { e.preventDefault(); stage.classList.add('drag-over'); });
+  stage.addEventListener('dragenter', (e) => { e.preventDefault(); stage.classList.add('drag-over'); });
+  stage.addEventListener('dragleave', () => { stage.classList.remove('drag-over'); });
+  stage.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    stage.classList.remove('drag-over');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) await handleFile(file);
+  });
+
+  // =====================================================================
+  // 5. Rendering
+  // =====================================================================
+  function scheduleRedraw() {
+    if (state.rafScheduled) return;
+    state.rafScheduled = true;
+    requestAnimationFrame(redraw);
+  }
+
+  function redraw() {
+    state.rafScheduled = false;
+    const rect = stage.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    if (!state.sourceCanvas) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(
+      state.sourceCanvas,
+      0, 0, state.sourceCanvas.width, state.sourceCanvas.height,
+      state.transform.offsetX, state.transform.offsetY,
+      state.sourceCanvas.width * state.transform.scale,
+      state.sourceCanvas.height * state.transform.scale,
+    );
+  }
+
+  // =====================================================================
+  // 6. Pan
+  // =====================================================================
+  canvas.addEventListener('pointerdown', (e) => {
+    if (state.pointer.active.size === 0) {
+      // Fresh gesture starting from no pointers down: clear any leftover
+      // pinch-tracking flag from a previous gesture defensively (endPointer
+      // already resets this when the last pointer of a gesture lifts, but
+      // resetting here too keeps this robust regardless of event ordering).
+      state.pointer.hadPinch = false;
+    }
+    state.pointer.active.set(e.pointerId, { x: cssX(e), y: cssY(e) });
+    // Two-pointer pinch-zoom is allowed even while sampling (it's the touch
+    // equivalent of wheel-zoom, not of click-pan) — check this before the
+    // chooseColorActive early-return below, which only suppresses
+    // single-pointer panning.
+    if (state.pointer.active.size === 2) {
+      state.pointer.dragging = false; // hand off to pinch
+      if (state.touch.dragging) cancelTouchDrag(); // 2nd finger joined -> pinch takes over
+      beginPinch();
+      return;
+    }
+    if (state.chooseColorActive) {
+      if (isTouchAimEvent(e)) startTouchDrag(e);
+      return; // sampling happens on pointerup, no pan
+    }
+    if (state.pointer.active.size === 1) {
+      state.pointer.dragging = true;
+      state.pointer.pointerId = e.pointerId;
+      state.pointer.lastX = cssX(e);
+      state.pointer.lastY = cssY(e);
+      state.mode = 'pan';
+      canvas.setPointerCapture(e.pointerId);
+      canvas.classList.add('grabbing');
+    }
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (state.pointer.active.has(e.pointerId)) {
+      state.pointer.active.set(e.pointerId, { x: cssX(e), y: cssY(e) });
+    }
+    if (state.pointer.active.size === 2) { updatePinch(); return; }
+    if (state.chooseColorActive) {
+      if (state.touch.dragging && e.pointerId === state.touch.pointerId) {
+        updateTouchDrag(e);
+      }
+      return; // sampling mode never pans, even mid-gesture
+    }
+    if (!state.pointer.dragging || e.pointerId !== state.pointer.pointerId) return;
+    const x = cssX(e), y = cssY(e);
+    state.transform.offsetX += x - state.pointer.lastX;
+    state.transform.offsetY += y - state.pointer.lastY;
+    state.pointer.lastX = x;
+    state.pointer.lastY = y;
+    scheduleRedraw();
+  });
+
+  function endPointer(e) {
+    state.pointer.active.delete(e.pointerId);
+    if (state.pointer.active.size === 0) state.pointer.hadPinch = false;
+    if (state.pointer.cancelledDragPointerId === e.pointerId) {
+      state.pointer.cancelledDragPointerId = null;
+    }
+    if (state.touch.dragging && state.touch.pointerId === e.pointerId) {
+      // Reached via pointercancel/pointerleave (onPointerUp already resolves
+      // a normal pointerup via endTouchDrag(), which clears `dragging` first,
+      // so this is a no-op in that case) — cancel without sampling.
+      cancelTouchDrag();
+    }
+    if (e.pointerId === state.pointer.pointerId) {
+      state.pointer.dragging = false;
+      state.pointer.pointerId = null;
+      canvas.classList.remove('grabbing');
+      state.mode = state.chooseColorActive ? 'chooseColor' : 'idle';
+      try { canvas.releasePointerCapture(e.pointerId); } catch { /* not captured */ }
+    }
+    if (state.pointer.active.size < 2) endPinch();
+  }
+
+  // Sampling and pan-release both react to pointerup. They're combined into
+  // one handler (rather than two separate listeners) so the "was this a
+  // mid-pinch release?" check can be made robustly BEFORE endPointer() does
+  // any cleanup.
+  //
+  // NOTE: state.pointer.active.size alone is NOT a reliable "was this pointer
+  // part of a pinch?" signal — on the SECOND finger's release of a
+  // two-finger pinch, the first finger's pointerup has already shrunk the
+  // map to size 1 (and cleared state.pointer.pinch via endPinch()), so
+  // neither `active.size > 1` nor `pinch !== null` reads true anymore even
+  // though this pointerup is ending the same pinch gesture. Instead we rely
+  // on state.pointer.hadPinch, which is set true in beginPinch() and stays
+  // true across BOTH fingers' pointerup events until the whole gesture is
+  // fully released (active size back to 0) — see endPointer().
+  function onPointerUp(e) {
+    const wasPinchRelease = state.pointer.active.size > 1 || state.pointer.hadPinch;
+    const wasCancelledDrag = state.pointer.cancelledDragPointerId === e.pointerId;
+    if (wasCancelledDrag) state.pointer.cancelledDragPointerId = null;
+    if (state.chooseColorActive && !wasPinchRelease && !wasCancelledDrag) {
+      if (state.touch.dragging && e.pointerId === state.touch.pointerId) {
+        endTouchDrag(); // tap samples at the crosshair; a drag just repositions it
+      } else if (!isTouchAimEvent(e)) {
+        // Existing mouse / non-touch-aim path: sample exactly under the pointer.
+        const rgba = sampleAtClient(cssX(e), cssY(e));
+        if (rgba) addColor(rgba);
+      }
+    }
+    endPointer(e);
+  }
+
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('pointerleave', (e) => { if (state.pointer.active.size <= 1) endPointer(e); });
+
+  // =====================================================================
+  // 7. Zoom (wheel + pinch)
+  // =====================================================================
+  function clampScale(s) {
+    const min = state.fitScale > 0 && isFinite(state.fitScale) ? state.fitScale * 0.5 : 0.01;
+    return Math.min(Math.max(s, min), 40);
+  }
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const cssX0 = cssX(e), cssY0 = cssY(e);
+    const imgX = (cssX0 - state.transform.offsetX) / state.transform.scale;
+    const imgY = (cssY0 - state.transform.offsetY) / state.transform.scale;
+
+    const zoomFactor = Math.exp(-e.deltaY * 0.001);
+    const newScale = clampScale(state.transform.scale * zoomFactor);
+
+    state.transform.scale = newScale;
+    state.transform.offsetX = cssX0 - imgX * newScale;
+    state.transform.offsetY = cssY0 - imgY * newScale;
+    scheduleRedraw();
+    updateZoomIndicator();
+    if (state.chooseColorActive && state.touch.active) renderTouchAimUI();
+  }, { passive: false });
+
+  function pinchPoints() { return [...state.pointer.active.values()]; }
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+
+  function beginPinch() {
+    const [a, b] = pinchPoints();
+    const m = mid(a, b);
+    state.pointer.pinch = {
+      startDist: dist(a, b),
+      startScale: state.transform.scale,
+      startImgX: (m.x - state.transform.offsetX) / state.transform.scale,
+      startImgY: (m.y - state.transform.offsetY) / state.transform.scale,
+    };
+    state.pointer.hadPinch = true; // sticky across both fingers' pointerup, see onPointerUp
+  }
+
+  function updatePinch() {
+    if (!state.pointer.pinch || state.pointer.active.size !== 2) return;
+    const [a, b] = pinchPoints();
+    const m = mid(a, b);
+    const d = dist(a, b);
+    const ratio = state.pointer.pinch.startDist > 0 ? d / state.pointer.pinch.startDist : 1;
+    const newScale = clampScale(state.pointer.pinch.startScale * ratio);
+    state.transform.scale = newScale;
+    // Re-anchoring at the *current* midpoint also gives two-finger pan for
+    // free, since the midpoint itself may have translated since gesture start.
+    state.transform.offsetX = m.x - state.pointer.pinch.startImgX * newScale;
+    state.transform.offsetY = m.y - state.pointer.pinch.startImgY * newScale;
+    scheduleRedraw();
+    updateZoomIndicator();
+    // The crosshair's CSS position doesn't move during a pinch, but the
+    // transform did — refresh the loupe so it reflects the (now different)
+    // source pixel under the crosshair at the new zoom level.
+    if (state.chooseColorActive && state.touch.active) renderTouchAimUI();
+  }
+
+  function endPinch() {
+    state.pointer.pinch = null;
+    if (state.pointer.active.size === 1 && !state.chooseColorActive) {
+      const [only] = pinchPoints();
+      state.pointer.dragging = true;
+      state.pointer.lastX = only.x;
+      state.pointer.lastY = only.y;
+    }
+  }
+
+  resetViewBtn.addEventListener('click', () => {
+    if (!state.sourceCanvas) return;
+    state.transform = computeFitTransform();
+    scheduleRedraw();
+    updateZoomIndicator();
+  });
+
+  function updateZoomIndicator() {
+    zoomIndicatorEl.textContent = `${Math.round(state.transform.scale * 100)}%`;
+  }
+
+  // =====================================================================
+  // 8. Choose Color (eyedropper) mode
+  // =====================================================================
+  const LOUPE_SIZE = 120;   // CSS px, matches #loupe / #loupeCanvas
+  const LOUPE_PIXELS = 9;   // source pixels shown across the loupe diameter
+
+  chooseColorBtn.addEventListener('click', () => {
+    state.chooseColorActive = !state.chooseColorActive;
+    state.mode = state.chooseColorActive ? 'chooseColor' : 'idle';
+    chooseColorBtn.setAttribute('aria-pressed', String(state.chooseColorActive));
+    chooseColorBtn.classList.toggle('active', state.chooseColorActive);
+    stage.classList.toggle('choose-color', state.chooseColorActive);
+
+    if (!state.chooseColorActive) {
+      state.pointer.dragging = false; // defensive: no stray pan state
+      cancelTouchDrag();
+      state.touch.active = false;
+      hideTouchAimUI();
+      loupeEl.hidden = true;
+    } else if (state.pointer.dragging) {
+      // Turning ON mid-drag: a single-pointer pan may already be underway
+      // (it started before Choose Color was active, which was legitimate at
+      // the time). Cancel it immediately — pan must not continue once
+      // sampling mode is active — and remember which pointer this was so
+      // its eventual pointerup (the tail end of what was really a drag
+      // gesture, not a deliberate tap) doesn't also fire a sample.
+      const cancelledId = state.pointer.pointerId;
+      try { canvas.releasePointerCapture(cancelledId); } catch { /* not captured */ }
+      state.pointer.dragging = false;
+      state.pointer.pointerId = null;
+      state.pointer.cancelledDragPointerId = cancelledId;
+      canvas.classList.remove('grabbing');
+    }
+
+    if (state.chooseColorActive) {
+      // On TOUCH input, DESIGN.md's "relative-drag crosshair" model applies
+      // instead of the mouse's "cursor follows pointer absolutely" model —
+      // detected once per activation via the device's touch capability
+      // (navigator.maxTouchPoints), not per-event, since the dead-center
+      // crosshair must render immediately on activation, before any pointer
+      // event on the canvas has occurred.
+      state.touch.active = deviceIsTouchCapable();
+      if (state.touch.active) {
+        enterTouchAimMode();
+      } else {
+        // Give the loupe a sensible default position (centered over the
+        // canvas) BEFORE unhiding it. Otherwise, with no pointermove/
+        // pointerenter having happened yet, #loupe's position:fixed left/top
+        // are still unset — the browser falls back to its static position in
+        // the DOM flow, which renders as a stray opaque circle over the
+        // header/toolbar until the mouse first enters the canvas.
+        // updateLoupe() (below) takes over the instant a real pointer event
+        // on the canvas fires, so this is purely a one-time default.
+        positionLoupeDefault();
+        loupeEl.hidden = false; // existing mouse behavior: loupe follows the cursor
+      }
+    }
+  });
+
+  function setupLoupeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    loupeCanvas.width = Math.round(LOUPE_SIZE * dpr);
+    loupeCanvas.height = Math.round(LOUPE_SIZE * dpr);
+    loupeCanvas.style.width = `${LOUPE_SIZE}px`;
+    loupeCanvas.style.height = `${LOUPE_SIZE}px`;
+    loupeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawLoupe(px, py) {
+    loupeCtx.imageSmoothingEnabled = false; // crisp pixelated zoom, mandatory
+    loupeCtx.clearRect(0, 0, LOUPE_SIZE, LOUPE_SIZE);
+    if (!state.sourceCanvas) return;
+
+    const cell = LOUPE_SIZE / LOUPE_PIXELS;
+    const half = Math.floor(LOUPE_PIXELS / 2);
+    const sx = px - half, sy = py - half;
+
+    loupeCtx.drawImage(
+      state.sourceCanvas,
+      sx, sy, LOUPE_PIXELS, LOUPE_PIXELS,
+      0, 0, LOUPE_SIZE, LOUPE_SIZE,
+    );
+
+    // Crosshair lines through the center.
+    loupeCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    loupeCtx.lineWidth = 1;
+    loupeCtx.beginPath();
+    loupeCtx.moveTo(LOUPE_SIZE / 2, 0);
+    loupeCtx.lineTo(LOUPE_SIZE / 2, LOUPE_SIZE);
+    loupeCtx.moveTo(0, LOUPE_SIZE / 2);
+    loupeCtx.lineTo(LOUPE_SIZE, LOUPE_SIZE / 2);
+    loupeCtx.stroke();
+
+    // Outline the exact center cell (the pixel that will be sampled).
+    loupeCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+    loupeCtx.lineWidth = 2;
+    loupeCtx.strokeRect(half * cell + 1, half * cell + 1, cell - 2, cell - 2);
+  }
+
+  // One-time default position for the mouse-mode loupe on activation, before
+  // any real pointermove/pointerenter over the canvas has happened — see the
+  // call site in the chooseColorBtn click handler above. Centers it over the
+  // canvas (in viewport space, matching how updateLoupe positions it from
+  // e.clientX/clientY) and, if an image is already loaded and that center
+  // point lands on it, draws the loupe for that pixel too.
+  function positionLoupeDefault() {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+    loupeEl.style.left = `${clientX}px`;
+    loupeEl.style.top = `${clientY}px`;
+
+    if (!state.sourceCanvas) return;
+    const x = rect.width / 2, y = rect.height / 2;
+    const imgX = (x - state.transform.offsetX) / state.transform.scale;
+    const imgY = (y - state.transform.offsetY) / state.transform.scale;
+    const px = Math.floor(imgX), py = Math.floor(imgY);
+    const inBounds = px >= 0 && py >= 0 && px < state.sourceCanvas.width && py < state.sourceCanvas.height;
+    if (inBounds) drawLoupe(px, py);
+  }
+
+  function updateLoupe(e) {
+    loupeEl.style.left = `${e.clientX}px`;
+    loupeEl.style.top = `${e.clientY}px`;
+
+    if (!state.sourceCanvas) { loupeEl.hidden = true; return; }
+
+    const x = cssX(e), y = cssY(e);
+    const imgX = (x - state.transform.offsetX) / state.transform.scale;
+    const imgY = (y - state.transform.offsetY) / state.transform.scale;
+    const px = Math.floor(imgX), py = Math.floor(imgY);
+
+    const inBounds = px >= 0 && py >= 0 && px < state.sourceCanvas.width && py < state.sourceCanvas.height;
+    loupeEl.hidden = !inBounds;
+    if (inBounds) drawLoupe(px, py);
+  }
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!state.chooseColorActive || state.touch.active) return; // touch-aim UI is driven by the drag handlers below
+    updateLoupe(e);
+  });
+  canvas.addEventListener('pointerenter', (e) => {
+    if (state.chooseColorActive && !state.touch.active) updateLoupe(e);
+  });
+  canvas.addEventListener('pointerleave', () => {
+    if (state.chooseColorActive && !state.touch.active) loupeEl.hidden = true;
+  });
+
+  // -------------------------------------------------------------------
+  // Touch / mobile: relative-drag crosshair (DESIGN.md "Touch / mobile").
+  //
+  // On touch input, "sample where your finger is" fails — the finger covers
+  // the target pixel. So instead: a rendered crosshair sits dead-center of
+  // the canvas when Choose Color is enabled; a single-finger drag moves the
+  // crosshair by the drag DELTA (not to the finger's absolute position),
+  // clamped to the canvas; and a TAP (drag ending below TAP_THRESHOLD_PX of
+  // total movement) samples the pixel currently under the crosshair — a
+  // real drag only repositions it. The crosshair persists between samples.
+  // Two-finger pinch still zooms (handled entirely by the existing pinch
+  // code above); single-finger drag never pans in this mode.
+  // -------------------------------------------------------------------
+  const TAP_THRESHOLD_PX = 6;
+  const TOUCH_TOAST_SEEN_KEY = 'colorPickerTouchHintSeen';
+
+  function deviceIsTouchCapable() {
+    return (navigator.maxTouchPoints || 0) > 0;
+  }
+
+  function isTouchAimEvent(e) {
+    return state.chooseColorActive && state.touch.active && e.pointerType === 'touch';
+  }
+
+  function enterTouchAimMode() {
+    const rect = canvas.getBoundingClientRect();
+    state.touch.cx = rect.width / 2;
+    state.touch.cy = rect.height / 2;
+    state.touch.dragging = false;
+    state.touch.pointerId = null;
+    state.touch.moved = 0;
+    touchCrosshairEl.classList.remove('pulse');
+    touchCrosshairEl.hidden = false;
+    touchHintEl.hidden = false;
+    loupeEl.hidden = false;
+    renderTouchAimUI();
+    maybeShowFirstTimeToast();
+  }
+
+  function hideTouchAimUI() {
+    touchCrosshairEl.hidden = true;
+    touchCrosshairEl.classList.remove('pulse');
+    touchHintEl.hidden = true;
+    touchToastEl.hidden = true;
+  }
+
+  // Positions the rendered crosshair + loupe at the current crosshair
+  // position and redraws the loupe for the pixel under it. Called after
+  // every crosshair move (drag) and on activation/resize.
+  function renderTouchAimUI() {
+    touchCrosshairEl.style.left = `${state.touch.cx}px`;
+    touchCrosshairEl.style.top = `${state.touch.cy}px`;
+
+    // Loupe is positioned OFFSET from the crosshair (via the same
+    // translate(-50%, calc(-100% - 22px)) CSS used for the mouse path), not
+    // from the finger — so it stays visible above the crosshair regardless
+    // of where the finger currently is on screen.
+    const rect = canvas.getBoundingClientRect();
+    loupeEl.style.left = `${rect.left + state.touch.cx}px`;
+    loupeEl.style.top = `${rect.top + state.touch.cy}px`;
+
+    if (!state.sourceCanvas) { loupeEl.hidden = true; return; }
+    const imgX = (state.touch.cx - state.transform.offsetX) / state.transform.scale;
+    const imgY = (state.touch.cy - state.transform.offsetY) / state.transform.scale;
+    const px = Math.floor(imgX), py = Math.floor(imgY);
+    const inBounds = px >= 0 && py >= 0 && px < state.sourceCanvas.width && py < state.sourceCanvas.height;
+    loupeEl.hidden = !inBounds;
+    if (inBounds) drawLoupe(px, py);
+  }
+
+  function startTouchDrag(e) {
+    state.touch.dragging = true;
+    state.touch.pointerId = e.pointerId;
+    state.touch.lastX = cssX(e);
+    state.touch.lastY = cssY(e);
+    state.touch.moved = 0;
+    touchCrosshairEl.classList.remove('pulse');
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+  }
+
+  function updateTouchDrag(e) {
+    const x = cssX(e), y = cssY(e);
+    const dx = x - state.touch.lastX;
+    const dy = y - state.touch.lastY;
+    state.touch.lastX = x;
+    state.touch.lastY = y;
+    state.touch.moved += Math.hypot(dx, dy);
+    const rect = canvas.getBoundingClientRect();
+    state.touch.cx = clamp(state.touch.cx + dx, 0, rect.width);
+    state.touch.cy = clamp(state.touch.cy + dy, 0, rect.height);
+    renderTouchAimUI();
+  }
+
+  function endTouchDrag() {
+    const wasTap = state.touch.moved < TAP_THRESHOLD_PX;
+    try { canvas.releasePointerCapture(state.touch.pointerId); } catch { /* not captured */ }
+    state.touch.dragging = false;
+    state.touch.pointerId = null;
+    state.touch.moved = 0;
+    if (wasTap) {
+      const rgba = sampleAtClient(state.touch.cx, state.touch.cy);
+      if (rgba) addColor(rgba);
+    } else {
+      triggerCrosshairPulse(); // drag ended -> cue that it's ready to tap-to-sample
+    }
+  }
+
+  function cancelTouchDrag() {
+    if (state.touch.pointerId != null) {
+      try { canvas.releasePointerCapture(state.touch.pointerId); } catch { /* not captured */ }
+    }
+    state.touch.dragging = false;
+    state.touch.pointerId = null;
+    state.touch.moved = 0;
+  }
+
+  function triggerCrosshairPulse() {
+    // CSS handles prefers-reduced-motion (the .pulse animation is disabled
+    // there); toggling the class unconditionally is harmless either way and
+    // keeps this one code path for both cases.
+    touchCrosshairEl.classList.remove('pulse');
+    void touchCrosshairEl.offsetWidth; // reflow, so re-adding the class restarts the animation
+    touchCrosshairEl.classList.add('pulse');
+  }
+
+  function maybeShowFirstTimeToast() {
+    let seen = false;
+    try { seen = localStorage.getItem(TOUCH_TOAST_SEEN_KEY) === '1'; } catch { /* storage unavailable */ }
+    if (!seen) touchToastEl.hidden = false;
+  }
+
+  touchToastDismissBtn.addEventListener('click', () => {
+    touchToastEl.hidden = true;
+    try { localStorage.setItem(TOUCH_TOAST_SEEN_KEY, '1'); } catch { /* storage unavailable */ }
+  });
+
+  // ===== BEGIN PURE-LOGIC (unit-tested — see tests/unit/extract-inline-module.mjs) =====
+  // =====================================================================
+  // 9. Color formatting (pure functions — the primary unit-test surface)
+  // =====================================================================
+  function rgbaString({ r, g, b, a }) {
+    const alpha = Number.isInteger(a) ? a : Math.round(a * 1000) / 1000;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function hexString({ r, g, b, a }) {
+    const h = (n) => n.toString(16).padStart(2, '0');
+    const base = `#${h(r)}${h(g)}${h(b)}`;
+    return a < 1 ? `${base}${h(Math.round(a * 255))}` : base;
+  }
+
+  export { rgbaString, hexString };
+  // ===== END PURE-LOGIC =====
+
+  // =====================================================================
+  // 10. Color list / rows
+  // =====================================================================
+  function addColor({ r, g, b, a }) {
+    const color = { id: nextId++, r, g, b, a };
+    state.colors.unshift(color); // newest first
+    renderColorList();
+    saveState();
+    return color;
+  }
+
+  function removeColorById(id) {
+    state.colors = state.colors.filter((c) => c.id !== id);
+    renderColorList();
+    saveState();
+  }
+
+  function removeAllColors() {
+    state.colors = [];
+    renderColorList();
+    saveState();
+  }
+
+  function updateRemoveAllDisabled() {
+    removeAllBtn.disabled = state.colors.length === 0;
+  }
+
+  // -------------------------------------------------------------------
+  // Derived outputs (RGBA-per-line, HEX-per-line). `state.colors` (newest
+  // first, per addColor's unshift) is the single source of truth; these two
+  // textareas are pure derivations of it and are rebuilt on every change to
+  // the list. There is no path from the textareas back into state.colors.
+  // -------------------------------------------------------------------
+  function rgbaOutput() {
+    return state.colors.map(rgbaString).join('\n');
+  }
+
+  function hexOutput() {
+    return state.colors.map(hexString).join('\n');
+  }
+
+  function updateCopyAllDisabled() {
+    const empty = state.colors.length === 0;
+    rgbaCopyAllBtn.disabled = empty;
+    hexCopyAllBtn.disabled = empty;
+  }
+
+  function renderOutputs() {
+    rgbaOutputEl.value = rgbaOutput();
+    hexOutputEl.value = hexOutput();
+    updateCopyAllDisabled();
+  }
+
+  function renderColorList() {
+    colorListEl.innerHTML = '';
+    for (const color of state.colors) {
+      colorListEl.appendChild(buildRow(color));
+    }
+    updateRemoveAllDisabled();
+    renderOutputs();
+  }
+
+  // In-field copy affordance (docs/conventions.md "Standard control height &
+  // in-field copy — controls.css"): the copy button lives INSIDE the value
+  // field via the shared `.ct-field` / `.ct-copy-btn` pattern. These are
+  // read-only OUTPUT fields (the sampled color's rgba()/hex value), so the
+  // copy button is ALWAYS shown (only editable inputs reveal it on non-empty).
+  function buildField(value, inputTestId, copyTestId, copyLabel, fieldLabel) {
+    const wrap = document.createElement('div');
+    wrap.className = 'ct-field';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.readOnly = true;
+    input.value = value;
+    input.dataset.testid = inputTestId;
+    input.setAttribute('aria-label', fieldLabel);
+    wrap.appendChild(input);
+
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'ct-copy-btn';
+    copyBtn.dataset.testid = copyTestId;
+    copyBtn.setAttribute('aria-label', copyLabel);
+    copyBtn.title = copyLabel; // icon-only button: hover tooltip alongside aria-label
+    copyBtn.textContent = '📋';
+    copyBtn.addEventListener('click', () => handleCopyClick(copyBtn, input.value));
+    wrap.appendChild(copyBtn);
+
+    return wrap;
+  }
+
+  function buildRow(color) {
+    const li = document.createElement('li');
+    li.className = 'color-row';
+    li.dataset.testid = 'color-row';
+    li.dataset.id = String(color.id);
+
+    const swatch = document.createElement('span');
+    swatch.className = color.a < 1 ? 'swatch alpha' : 'swatch';
+    swatch.dataset.testid = 'color-swatch';
+    swatch.style.setProperty('--swatch-color', rgbaString(color));
+    li.appendChild(swatch);
+
+    li.appendChild(buildField(rgbaString(color), 'color-rgba-input', 'color-rgba-copy', 'Copy rgba value', 'RGBA color value'));
+    li.appendChild(buildField(hexString(color), 'color-hex-input', 'color-hex-copy', 'Copy hex value', 'Hex color value'));
+
+    const trashBtn = document.createElement('button');
+    trashBtn.type = 'button';
+    trashBtn.className = 'trash-btn';
+    trashBtn.dataset.testid = 'color-trash';
+    trashBtn.setAttribute('aria-label', 'Remove color');
+    trashBtn.title = 'Remove color'; // icon-only button: hover tooltip alongside aria-label
+    trashBtn.textContent = '🗑';
+    trashBtn.addEventListener('click', async () => {
+      if (await confirmDialog('Remove this color?')) removeColorById(color.id);
+    });
+    li.appendChild(trashBtn);
+
+    return li;
+  }
+
+  // Shared copy/flash (tools/include/copy.js, pasted above as a classic
+  // <script>).
+  async function handleCopyClick(btn, text) {
+    if (!text) return; // nothing to copy (defensive; Copy-all is disabled when empty)
+    const ok = await copy(text);
+    if (!ok) return;
+    const current = btn.dataset.ctcFlashOriginal ?? btn.textContent;
+    flash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
+  }
+
+  // =====================================================================
+  // 11. Destructive-action confirms
+  // =====================================================================
+  // Per docs/conventions.md "Destructive actions require confirmation", both
+  // the per-row trash button (above, in buildRow) and Remove all use the
+  // shared confirmDialog(message) component (tools/include/confirm.js, pasted
+  // above as a classic <script>) rather than a bespoke modal —
+  // removeColorById(id)/removeAllColors() remain direct, non-modal calls
+  // (used here only after confirmDialog resolves true, and by tests).
+  removeAllBtn.addEventListener('click', async () => {
+    if (state.colors.length === 0) return;
+    if (await confirmDialog('Remove all colors?')) removeAllColors();
+  });
+
+  rgbaCopyAllBtn.addEventListener('click', () => handleCopyClick(rgbaCopyAllBtn, rgbaOutputEl.value));
+  hexCopyAllBtn.addEventListener('click', () => handleCopyClick(hexCopyAllBtn, hexOutputEl.value));
+
+  // =====================================================================
+  // 11a. Help modal — docs/conventions.md "First-load help popup (all
+  // tools)". Purely informational (what the tool does + how to use it), so
+  // it's its own small dedicated dialog rather than confirmDialog (which is a
+  // yes/no destructive-action confirm). Markup is static in the document
+  // (shown/hidden via [hidden]) rather than built/torn down per open/close.
+  // Structure/focus-handling mirrors tools/hat-picker's and
+  // tools/color-designer's Help modal.
+  // =====================================================================
+
+  // Whether the visitor has already dismissed the Help modal at least once.
+  // If localStorage throws/is unavailable, treat it as already-seen so we
+  // don't nag on every load — the least-annoying safe fallback (the ?
+  // button is always there if they want the modal later).
+  function hasSeenHelp() {
+    try {
+      return localStorage.getItem(HELP_SEEN_KEY) === '1';
+    } catch {
+      return true;
+    }
+  }
+
+  function markHelpSeen() {
+    try {
+      localStorage.setItem(HELP_SEEN_KEY, '1');
+    } catch {
+      // Best-effort, same as saveState().
+    }
+  }
+
+  let helpPreviouslyFocused = null;
+
+  function getHelpFocusable() {
+    return Array.from(
+      helpDialogEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter((el) => !el.disabled && el.getClientRects().length > 0);
+  }
+
+  function onHelpKeydown(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeHelp();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const focusable = getHelpFocusable();
+    if (focusable.length === 0) return;
+    e.preventDefault();
+    const idx = focusable.indexOf(document.activeElement);
+    let next = e.shiftKey ? idx - 1 : idx + 1;
+    if (next < 0) next = focusable.length - 1;
+    if (next >= focusable.length) next = 0;
+    focusable[next].focus();
+  }
+
+  function openHelp() {
+    helpPreviouslyFocused = document.activeElement;
+    helpOverlayEl.hidden = false;
+    document.addEventListener('keydown', onHelpKeydown, true);
+    helpDialogEl.scrollTop = 0;
+    helpCloseXBtnEl.focus({ preventScroll: true });
+  }
+
+  function closeHelp() {
+    if (helpOverlayEl.hidden) return;
+    helpOverlayEl.hidden = true;
+    document.removeEventListener('keydown', onHelpKeydown, true);
+    if (helpPreviouslyFocused && typeof helpPreviouslyFocused.focus === 'function') {
+      try { helpPreviouslyFocused.focus(); } catch { /* ignore */ }
+    }
+    helpPreviouslyFocused = null;
+  }
+
+  helpButtonEl.addEventListener('click', () => openHelp());
+  helpCloseXBtnEl.addEventListener('click', () => closeHelp());
+  // e.preventDefault() on the overlay mousedown keeps Chromium from moving
+  // focus to the overlay itself before the click fires, which would
+  // otherwise steal focus-return away from helpPreviouslyFocused on close.
+  helpOverlayEl.addEventListener('mousedown', (e) => {
+    if (e.target === helpOverlayEl) {
+      e.preventDefault();
+      closeHelp();
+    }
+  });
+
+  // =====================================================================
+  // 12. Test hook
+  // =====================================================================
+  // Inert namespace for Playwright-driven tests: exposes the pure
+  // formatters, a deterministic image-load path, image-space sampling,
+  // programmatic row-add, and a live (non-cloned) state reference.
+  window.__colorPicker = {
+    rgbaString,
+    hexString,
+    loadImageFromDataURL(dataUrl) {
+      return loadImageFromSource(dataUrl);
+    },
+    sampleAt(px, py) {
+      return sampleImagePixel(px, py);
+    },
+    addColor,
+    state,
+    rgbaOutput,
+    hexOutput,
+
+    // Direct, non-modal removal — used by tests that don't need to drive the
+    // shared confirmDialog dialog (see section 11), same pattern as
+    // tools/hat-picker's window.__hatPicker.removeEntry/clear.
+    removeColorById,
+    removeAllColors,
+
+    // Touch relative-drag crosshair (DESIGN.md "Touch / mobile"): read-only
+    // helpers for deterministic assertions. `state.touch` (already exposed
+    // live via `state` above) carries the crosshair's current position
+    // (`cx`/`cy`) and drag/active flags; these two are just convenience
+    // reads, not alternate input paths — tests still drive the crosshair
+    // itself via real pointer/touch events, never these hooks.
+    sampleAtCrosshair() {
+      return sampleAtClient(state.touch.cx, state.touch.cy);
+    },
+    isTouchCrosshairActive() {
+      return state.chooseColorActive && state.touch.active;
+    },
+  };
+
+  // =====================================================================
+  // 13. Init
+  // =====================================================================
+  setupLoupeCanvas();
+  resizeCanvasForDPR();
+
+  // Restore the persisted color list (no image restore — see "2a.
+  // Persistence" above). Works with zero stored state (fresh/unreadable):
+  // state.colors simply stays empty, same as before persistence existed.
+  const restored = loadState();
+  state.colors = restored.colors;
+  if (state.colors.length > 0) {
+    nextId = state.colors.reduce((max, c) => Math.max(max, c.id), 0) + 1;
+  }
+  renderColorList(); // renders rows + re-derives rgba/hex outputs + Remove-all disabled state
+
+  updateZoomIndicator();
+
+  // Auto-show the Help modal once, on a genuinely fresh visit only. Marking
+  // it seen right away (rather than on close) keeps this a true "once" —
+  // even if the visitor navigates away without explicitly closing it, it
+  // won't auto-show again next time.
+  if (!hasSeenHelp()) {
+    markHelpSeen();
+    openHelp();
+  }
+
+  let resizeScheduled = false;
+  const stageResizeObserver = new ResizeObserver(() => {
+    if (resizeScheduled) return;
+    resizeScheduled = true;
+    requestAnimationFrame(() => {
+      resizeScheduled = false;
+      resizeCanvasForDPR();
+    });
+  });
+  stageResizeObserver.observe(stage);
+
+</script>
+</body>
+</html>

@@ -2,11 +2,14 @@
 /*
  * new-tool.mjs — scaffold a new single-file tool from new-tool-template/.
  *
- * Copies the canonical template directory (the four-file source/ set, a
- * standalone package.json, both test layers, and the README/DESIGN/PLAN stubs)
- * into a new tool directory, substituting the __PLACEHOLDER__ tokens (see
- * new-tool-template/TEMPLATE.md for the token table). Dependency-free: Node
- * stdlib only, ES module, Node >= 20.
+ * Copies the canonical template directory (the four-file source/ set, both test
+ * layers, and the README/DESIGN/PLAN stubs) into a new tool directory,
+ * substituting the __PLACEHOLDER__ tokens (see new-tool-template/TEMPLATE.md for
+ * the token table). Dependency-free: Node stdlib only, ES module, Node >= 20.
+ *
+ * There is no per-tool package.json: the dev/test dependencies (Playwright and
+ * the e2e helpers) live once at the repo root, so a scaffolded tool needs no
+ * install of its own.
  *
  * Usage:
  *   node new-tool.mjs --name=color-picker [options]
@@ -156,6 +159,8 @@ try {
 
 process.stdout.write(
   `✓ scaffolded ${scope}/${name} → ${dest} (${fileCount} files)\n` +
-  `  next: cd ${dest} && npm install && npm run build && npm test\n`
+  `  next: build + test from the repo root —\n` +
+  `        npx ct build ${name} && npx ct test ${name}\n` +
+  `        (first time only: npm install && npx playwright install chromium)\n`
 );
 process.exit(0);

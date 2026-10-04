@@ -2,7 +2,7 @@
   "name": "claude-tools",
   "groupId": "com.codercowboy",
   "version": "1.0.0",
-  "description": "A collection of small, single-file, vanilla-JS web tools. Each tool under src/tools/ is standalone (its own package.json + node_modules) and its shipped index.html opens straight from file:// with no build step and no runtime dependencies.",
+  "description": "A collection of small, single-file, vanilla-JS web tools. Each tool under src/tools/ ships an index.html that opens straight from file:// with no build step and no runtime dependencies; the dev/test dependencies (Playwright and friends) install once at the repo root.",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -25,8 +25,7 @@
     "test": "node --test",
     "build": "node scripts/build-all.mjs",
     "build:check": "node scripts/build-all.mjs --check",
-    "postinstall": "node scripts/install-all.mjs",
-    "install:all": "node scripts/install-all.mjs",
+    "dist": "node scripts/build-all.mjs && node scripts/dist.mjs",
     "test:lib": "node --test src/lib/tests/",
     "test:all": "node scripts/test-all.mjs",
     "serve": "node scripts/serve.mjs src"
@@ -58,6 +57,12 @@
     "utilities",
     "tools"
   ],
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4"
+  },
   "optionalDependencies": {
     "@codercowboy/claude-tpm": "file:../../tpm-workspace/claude-tpm-0.1.0",
     "jason-code": "file:../../jason-code"

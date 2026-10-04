@@ -6,17 +6,21 @@
  * script (modeled on the same "dumb top dispatcher" idea as claude-tpm's `tpm`).
  * It self-locates its sibling scripts, so it runs from any working directory.
  *
- *   ct build [--check]   assemble every tool's index.html   (scripts/build-all.mjs)
- *   ct test              run the whole test suite            (scripts/test-all.mjs)
- *   ct serve [dir]       serve the gallery over http://      (scripts/serve.mjs; default src, $PORT or 8080)
- *   ct run               open the built gallery in your default browser
- *   ct install           install every tool's dependencies  (scripts/install-all.mjs)
+ *   ct build [--check] [tool]   assemble every tool's index.html, or just <tool>  (scripts/build-all.mjs)
+ *   ct dist                     build, then copy the deliverables into dist/      (scripts/dist.mjs)
+ *   ct test [tool...]           run the whole suite, or just <tool>'s unit + e2e  (scripts/test-all.mjs)
+ *   ct serve [tool|dir]         serve a tool (or dir) over http://                (scripts/serve.mjs)
+ *   ct run                      open the built gallery in your default browser
+ *
+ * Dev/test deps live once at the repo root — a plain `npm install` installs them,
+ * so there is no per-tool install step anymore.
  *
  * Invocation: `ct <verb>` once the package is installed or linked (`npm link`),
  * or `node scripts/ct.mjs <verb>` straight from a clone. Unknown verb or --help
  * prints this menu (exit 2 on an unknown verb).
  */
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -57,26 +61,44 @@ function openGallery() {
   child.on('exit', (code) => process.exit(code ?? 0));
 }
 
+// `ct serve <arg>`: a bare tool name serves src/tools/<name>; anything else is
+// passed through to serve.mjs as a directory. No arg serves the whole src/ site.
+function serveArgs(args) {
+  if (args.length === 0) return [join(REPO, 'src')];
+  const [first, ...more] = args;
+  const toolDir = join(REPO, 'src', 'tools', first);
+  if (!first.startsWith('-') && existsSync(toolDir)) return [toolDir, ...more];
+  return args;
+}
+
 const MENU = `ct — claude-tools front door
 
 Usage: ct <verb>            (or from a clone: node scripts/ct.mjs <verb>)
 
-  build [--check]   assemble every tool's index.html, then the preview gif
-                    (build-all.mjs + build-preview-gif.mjs; --check skips the gif)
-  test              run the whole test suite              (test-all.mjs)
-  serve [dir]       serve the gallery over http://         (default src → /gallery/, $PORT or 8080)
-  run               open the built gallery in your browser
-  install           install every tool's dependencies     (install-all.mjs)
+  build [--check] [tool]  assemble every tool's index.html (then the preview gif),
+                          or just <tool>  (build-all.mjs; --check skips the gif)
+  dist                    build, then copy the deliverables into dist/ (dist.mjs):
+                          dist/index.html is the gallery, dist/<tool>/index.html each tool
+  test [tool...]          run the whole suite, or just <tool>'s unit + e2e  (test-all.mjs)
+  serve [tool|dir]        serve a tool (or dir) over http:// (default src → /gallery/, $PORT or 8080)
+  run                     open the built gallery in your browser
+
+Dev/test deps install once at the repo root: \`npm install\` (+ \`npx playwright install chromium\`).
 `;
 
+// A build is "full" (and gets the preview gif) only when it builds everything:
+// no --check and no named tool.
+const named = rest.some((a) => !a.startsWith('-'));
+const fullBuild = !rest.includes('--check') && !named;
+
 switch (verb) {
-  case 'build':   runChain(rest.includes('--check')
-                    ? [['build-all.mjs', rest]]
-                    : [['build-all.mjs', rest], ['build-preview-gif.mjs', []]]); break;
+  case 'build':   runChain(fullBuild
+                    ? [['build-all.mjs', rest], ['build-preview-gif.mjs', []]]
+                    : [['build-all.mjs', rest]]); break;
+  case 'dist':    runChain([['build-all.mjs', []], ['dist.mjs', []]]); break;
   case 'test':    runScript('test-all.mjs', rest); break;
-  case 'serve':   runScript('serve.mjs', rest.length ? rest : [join(REPO, 'src')]); break;
+  case 'serve':   runScript('serve.mjs', serveArgs(rest)); break;
   case 'run':     openGallery(); break;
-  case 'install': runScript('install-all.mjs', rest); break;
   case undefined:
   case 'help':
   case '-h':

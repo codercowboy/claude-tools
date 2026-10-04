@@ -1,0 +1,342 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>claude-tools — Tools</title>
+  <meta property="og:title"       content="claude-tools — Tools">
+  <meta property="og:description" content="A collection of small, single-file, vanilla web tools — color picker, color converter, color designer, QR generator, and more.">
+  <meta property="og:type"        content="website">
+  <meta property="og:site_name"   content="claude-tools">
+  <meta property="og:image"       content="preview.png">
+  <meta name="twitter:card"       content="summary_large_image">
+  <style>
+    /* ===== Begin ct-gallery ===== */
+/* Shared gallery styles — inlined by the build into the <style> block of a landing gallery page.
+   PAGE-AGNOSTIC card-grid layout + palette tokens only. Each gallery keeps
+   its own <title>/og:* tags, its <h1>/tagline copy, and its own cards inline
+   — this include has no page-specific text. Single source of truth: edit here
+   and run `npm run build`. See the html-single-file conventions (web-craft.md).
+   It is inlined as the entire contents of each gallery's <style> block. */
+:root {
+  --bg: #f7f7f9;
+  --card: #ffffff;
+  --text: #1f2430;
+  --muted: #6b7280;
+  --border: rgba(120, 120, 130, 0.22);
+  --accent: #2563eb;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --card: #171a22;
+    --text: #e6e8ee;
+    --muted: #9ca3af;
+    --border: rgba(255, 255, 255, 0.12);
+    --accent: #60a5fa;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 960px; margin: 0 auto; padding: clamp(1.25rem, 4vw, 3rem) 1rem 0; }
+header.page { text-align: center; margin-bottom: clamp(1.5rem, 5vw, 2.5rem); }
+header.page h1 { font-size: clamp(1.9rem, 6vw, 2.8rem); margin: 0 0 0.35rem; letter-spacing: -0.02em; }
+header.page p { margin: 0 auto; max-width: 40ch; color: var(--muted); font-size: clamp(0.95rem, 2.5vw, 1.1rem); }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: clamp(0.85rem, 2.5vw, 1.25rem);
+}
+a.tool {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.15rem 1.2rem 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+a.tool:hover, a.tool:focus-visible { transform: translateY(-2px); border-color: var(--accent); outline: none; }
+a.tool:focus-visible { box-shadow: var(--shadow), 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent); }
+.tool .icon { font-size: 1.9rem; line-height: 1; }
+.tool .name { font-size: 1.15rem; font-weight: 700; }
+.tool .desc { color: var(--muted); font-size: 0.92rem; }
+.tool .go { margin-top: 0.35rem; color: var(--accent); font-weight: 600; font-size: 0.9rem; }
+/* ===== end ct-gallery ===== */
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page">
+      <h1>claude-tools</h1>
+      <p>A collection of small, single-file, vanilla web tools. Pick one to get started.</p>
+    </header>
+
+    <main class="grid" aria-label="Tools">
+      <a class="tool" href="color-picker/index.html">
+        <span class="icon" aria-hidden="true">🎨</span>
+        <span class="name">Color Picker</span>
+        <span class="desc">Load an image, pan/zoom, and sample pixel colors with a magnifier loupe. Collect them as rgba() and hex.</span>
+        <span class="go">Open →</span>
+      </a>
+      <a class="tool" href="color-converter/index.html">
+        <span class="icon" aria-hidden="true">🔄</span>
+        <span class="name">Color Converter</span>
+        <span class="desc">Convert a batch of intermixed rgba()/hex colors. Type or bulk-paste, see swatches, copy out in either format.</span>
+        <span class="go">Open →</span>
+      </a>
+      <a class="tool" href="color-designer/index.html">
+        <span class="icon" aria-hidden="true">🌈</span>
+        <span class="name">Color Designer</span>
+        <span class="desc">Generate five color schemes from color-theory harmonies — seed your own colors or roll random, preview with a live demo, and copy out.</span>
+        <span class="go">Open →</span>
+      </a>
+      <a class="tool" href="base64-tool/index.html">
+        <span class="icon" aria-hidden="true">🔠</span>
+        <span class="name">Base64 Tool</span>
+        <span class="desc">Base64 / data-URI encode &amp; decode — text or a file in; Base64, Base64URL, data URI, or a JS snippet out; and decode back.</span>
+        <span class="go">Open →</span>
+      </a>
+      <a class="tool" href="qr-generator/index.html">
+        <span class="icon" aria-hidden="true">🔳</span>
+        <span class="name">QR Generator</span>
+        <span class="desc">Turn text or a URL into a QR code with a hand-rolled encoder, then download it as PNG or SVG.</span>
+        <span class="go">Open →</span>
+      </a>
+      <a class="tool" href="uuid-generator/index.html">
+        <span class="icon" aria-hidden="true">🆔</span>
+        <span class="name">UUID Generator</span>
+        <span class="desc">Generate UUID v4/v7, ULID, nanoid, and random tokens in bulk, plus a UUID inspector — uses secure randomness.</span>
+        <span class="go">Open →</span>
+      </a>
+      <a class="tool" href="cron-builder/index.html">
+        <span class="icon" aria-hidden="true">⏰</span>
+        <span class="name">Cron Builder</span>
+        <span class="desc">Build &amp; parse cron expressions with field pickers, a plain-English explainer, and a next-runs preview.</span>
+        <span class="go">Open →</span>
+      </a>
+      <a class="tool" href="network-toolkit/index.html">
+        <span class="icon" aria-hidden="true">🌐</span>
+        <span class="name">Network Toolkit</span>
+        <span class="desc">Transfer-time calculator, CIDR/subnet math, IP ⇄ int/hex/binary (v4 &amp; v6), and netmask ⇄ prefix — offline.</span>
+        <span class="go">Open →</span>
+      </a>
+      <a class="tool" href="inflation-calculator/index.html">
+        <span class="icon" aria-hidden="true">💵</span>
+        <span class="name">Inflation Calculator</span>
+        <span class="desc">US inflation between years from bundled BLS CPI-U data — adjusted amount, cumulative % and annual rate.</span>
+        <span class="go">Open →</span>
+      </a>
+    </main>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<!---- end footer -->
+
+<script type="module">/* ct:module components/CtLicense.mjs */
+const __ct_components_CtLicense = (() => {
+/* CtLicense — shared License modal (components/CtLicense.mjs).
+   An ES module with a SIDE-EFFECT: importing it wires a global click listener
+   (once) that opens the modal on any [data-ct-license] trigger (the footer link in
+   components/footer.html). Every tool that carries the footer imports this module in its
+   app.mjs, so the footer link works for free; the footer no longer inlines a script.
+   Also callable as `openLicense()` / `CtLicense.open()` (there is no window global
+   any more). Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (e.g. a tool that bundles a wasm codec — a per-tool DATA config hook, read at
+   open time). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. Module-private names carry a "License"
+   qualifier so the build's import-flattening cannot collide with app.mjs top-levels. */
+var LICENSE_REPO = 'https://github.com/codercowboy/claude-tools';
+var LICENSE_REPO_LABEL = LICENSE_REPO.replace(/^https?:\/\//, '');
+var LICENSE_MIT_TEXT = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Jason and Claude (Anthropic)',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+
+var licenseOverlay, licenseDialog, licensePrevFocus, licenseStyleEl;
+
+function escapeLicenseHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function injectLicenseStyles() {
+  if (licenseStyleEl) return;
+  licenseStyleEl = document.createElement('style');
+  licenseStyleEl.textContent =
+    '.jbcl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+    '.jbcl-overlay[hidden]{display:none!important;}' +
+    '@media (prefers-reduced-motion:no-preference){.jbcl-overlay{animation:jbcl-fade .15s ease;}@keyframes jbcl-fade{from{opacity:0}to{opacity:1}}}' +
+    '.jbcl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+    '.jbcl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+    '.jbcl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+    '.jbcl-dialog a{color:LinkText;}' +
+    '.jbcl-lead{margin:0 0 .8rem;}' +
+    '.jbcl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+    '.jbcl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.jbcl-tp li{margin-bottom:.3rem;}' +
+    '.jbcl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+    '.jbcl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+    '.jbcl-close:hover{background:rgba(127,127,127,.18);}' +
+    '.jbcl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+  (document.head || document.documentElement).appendChild(licenseStyleEl);
+}
+
+function buildLicenseDialog() {
+  injectLicenseStyles();
+  licenseOverlay = document.createElement('div');
+  licenseOverlay.className = 'jbcl-overlay';
+  licenseOverlay.hidden = true;
+  licenseOverlay.setAttribute('data-testid', 'license-overlay');
+  licenseOverlay.innerHTML =
+    '<div class="jbcl-dialog" role="dialog" aria-modal="true" aria-labelledby="jbcl-title" data-testid="license-modal">' +
+      '<button type="button" class="jbcl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+      '<h2 id="jbcl-title">License</h2>' +
+      '<div class="jbcl-body"></div>' +
+    '</div>';
+  document.body.appendChild(licenseOverlay);
+  licenseDialog = licenseOverlay.querySelector('.jbcl-dialog');
+  licenseOverlay.querySelector('.jbcl-close').addEventListener('click', closeLicense);
+  licenseOverlay.addEventListener('mousedown', function (e) {
+    if (e.target === licenseOverlay) { e.preventDefault(); closeLicense(); }
+  });
+}
+
+function renderLicenseBody() {
+  var html =
+    '<p class="jbcl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+    '<a href="' + LICENSE_REPO + '" target="_blank" rel="noopener noreferrer">' + LICENSE_REPO_LABEL + '</a></p>' +
+    '<pre class="jbcl-text">' + escapeLicenseHtml(LICENSE_MIT_TEXT) + '</pre>';
+  var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+  if (tp.length) {
+    html += '<h3>Bundled third-party libraries</h3><ul class="jbcl-tp">';
+    tp.forEach(function (d) {
+      var label = escapeLicenseHtml(d.name || '') + (d.version ? ' ' + escapeLicenseHtml(d.version) : '');
+      var lic = d.license ? ' &mdash; ' + escapeLicenseHtml(d.license) : '';
+      var link = d.url ? ' &middot; <a href="' + escapeLicenseHtml(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+      html += '<li>' + label + lic + link + '</li>';
+    });
+    html += '</ul><p class="jbcl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+  } else {
+    html += '<p class="jbcl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+  }
+  licenseOverlay.querySelector('.jbcl-body').innerHTML = html;
+}
+
+function licenseFocusables() {
+  return Array.prototype.slice
+    .call(licenseDialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+    .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+}
+
+function onLicenseKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeLicense(); return; }
+  if (e.key !== 'Tab') return;
+  var f = licenseFocusables();
+  if (!f.length) return;
+  e.preventDefault();
+  var i = f.indexOf(document.activeElement);
+  var n = e.shiftKey ? i - 1 : i + 1;
+  if (n < 0) n = f.length - 1;
+  if (n >= f.length) n = 0;
+  f[n].focus();
+}
+
+function openLicense() {
+  if (!licenseOverlay) buildLicenseDialog();
+  renderLicenseBody();
+  licensePrevFocus = document.activeElement;
+  // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+  var host = document.fullscreenElement || document.body;
+  if (licenseOverlay.parentNode !== host) host.appendChild(licenseOverlay);
+  licenseOverlay.hidden = false;
+  document.addEventListener('keydown', onLicenseKey, true);
+  licenseDialog.scrollTop = 0;
+  licenseOverlay.querySelector('.jbcl-close').focus({ preventScroll: true });
+}
+
+function closeLicense() {
+  if (!licenseOverlay || licenseOverlay.hidden) return;
+  licenseOverlay.hidden = true;
+  document.removeEventListener('keydown', onLicenseKey, true);
+  if (licenseOverlay.parentNode !== document.body) document.body.appendChild(licenseOverlay);
+  if (licensePrevFocus && typeof licensePrevFocus.focus === 'function') { try { licensePrevFocus.focus(); } catch (e) {} }
+  licensePrevFocus = null;
+}
+
+var licenseTriggerWired = false;
+function wireLicenseTrigger() {
+  if (licenseTriggerWired || typeof document === 'undefined') return; // idempotent
+  licenseTriggerWired = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); openLicense(); }
+  });
+}
+wireLicenseTrigger(); // self-wire on module evaluation
+
+class CtLicense {
+  static open = openLicense;
+}
+return { openLicense, CtLicense };
+})();
+const { openLicense, CtLicense } = __ct_components_CtLicense;
+</script>
+  </div>
+</body>
+</html>

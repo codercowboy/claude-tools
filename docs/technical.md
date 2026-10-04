@@ -10,7 +10,7 @@ Claude (Anthropic) wrote nearly all of the code and docs. [Jason Baker](https://
 
 claude-tools is a portfolio of single-file, [vanilla-JS](https://developer.mozilla.org/en-US/docs/Web/JavaScript) web tools. The shipped artifact for every tool is one self-contained `index.html` that opens straight from `file://` with no build step, no server, no [CDN](https://developer.mozilla.org/en-US/docs/Glossary/CDN), and no runtime dependencies. Everything else in the repo exists only to author, assemble, and test those files.
 
-A tool that has outgrown comfortable hand-authoring is written under a `source/` folder and assembled back into one `index.html` by a shared, dependency-free build. Each tool is its own standalone [npm](https://www.npmjs.com/) package with its own `package.json` and its own `node_modules`, so the repo is not an npm workspace. Two shared directories hold the common pieces: `jbc-include/` for HTML/CSS/JS the build inlines into the shipped files, and `test-support/` for test helpers the tools import. Testing runs in two layers: fast [`node --test`](https://nodejs.org/api/test.html) unit tests against each tool's pure engine, and [Playwright](https://playwright.dev) end-to-end tests that drive the built `index.html` in a real browser.
+A tool that has outgrown comfortable hand-authoring is written under a `source/` folder and assembled back into one `index.html` by a shared, dependency-free build. The repo has a single [npm](https://www.npmjs.com/) `package.json`, at its root: the tools themselves carry no manifest, and the dev/test dependencies ([Playwright](https://playwright.dev) and a couple of test oracles) install once into one root `node_modules`. Two shared directories hold the common pieces: `jbc-include/` for HTML/CSS/JS the build inlines into the shipped files, and `test-support/` for test helpers the tools import. Testing runs in two layers: fast [`node --test`](https://nodejs.org/api/test.html) unit tests against each tool's pure engine, and Playwright end-to-end tests that drive the built `index.html` in a real browser.
 
 ```mermaid
 flowchart TB
@@ -26,7 +26,7 @@ flowchart TB
   Logic["source/logic.mjs<br/>(pure engine)"] -->|"imported directly"| Unit["node --test<br/>tests/unit/*.test.mjs"]
 ```
 
-The rest of this doc walks each piece: the build pipeline, the per-tool package model, the shared assets, the two test layers, and the dependency and toolkit breakdown.
+The rest of this doc walks each piece: the build pipeline, how the dependencies and dev scripts are wired, the shared assets, the two test layers, and the dependency and toolkit breakdown.
 
 ---
 
@@ -42,21 +42,20 @@ A tool opts into the build by having `source/index.template.html`. Alongside it 
 
 ### `scripts/` — the build and dev plumbing
 
-Five small Node scripts, all dependency-free, run from the repo root:
+A handful of small Node scripts, all dependency-free, run from the repo root. `ct` (`scripts/ct.mjs`, exposed as the `ct` bin) is the front door that dispatches to the rest:
 
 | Script | Wired to | Does |
 |---|---|---|
-| `build-tool.mjs` | per-tool `npm run build` | assembles one tool's `index.html` from `source/`; also `--check` |
-| `build-all.mjs` | root `npm run build` / `build:check` | discovers and builds every opted-in tool |
-| `install-all.mjs` | root `postinstall` / `npm run install:all` | installs every sub-package's deps |
-| `test-all.mjs` | root `npm run test:all` | runs every tool's e2e suite |
-| `serve.mjs` | per-tool `npm run serve` | a tiny static server for one tool over `http://` |
+| `build-tool.mjs` | `build-all.mjs`, per tool | assembles one tool's `index.html` from `source/`; also `--check` |
+| `build-all.mjs` | `ct build` / root `npm run build` / `build:check` | discovers and builds every opted-in tool, or just the one(s) named |
+| `test-all.mjs` | `ct test` / root `npm run test:all` | runs the `src/lib` unit tests + every tool's e2e suite, or one tool's unit + e2e |
+| `serve.mjs` | `ct serve` / root `npm run serve` | a tiny static server for a tool (or any dir) over `http://` |
 
 ### `jbc-include/` and `test-support/` — the shared pieces
 
 `src/tools/jbc-include/` holds shared HTML/CSS/JS the build inlines into the shipped files. `src/tools/test-support/` holds dev-only test helpers the tools import. Neither is special-cased anywhere: the build resolves include tokens against `jbc-include/`, and the tools reach `test-support/` by a relative path. Both get their own sections below.
 
-The design principle under all of it: the shipped `index.html` is the only thing that ships. `source/`, `scripts/`, `jbc-include/`, `test-support/`, `tests/`, and `node_modules/` are authoring and dev scaffolding, kept out of every tool's published `files` list.
+The design principle under all of it: the shipped `index.html` is the only thing that ships. `source/`, `scripts/`, `jbc-include/`, `test-support/`, `tests/`, and `node_modules/` are authoring and dev scaffolding, not part of what a tool ships.
 
 ---
 
@@ -91,24 +90,41 @@ Include tokens resolve against `src/tools/jbc-include/`, the builder's `INCLUDE_
 
 ---
 
-## Per-tool standalone packages
+## The dist tree
 
-The repo is not an npm workspace. Each package under `src/tools/` is standalone. It has its own `package.json` and its own isolated `node_modules`. That keeps installs from racing each other and lets the tools be tested in parallel with their own playwright browser instances.
+The build writes each tool's `index.html` in place, beside its `source/`. `ct dist` (or `npm run dist`) runs that same build and then adds a copy step on top of it: it assembles a deployable `dist/` tree, with each tool's single-file `index.html` under its own subfolder and the landing gallery at the root.
 
-There's no ledger of packages to maintain. `scripts/install-all.mjs` (wired as the root `postinstall` and as `npm run install:all`) walks the whole repo, finds every `package.json` except the root's (skipping `node_modules/` and `.git/`), and runs `npm install` in each directory it finds. Adding a new tool with a `package.json` picks it up automatically.
+```
+  dist/
+    index.html               <- the gallery (tool links rewritten to the dist layout)
+    preview.png              <- the gallery's og:image
+    color-picker/index.html
+    qr-generator/index.html
+    …                        (one subfolder per build-assembled tool)
+```
+
+`scripts/dist.mjs` is the copy step, and it builds nothing itself. It cleans `dist/`, discovers tools the same way the build does (a `source/index.template.html` under `src/tools/`), and copies each built `index.html` into `dist/<tool>/`. Source files are copied, never moved. The gallery's built links are `../tools/<tool>/index.html`; in `dist/` the gallery sits one level above the tool folders, so those are rewritten to `<tool>/index.html` as it's copied, which makes `dist/` a self-contained site you can drop on any static host. `dist/` is committed, and it's rebuilt whole on each run, so it always matches the current build.
+
+---
+
+## Dependencies and the dev scripts — one root install
+
+The repo is not an npm workspace, and the tools aren't individual npm packages. There's one `package.json`, at the repo root. It declares the dev/test dependencies for the whole repo, and they install into a single root `node_modules`. A plain `npm install` at the root is the whole setup, plus `npx playwright install chromium` for the browser. Nothing is installed per tool.
 
 ```
   npm install  (at repo root)
-        │  triggers postinstall → scripts/install-all.mjs
         ▼
-   walk the repo, skip node_modules/ .git/ and the root
-        ├── src/tools/base64-tool        → npm install
-        ├── src/tools/color-converter    → npm install
-        ├── …                            → npm install
-        └── src/tools/uuid-generator     → npm install
+   one node_modules/ at the root
+        ├── @playwright/test      (every tool's e2e suite resolves it from here)
+        ├── jsqr · pngjs · qrcode (qr-generator's test oracles)
+        └── …
 ```
 
-Each tool's `package.json` also wires `npm run build`, `build:check`, `test`, `test:unit`, `test:e2e`, and `serve`, all pointing at the shared root scripts (`node ../../../scripts/build-tool.mjs`, and so on). For behavior that differs between `file://` and `http://` (some `fetch` or permission cases), `scripts/serve.mjs` gives each tool an `npm run serve` that serves its own directory over `http://localhost:8080` (or `$PORT`), with a path-traversal guard and no dependencies.
+A tool opts into the e2e layer just by having a `tests/playwright.config.mjs`. That config imports `@playwright/test`, which Node resolves from the root `node_modules` up the directory tree, so a tool needs no manifest of its own. `scripts/build-all.mjs` and `scripts/test-all.mjs` discover tools the same way, by walking `src/tools/`, so a new tool is picked up automatically with nothing to register.
+
+The dev commands run through `ct`, or the matching root `npm` scripts, rather than per tool. `ct build [tool]` assembles every tool's `index.html` or just the named one. `ct test [tool]` runs the whole suite or a single tool's unit + e2e. `ct serve [tool]` serves a tool (or any directory) over `http://localhost:8080` (or `$PORT`), with a path-traversal guard and no dependencies, for the cases where behavior differs between `file://` and `http://`.
+
+The single install has one consequence worth naming: Playwright runs one instance at a time. `test-all.mjs` runs the tools' suites in sequence, and each suite already uses a single worker. Running several tools' browsers in parallel against separate isolated installs isn't possible anymore; in practice the suite runs one tool at a time regardless.
 
 ---
 
@@ -125,7 +141,7 @@ These are dev/test-only [ESM](https://developer.mozilla.org/en-US/docs/Web/JavaS
 - `setup.mjs` — e2e navigation and first-load setup: `toolUrl()` resolves the built `index.html` as a `file://` URL, and `seedHelpSeen()` sets the help-seen flag before the page's own script runs so the Help popup doesn't open over assertions.
 - `unit.mjs` — `loadLogic()`, a memoized dynamic import of the tool's `source/logic.mjs`, so unit tests import the pure engine directly.
 - `shared-ui.mjs` — `assertLicenseModal()`, the shared footer License-modal contract every tool's e2e suite reuses.
-- `playwright.base.config.mjs` — the base Playwright config, exported as a plain object (no `@playwright/test` import) so it resolves from this shared dir, which has no `node_modules` of its own. A tool spreads it into its own `defineConfig`, overriding only where it differs.
+- `playwright.base.config.mjs` — the base Playwright config, exported as a plain object (no `@playwright/test` import), so the shared dir needs no imports of its own. A tool spreads it into its own `defineConfig`, which imports `@playwright/test` (resolved from the root `node_modules`) and overrides only where it differs.
 
 ---
 
@@ -133,13 +149,13 @@ These are dev/test-only [ESM](https://developer.mozilla.org/en-US/docs/Web/JavaS
 
 ### Unit — `node --test`, no browser
 
-A build-assembled tool's pure, DOM-free engine lives in `source/logic.mjs`, the same file the shipped `index.html` inlines. Unit tests import that module directly through `test-support`'s `loadLogic()` and run under Node's built-in test runner. No browser, no DOM. Per tool: `npm run test:unit` runs `node --test tests/unit/*.test.mjs`. At the repo root, `npm test` is plain `node --test`, which discovers the tools' unit tests across the tree.
+A build-assembled tool's pure, DOM-free engine lives in `source/logic.mjs`, the same file the shipped `index.html` inlines. Unit tests import that module directly through `test-support`'s `loadLogic()` and run under Node's built-in test runner. No browser, no DOM. `ct test <tool>` runs that tool's unit layer (`node --test` over its `tests/unit/`) ahead of its e2e; the repo-wide `ct test` runs the `src/lib` unit suite plus every tool's e2e. At the repo root, `npm test` is plain `node --test`, which discovers unit tests across the whole tree.
 
 ### End-to-end — Playwright over `file://`
 
-E2E specs are named `*.e2e.mjs` (not Playwright's default `*.spec.*`), live in each tool's `tests/`, and drive the built `index.html` over a `file://` URL in a real browser. Per tool: `npm run test:e2e` runs `playwright test --config=tests/playwright.config.mjs`, where that config spreads the shared base and overrides only outliers (`qr-generator`, for example, runs serial with a longer timeout because its round-trip decode tests render to a real canvas). At the repo root, `npm run test:all` (`scripts/test-all.mjs`) discovers every package that has a `test:e2e` script and runs them sequentially. Running the e2e layer needs the deps installed (`npm run install:all`) and the Playwright browser (`npx playwright install chromium`).
+E2E specs are named `*.e2e.mjs` (not Playwright's default `*.spec.*`), live in each tool's `tests/`, and drive the built `index.html` over a `file://` URL in a real browser. Each tool's `tests/playwright.config.mjs` spreads the shared base and overrides only outliers (`qr-generator`, for example, runs serial with a longer timeout because its round-trip decode tests render to a real canvas). `scripts/test-all.mjs` discovers every tool that has a `tests/playwright.config.mjs` and runs `npx playwright test --config=…` for each, from the repo root, in sequence; `ct test <tool>` runs one tool's suite the same way. Running the e2e layer needs the root deps installed (`npm install`) and the Playwright browser (`npx playwright install chromium`).
 
-Both `test:unit` and `test:e2e` have a `pretest` hook that runs `build --check` first, so a stale `index.html` fails the run before any test executes. The tests can't pass against a file that drifted from its source.
+Before it runs a tool's tests, `test-all.mjs` rebuilds that tool in `--check` mode, so a stale `index.html` fails the run before any test executes. The tests can't pass against a file that drifted from its source.
 
 ```mermaid
 flowchart LR
@@ -159,22 +175,22 @@ flowchart LR
 
 ### Packaged (npm) dependencies: none ship
 
-Every shipped tool has **zero runtime dependencies.** Each tool's `package.json` declares an empty `dependencies`, and its `files` list is only `index.html`, `README.md`, and `preview.png`. `source/`, `tests/`, and `node_modules/` never ship. The shipped `index.html` files carry no external `<script>` or `<link>` to any CDN. For a set of tools whose whole point is to run offline from a single file, no supply chain to audit is the property to want.
+Every shipped tool has **zero runtime dependencies.** The shipped artifact is a single `index.html`, alongside its `README.md` and `preview.png`; the authoring scaffolding (`source/`, `tests/`, `node_modules/`) never ships. The `index.html` files carry no external `<script>` or `<link>` to any CDN. For a set of tools whose whole point is to run offline from a single file, no supply chain to audit is the property to want.
 
-There are dev-only dependencies, and none of them ship:
+The dev-only dependencies all live in the root `package.json`, and none of them ship:
 
-- **[`@playwright/test`](https://playwright.dev)** — the e2e test runner, a `devDependency` of all nine tools.
-- **[`jsqr`](https://github.com/cozmo/jsQR), [`pngjs`](https://github.com/pngjs/pngjs), [`qrcode`](https://github.com/soldair/node-qrcode)** — extra `devDependencies` of `qr-generator` only, used as reference oracles to check its hand-rolled QR encoder against known-good libraries in tests. They verify the tool, they're never part of it.
+- **[`@playwright/test`](https://playwright.dev)** — the e2e test runner. One root `devDependency`; every tool's e2e suite resolves it from the root `node_modules`.
+- **[`jsqr`](https://github.com/cozmo/jsQR), [`pngjs`](https://github.com/pngjs/pngjs), [`qrcode`](https://github.com/soldair/node-qrcode)** — reference oracles used only by `qr-generator`'s tests, to check its hand-rolled QR encoder against known-good libraries. They verify the tool, they're never part of it.
 
-The root `package.json` has no runtime dependencies of its own. Its `optionalDependencies` (`@codercowboy/claude-tpm`, `jason-code`) are local dev-workspace tooling wired by `file:` path, not anything a tool uses.
+The root `package.json` carries those dev/test deps but no runtime dependencies of its own. Its `optionalDependencies` (`@codercowboy/claude-tpm`, `jason-code`) are local dev-workspace tooling wired by `file:` path, not anything a tool uses.
 
 ### Hard platform / engine requirements
 
 "No runtime deps" is not "no requirements." The foundational things, none of which are a packaged dependency:
 
 - **A modern browser** — the only thing needed to *use* a built tool. The shipped `index.html` runs entirely client-side, from `file://` or any static host.
-- **[Node.js](https://nodejs.org) 20 or newer** — needed only to build and test, not to use a tool. Both the root and every tool declare `engines.node >= 20`, and the build and test scripts use Node's standard library and its built-in test runner.
-- **[npm](https://www.npmjs.com/)** — needed only to install the dev/test dependencies (`npm install`, which triggers `install:all`).
+- **[Node.js](https://nodejs.org) 20 or newer** — needed only to build and test, not to use a tool. The root `package.json` declares `engines.node >= 20`, and the build and test scripts use Node's standard library and its built-in test runner.
+- **[npm](https://www.npmjs.com/)** — needed only to install the dev/test dependencies (`npm install` at the repo root).
 
 ---
 
@@ -186,8 +202,8 @@ The dev and authoring toolkit, distinct from the requirements above. These are t
 - **[Node.js](https://nodejs.org)** — the runtime the build and test scripts are written in. Tests are plain `node --test`, so there's no unit-test framework to install.
 - **[Claude Code](https://claude.com/claude-code)** — Claude wrote nearly all of the code and docs through it.
 - **[git](https://git-scm.com)** — version control.
-- **[npm](https://www.npmjs.com/)** — per-tool packaging, the dev/test dependency install, and the script wiring.
+- **[npm](https://www.npmjs.com/)** — the dev/test dependency install and the script wiring.
 
 ---
 
-> Cross-links: → [README](../README.md), → [Alternatives](alternatives.md). Last touched 2026-09-16.
+> Cross-links: → [README](../README.md), → [Alternatives](alternatives.md). Last touched 2026-10-04.

@@ -1,0 +1,3347 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Code Generator</title>
+
+<meta property="og:title" content="QR Code Generator">
+<meta property="og:description" content="Generate a QR code from text or a URL — hand-rolled encoder, no library, download as PNG or SVG.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="claude-tools">
+<meta property="og:image" content="preview.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --text: #1a1d23;
+    --muted: #5b6270;
+    --border: #d8dce3;
+    --accent: #2563eb;
+    --accent-contrast: #ffffff;
+    --error-bg: #fdecec;
+    --error-border: #f4b4b4;
+    --error-text: #9c1c1c;
+    --warn-bg: #fff8e6;
+    --warn-border: #f0d385;
+    --warn-text: #7a5b00;
+    --radius: 10px;
+    --focus: 0 0 0 3px rgba(37, 99, 235, 0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --panel: #1d2027;
+      --text: #eceef2;
+      --muted: #9aa2b1;
+      --border: #333844;
+      --accent: #5b8def;
+      --accent-contrast: #0b0d10;
+      --error-bg: #3a1414;
+      --error-border: #6b2323;
+      --error-text: #ff9d9d;
+      --warn-bg: #362a06;
+      --warn-border: #6b5417;
+      --warn-text: #f0cf6b;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  /* ===== Begin ct-base ===== */
+/* Shared single-file-tool base styles — inlined by the build
+   near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
+   This is the single source of truth: edit here, run `npm run build`. See
+   the html-single-file conventions (web-craft.md).
+   It sits near the TOP of the <style> block (after any reset) so a tool's own
+   later rules can still layer colors on top; for <select>, keep the tool's fill as
+   `background-color` (not the `background` shorthand, which would wipe the chevron). */
+html { touch-action: manipulation; } /* double-tap won't zoom the page; pinch-zoom + scroll still work. Gesture canvases keep their own touch-action:none. */
+[hidden] { display: none !important; } /* an author `display:` rule must never defeat the hidden attribute */
+.visually-hidden { /* screen-reader-only (kept in the a11y tree, unlike display:none) */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* iOS/Safari sizes a native <select> from font-size and ignores height/min-height
+   (renders ~half as tall as inputs). Opt out of the native control so the box model
+   applies, and supply our own chevron (appearance:none removes the native one). */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  font-size: 16px; /* >=16px also stops iOS zoom-on-focus */
+  padding-right: 2rem; /* room for the chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.6 6 6.4l5-4.8' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.72rem;
+}
+/* ===== end ct-base ===== */
+/* ===== Begin ct-controls ===== */
+/* Shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the jbc:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See web-craft.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use CtClipboardUtil copy/flash for behavior
+   (components/CtClipboardUtil.mjs). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */
+
+
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    padding: 1.5rem 1rem 1rem;
+  }
+
+  header.app-header {
+    max-width: 960px;
+    margin: 0 auto 1.25rem;
+    text-align: center;
+  }
+  header.app-header h1 {
+    margin: 0 0 0.35rem;
+    font-size: 1.6rem;
+  }
+  header.app-header p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  /* Header row: a spacer + the Help (?) button flank the centered title
+     block so adding the button doesn't shift the existing centered layout
+     (mirrors tools/hat-picker's header-row pattern). */
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .header-spacer,
+  .help-button {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+  .header-titles {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .help-button {
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .help-button:hover:not(:disabled) { background: var(--bg); filter: none; }
+
+  main.app {
+    max-width: 960px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 760px) {
+    main.app { grid-template-columns: 1fr; }
+  }
+
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem 1.2rem;
+  }
+  .input-section { grid-column: 1 / -1; }
+  .output-section { grid-column: 1 / -1; }
+
+  h2 {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 0 0 0.75rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+
+  /* Control heights (inputs/selects/buttons) are governed by controls.css
+     (--control-h: 44px) — no per-tool min-height here. textarea keeps its own
+     taller intrinsic height below (controls.css excludes textareas). */
+  textarea, input[type="number"], input[type="text"] {
+    width: 100%;
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.65rem;
+  }
+  textarea {
+    min-height: 110px;
+    resize: vertical;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 0.9rem;
+  }
+  /* Color/border/radius only here — sizing (min-height/font-size/appearance),
+     padding-right (chevron room), and the chevron image itself come from the
+     ct-base include above. background-color (not the `background` shorthand)
+     so the include's chevron background-image isn't wiped. */
+  select {
+    width: 100%;
+    font: inherit;
+    background-color: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding-left: 0.65rem;
+  }
+
+  input[type="color"] {
+    width: 100%;
+    height: 44px;
+    padding: 0.2rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus);
+    border-color: var(--accent);
+  }
+
+  .field { margin-bottom: 0.9rem; }
+  .field:last-child { margin-bottom: 0; }
+  .field-hint {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+  }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.9rem;
+  }
+  @media (max-width: 420px) {
+    .options-grid { grid-template-columns: 1fr; }
+  }
+
+  #capacity-hint {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    min-height: 1.2em;
+  }
+
+  #contrast-warning {
+    font-size: 0.82rem;
+    color: var(--warn-text);
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    margin-top: 0.6rem;
+    display: none;
+  }
+  #contrast-warning.visible { display: block; }
+
+  #error-message {
+    font-size: 0.9rem;
+    color: var(--error-text);
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.9rem;
+    display: none;
+  }
+  #error-message.visible { display: block; }
+
+  .canvas-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem 0;
+  }
+  #qr-canvas {
+    max-width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+    background: #fff;
+    border-radius: 4px;
+  }
+  #qr-canvas.hidden { display: none; }
+
+  #qr-caption {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0.5rem 0 0.9rem;
+  }
+
+  .download-row {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--accent-contrast);
+    background: var(--accent);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    /* Tells mobile browsers this control only needs tap/pan-through, not
+       double-tap-to-zoom — removes any residual gesture-recognition delay
+       or ambiguity on a real touch device before the click is dispatched.
+       No visible/behavioral effect on desktop (mouse) input. */
+    touch-action: manipulation;
+  }
+  /* Exclude .ct-copy-btn — it's an icon button with its own subtle hover
+     (opacity/background) from controls.css; the accent brightness filter here
+     is for the primary/download buttons only. */
+  button:hover:not(:disabled):not(.ct-copy-btn) { filter: brightness(1.08); }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  button svg { flex: none; }
+
+  /* ---------- In-field copy button (controls.css supplies the base) ----------
+     controls.css already reserves the textarea's right padding (2.6rem) and
+     positions .ct-copy-btn at the top-right for a .ct-field--multiline. This
+     tool's `textarea { padding: <shorthand> }` above would otherwise reset
+     padding-right (the shorthand trap), so re-declare it as a longhand here so
+     the first line of text never runs under the icon. */
+  .ct-field > textarea { padding-right: 2.6rem; }
+  .ct-copy-btn { font-size: 0.95rem; }
+
+  /* ---- Help modal ----
+     Reference pattern: tools/hat-picker and tools/color-designer's Help
+     modal (see docs/conventions.md "First-load help popup"). Static markup
+     in the document (shown/hidden via [hidden]) rather than built/torn down
+     per open. The Close button is a plain <button> so it inherits this
+     tool's existing accent/primary look (above) — no separate primary class
+     needed, and no ctConfirm-style hover-wash-out risk since nothing here
+     excludes accent buttons from the generic button:hover rule. */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(20, 22, 26, 0.55);
+  }
+  /* [hidden] cascade trap (docs/conventions.md): an author display:flex rule
+     out-specifies the UA [hidden]{display:none} rule, so pair it with an
+     explicit !important override. */
+  .help-overlay[hidden] { display: none !important; }
+
+  .help-dialog {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30rem;
+    max-height: min(85vh, 640px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    padding: 1.25rem 3rem 1.1rem 1.35rem;
+    position: relative;
+  }
+
+  /* Persistent close ✕, pinned top-right so it's reachable even when the
+     dialog is scrolled and the Close button is below the fold (see
+     docs/conventions.md "Every content modal has a close ✕"). */
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .modal-close-x:hover { background: rgba(127, 127, 127, .18); }
+  .modal-close-x:focus-visible { outline: 2px solid var(--focus-ring, #7dd3fc); outline-offset: 2px; }
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.25rem; }
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.9rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.4rem; }
+  .help-note {
+    margin-top: 0.9rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  @media (max-width: 420px) {
+    .help-dialog { padding: 1rem 2.75rem 0.9rem 1rem; }
+  }
+
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header-row">
+    <span class="header-spacer" aria-hidden="true"></span>
+    <div class="header-titles">
+      <h1>QR Code Generator</h1>
+      <p>Paste text or a URL — generates a scannable QR code entirely in your browser, no library.</p>
+    </div>
+    <button
+      type="button"
+      id="help-button"
+      class="help-button"
+      data-testid="help-button"
+      title="How it works"
+      aria-label="How it works"
+    >?</button>
+  </div>
+</header>
+
+<main class="app">
+  <section class="input-section" data-testid="input-section">
+    <h2>Content</h2>
+    <div class="field">
+      <label for="qr-input">Text or URL</label>
+      <!-- In-field copy on the editable input (revealed only when non-empty; the
+           app toggles [hidden] on input). Multiline wrapper pins the button to
+           the top-right of the textarea (see controls.css / conventions.md). -->
+      <div class="ct-field ct-field--multiline">
+        <textarea id="qr-input" data-testid="qr-input" placeholder="Type or paste text, or a URL…" aria-describedby="capacity-hint"></textarea>
+        <button type="button" class="ct-copy-btn" data-testid="qr-input-copy" title="Copy text" aria-label="Copy text" hidden>📋</button>
+      </div>
+      <div id="capacity-hint" data-testid="capacity-hint" aria-live="polite">Enter text or a URL above to generate a QR code.</div>
+    </div>
+  </section>
+
+  <section class="options-section" data-testid="options-section">
+    <h2>Options</h2>
+    <div class="field">
+      <label for="ec-level-select">Error correction level</label>
+      <select id="ec-level-select" data-testid="ec-level-select">
+        <option value="L">L — Low (~7% recovery)</option>
+        <option value="M">M — Medium (~15% recovery)</option>
+        <option value="Q">Q — Quartile (~25% recovery)</option>
+        <option value="H" selected>H — High (~30% recovery)</option>
+      </select>
+    </div>
+    <div class="options-grid">
+      <div class="field">
+        <label for="scale-input">Module scale (px)</label>
+        <input type="number" id="scale-input" data-testid="scale-input" min="1" max="40" value="8">
+      </div>
+      <div class="field">
+        <label for="quiet-zone-input">Quiet zone (modules)</label>
+        <input type="number" id="quiet-zone-input" data-testid="quiet-zone-input" min="0" max="20" value="4">
+      </div>
+      <div class="field">
+        <label for="fg-color-input">Foreground color</label>
+        <input type="color" id="fg-color-input" data-testid="fg-color-input" value="#000000">
+      </div>
+      <div class="field">
+        <label for="bg-color-input">Background color</label>
+        <input type="color" id="bg-color-input" data-testid="bg-color-input" value="#ffffff">
+      </div>
+    </div>
+    <div id="contrast-warning" data-testid="contrast-warning" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="output-section" data-testid="output-section">
+    <h2>Result</h2>
+    <div id="error-message" data-testid="error-message" role="alert"></div>
+    <div class="canvas-wrap">
+      <canvas id="qr-canvas" data-testid="qr-canvas" class="hidden" aria-label="QR code"></canvas>
+    </div>
+    <div id="qr-caption" data-testid="qr-caption"></div>
+    <div class="download-row">
+      <button type="button" id="download-png-btn" data-testid="download-png-btn" title="Download PNG" aria-label="Download PNG" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1v9m0 0 3-3m-3 3-3-3M2 12v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download PNG
+      </button>
+      <button type="button" id="download-svg-btn" data-testid="download-svg-btn" title="Download SVG" aria-label="Download SVG" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1v9m0 0 3-3m-3 3-3-3M2 12v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download SVG
+      </button>
+    </div>
+  </section>
+</main>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">How QR Code Generator works</h2>
+    <p>Type or paste text — or a URL — into the box above and a QR code is generated for you automatically, entirely in your browser. There's no library or server call involved: the encoder (error correction, masking, and all) is hand-rolled from the ISO/IEC 18004 spec.</p>
+    <ul>
+      <li><strong>Error correction level.</strong> Higher levels (Q, H) let the code keep scanning even if part of it gets damaged or obscured, at the cost of a denser code. <strong>H</strong> (~30% recovery) is the default.</li>
+      <li><strong>Module scale &amp; quiet zone.</strong> Scale sets how many pixels each square module renders at; quiet zone sets the blank border (in modules) most scanners expect around the code.</li>
+      <li><strong>Foreground &amp; background color.</strong> Customize the code's colors — a warning appears if the contrast between them gets too low to scan reliably.</li>
+      <li><strong>Download PNG or SVG.</strong> Save the generated code as a pixel PNG or a scalable SVG. Both files carry small embedded credit metadata (author "claude tools" and the project's GitHub URL) — the PNG via standard tEXt chunks, the SVG via an XML comment and a &lt;metadata&gt; block — the QR code's own pixels/geometry are never touched.</li>
+    </ul>
+    <p class="help-note">Your text and options are saved on this device, so they're still here next time you open QR Code Generator.</p>
+  </div>
+</div>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<!---- end footer -->
+
+
+<script type="module">
+/* ct:module utils/CtByteUtil.mjs */
+const __ct_utils_CtByteUtil = (() => {
+// ===== Begin CtByteUtil (ES module) =====
+/*
+ * CtByteUtil — byte-level utilities: CRC-32, base64/base64url, byte-size
+ * formatting, and the hand-rolled hash engine.
+ * ---------------------------------------------------------------------------
+ * ONE module, built by merging the former crc32.js / crc32.mjs / base64.mjs /
+ * formatBytes.mjs / hasher.mjs (jbc ES6 modularization · Train 35 · R4a). Every
+ * function is a NAMED export defined once (single implementation); the
+ * `CtByteUtil` class at the bottom is a thin aggregator whose static members
+ * REFERENCE those functions — it never reimplements anything. Consumers pick
+ * whichever shape they like:
+ *   import { crc32 } from '../../jbc-include/CtByteUtil.mjs';
+ *   import { CtByteUtil } from '../../jbc-include/CtByteUtil.mjs';  // CtByteUtil.crc32(...)
+ *
+ * The old crc32.js paste-in browser global is GONE: crc32.js and
+ * crc32.mjs computed the identical reflected 0xedb88320 CRC-32 (proven
+ * bit-identical over a vector set), so they are merged into the single `crc32`
+ * below. getRandomBytes + makeId (ex util.js) live in the "random" section below (R12).
+ *
+ * Node-importable ES module; the single-file build inlines this module body into
+ * the shipped index.html — stripping each `export` — so the shipped tool stays
+ * dependency-free and file://-openable.
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build.
+ */
+
+// =====================================================================
+// Section: crc32  (was crc32.mjs, and the retired crc32.js global)
+// =====================================================================
+/*
+ * crc32(bytes) -> uint32
+ * ---------------------------------------------------------------------------
+ * CRC-32 (ISO 3309 / ITU-T V.42 / PNG / ZIP) over a byte sequence, returned as
+ * an unsigned 32-bit integer. This is the standard reflected CRC with the
+ * 0xedb88320 polynomial — the exact checksum the PNG chunk format and the ZIP
+ * local/central records require. `bytes` is any indexed, length-bearing byte
+ * source (Uint8Array or a plain array of 0..255).
+ *
+ * Node-importable ES-module twin of crc32.js's paste-only browser global. A
+ * tool whose pure, unit-tested source/logic.mjs needs CRC-32 imports this
+ * module directly (so `node --test` can load it); the single-file build inlines
+ * this module body into the shipped index.html — stripping the `export` — so the
+ * shipped tool stays dependency-free and file://-openable. See the consuming
+ * repo's build docs (§ "Build-assembled tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+// =====================================================================
+// Section: base64  (was base64.mjs — jbcBase64)
+// =====================================================================
+/*
+ * base64 / base64url codec helpers
+ * ---------------------------------------------------------------------------
+ * Two small, dependency-free base64 helpers a pure, unit-tested source/logic.mjs
+ * reaches for — an encoder and a base64url decoder. Both rely only on the
+ * platform globals that exist in both a browser and Node >= 16 (`atob`/`btoa`,
+ * `TextEncoder`/`Uint8Array`), so `node --test` can import the module directly.
+ *
+ *   base64UrlToBytes(input) -> Uint8Array
+ *     Decode a base64url (or standard) string to raw bytes. Strips whitespace,
+ *     tolerates missing padding (URL-safe/JWT segments are unpadded by spec),
+ *     maps the URL-safe alphabet (`-`/`_`) onto standard (`+`/`/`), validates the
+ *     alphabet + length, and throws a friendly Error otherwise. (The Error text
+ *     says "segment" — its original JWT-decoding context — preserved verbatim so
+ *     existing consumers' messages/tests stay byte-stable.)
+ *
+ *   utf8ToBase64(str) -> string
+ *     Encode a JS string to STANDARD base64 (with padding), UTF-8-safe: `btoa`
+ *     alone only accepts Latin1 and throws on multi-byte characters (accents,
+ *     emoji), so the string is first encoded to UTF-8 bytes, turned into a
+ *     Latin1-safe binary string, then `btoa`'d.
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * needs base64 imports this module directly (so `node --test` can load it); the
+ * single-file build inlines this module body into the shipped index.html —
+ * stripping the `export` — so the shipped tool stays dependency-free and
+ * file://-openable. See the consuming repo's build docs (§ "Build-assembled
+ * tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function base64UrlToBytes(input) {
+  let s = String(input == null ? '' : input).replace(/\s+/g, '');
+  if (s === '') throw new Error('Empty segment.');
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  const rem = s.length % 4;
+  if (rem === 1) throw new Error('Invalid base64url length.');
+  if (rem === 2) s += '==';
+  else if (rem === 3) s += '=';
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(s)) {
+    throw new Error('Segment contains characters outside the base64url alphabet.');
+  }
+  let binary;
+  try {
+    binary = atob(s);
+  } catch {
+    throw new Error('Segment is not valid base64url.');
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+// =====================================================================
+// Section: formatBytes  (was formatBytes.mjs — jbcFormatBytes)
+// =====================================================================
+/*
+ * formatBytes(bytes, opts?) -> string
+ * ---------------------------------------------------------------------------
+ * Human-readable byte count for a file/blob size readout. With NO options it is
+ * the logic-layer default several tools hand-rolled: an integer count of bytes
+ * with a " B" suffix below 1 KiB, otherwise one decimal place in binary (1024)
+ * tiers — KB, MB, GB (capped at GB). A space separates the number and the unit
+ * ("1.5 KB", "976.6 KB", "931.3 GB"). `bytes` is coerced with `Number(bytes) ||
+ * 0`, so a non-numeric or NaN argument formats as "0 B". NOTE: ±Infinity is
+ * truthy, so it is NOT coerced to 0 — it survives and tops out in the capped GB
+ * tier ("Infinity GB" / "-Infinity B"). Pass `invalid` to show a sentinel for
+ * non-finite input instead (#1014-O: this note corrects the earlier "non-finite → 0 B").
+ *
+ * This is THE byte formatter for the whole library (R16): the old compact app-layer variant
+ * (no space, lowercase "b", two decimals, a TB tier) was removed from CtUtil, and every
+ * consumer now calls this one. Callers that want a different shape pass `opts`.
+ *
+ * OPTIONS (all optional; the DEFAULT reproduces the historical behavior exactly,
+ * so an option-free call is byte-identical to the pre-parameterization function):
+ *   base      1024 (default) | 1000 — the tier divisor. Pass 1000 for a
+ *             decimal-SI readout (rest-tester).
+ *   decimals  1 (default) | a number | a function(value) => number — the digits
+ *             after the decimal point for the scaled value. A function receives
+ *             the SCALED value (the number shown before the unit) so a consumer
+ *             can vary precision by magnitude, e.g. `v => v < 10 ? 2 : 1`
+ *             (image-metadata).
+ *   space     true (default) | false — whether a single space separates the
+ *             number and the unit.
+ *   units     ['KB','MB','GB'] (default) — the ascending tier labels (the last
+ *             one caps growth).
+ *   byteUnit  'B' (default) — the sub-`base` unit label.
+ *   invalid   undefined (default: coerce a non-finite/missing input to 0 via
+ *             `Number(bytes) || 0` → "0 B") | a string returned verbatim when
+ *             the input is invalid. Lets a consumer show its own sentinel
+ *             ("" for image-metadata, "—" for rest-tester).
+ *   invalidWhen  a predicate(bytes) => boolean deciding what counts as invalid;
+ *             only consulted when `invalid` is set. Defaults to
+ *             `!Number.isFinite(bytes)` (catches NaN and ±Infinity, matching
+ *             rest-tester). Pass `n => n == null || isNaN(n)` to mirror a
+ *             null/NaN-only guard (image-metadata).
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * needs a byte-size readout imports this module directly (so `node --test` can
+ * load it); the single-file build inlines this module body into the shipped
+ * index.html — stripping the `export` — so the shipped tool stays
+ * dependency-free and file://-openable. See the consuming repo's build docs
+ * (§ "Build-assembled tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function formatBytes(bytes, opts) {
+  opts = opts || {};
+  const base = opts.base || 1024;
+  const sep = opts.space === false ? '' : ' ';
+  const units = opts.units || ['KB', 'MB', 'GB'];
+  const byteUnit = opts.byteUnit || 'B';
+  const decimals = opts.decimals == null ? 1 : opts.decimals;
+  let n;
+  if (opts.invalid != null) {
+    const bad = opts.invalidWhen ? opts.invalidWhen(bytes) : !Number.isFinite(bytes);
+    if (bad) return opts.invalid;
+    n = Number(bytes);
+  } else {
+    n = Number(bytes) || 0;
+  }
+  if (n < base) return `${n}${sep}${byteUnit}`;
+  let value = n / base;
+  let i = 0;
+  while (value >= base && i < units.length - 1) {
+    value /= base;
+    i++;
+  }
+  const d = (typeof decimals === 'function') ? decimals(value) : decimals;
+  return `${value.toFixed(d)}${sep}${units[i]}`;
+}
+
+// =====================================================================
+// Section: hasher  (was hasher.mjs — jbcHasher; its crc32 import is now the
+// in-module `crc32` above, and its exports are inline)
+// =====================================================================
+/*
+ * jbcHasher — hand-rolled hash engine (crypto + non-crypto).
+ * ---------------------------------------------------------------------------
+ * A DOM-free, Node-importable ES module. Every digest is hand-rolled (no
+ * crypto.subtle.*, which is secure-context-only and would break over plain LAN
+ * HTTP): MD5, SHA-1, SHA-256, SHA-512 (BigInt), and HMAC (RFC 2104) over any of
+ * them, plus byte / hex / base64 encoders. Operates on Uint8Array; encoders are
+ * hand-rolled too so the module runs unchanged under node --test. CRC-32 is
+ * imported from the sibling crc32.mjs and re-exported (with the crc32Hex hex
+ * wrapper) so one import covers every algorithm a hasher UI offers.
+ *
+ * A tool whose pure, unit-tested source/logic.mjs needs hashing imports this
+ * module directly (so node --test can load it); the single-file build inlines
+ * this module body into the shipped index.html — stripping each export and
+ * hoisting the crc32 dependency once — so the shipped tool stays dependency-free
+ * and file://-openable. See the consuming repo's build docs (import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build.
+ */
+
+// --- encoders -----------------------------------------------------------
+
+function textToBytes(str) {
+  return new TextEncoder().encode(String(str ?? ''));
+}
+
+const HEX = '0123456789abcdef';
+function bytesToHex(bytes) {
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) {
+    out += HEX[bytes[i] >> 4] + HEX[bytes[i] & 0x0f];
+  }
+  return out;
+}
+
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function bytesToBase64(bytes) {
+  let out = '';
+  let i = 0;
+  for (; i + 3 <= bytes.length; i += 3) {
+    const n = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
+    out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + B64[(n >> 6) & 63] + B64[n & 63];
+  }
+  const rem = bytes.length - i;
+  if (rem === 1) {
+    const n = bytes[i] << 16;
+    out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + '==';
+  } else if (rem === 2) {
+    const n = (bytes[i] << 16) | (bytes[i + 1] << 8);
+    out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + B64[(n >> 6) & 63] + '=';
+  }
+  return out;
+}
+
+// --- CRC32 (table-driven, IEEE polynomial 0xEDB88320) -------------------
+// crc32 is imported from the shared Node-importable module instead of a local
+// copy; the single-file build inlines its body into the shipped index.html
+// (stripping the `export`), so runtime stays dependency-free. Re-exported via
+// the export block below (with crc32Hex, which stays local) so tests/unit and
+// the app hook see both.
+function crc32Hex(bytes) {
+  return crc32(bytes).toString(16).padStart(8, '0');
+}
+
+// --- shared padding -----------------------------------------------------
+// Append 0x80, zero-fill to a block boundary leaving room for a 64-bit
+// bit-length written into the final 8 bytes of the final block. blockSize is
+// 64 (MD5/SHA-1/SHA-256, 8-byte length field) or 128 (SHA-512, 16-byte length
+// field). Only the low 64 bits of the length are written; SHA-512's upper 8
+// bytes stay zero (fine for any real input). littleEndianLen picks MD5's LE
+// length vs the SHA family's BE length.
+function padMessage(msg, blockSize, littleEndianLen, lenFieldBytes) {
+  const msgLen = msg.length;
+  const bitLen = msgLen * 8; // exact JS number well past any file we'll hash
+  let total = msgLen + 1 + lenFieldBytes;     // 0x80 + length field
+  total = Math.ceil(total / blockSize) * blockSize;
+  const padded = new Uint8Array(total);
+  padded.set(msg);
+  padded[msgLen] = 0x80;
+  const lo = bitLen >>> 0;
+  const hi = Math.floor(bitLen / 0x100000000) >>> 0;
+  const dv = new DataView(padded.buffer);
+  if (littleEndianLen) {
+    dv.setUint32(total - 8, lo, true);
+    dv.setUint32(total - 4, hi, true);
+  } else {
+    dv.setUint32(total - 4, lo, false);
+    dv.setUint32(total - 8, hi, false);
+  }
+  return padded;
+}
+
+// --- MD5 ----------------------------------------------------------------
+
+const MD5_S = [
+  7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+  5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+  4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+  6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+];
+const MD5_K = (() => {
+  const k = new Uint32Array(64);
+  for (let i = 0; i < 64; i++) k[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 0x100000000) >>> 0;
+  return k;
+})();
+
+function rotl32(x, c) { return ((x << c) | (x >>> (32 - c))) >>> 0; }
+
+function md5(msg) {
+  const padded = padMessage(msg, 64, true, 8);
+  const dv = new DataView(padded.buffer);
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  const M = new Uint32Array(16);
+  for (let off = 0; off < padded.length; off += 64) {
+    for (let i = 0; i < 16; i++) M[i] = dv.getUint32(off + i * 4, true);
+    let A = a0, B = b0, C = c0, D = d0;
+    for (let i = 0; i < 64; i++) {
+      let F, g;
+      if (i < 16) { F = (B & C) | (~B & D); g = i; }
+      else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) & 15; }
+      else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) & 15; }
+      else { F = C ^ (B | ~D); g = (7 * i) & 15; }
+      F = (F + A + MD5_K[i] + M[g]) >>> 0;
+      A = D; D = C; C = B;
+      B = (B + rotl32(F, MD5_S[i])) >>> 0;
+    }
+    a0 = (a0 + A) >>> 0; b0 = (b0 + B) >>> 0; c0 = (c0 + C) >>> 0; d0 = (d0 + D) >>> 0;
+  }
+  const out = new Uint8Array(16);
+  const odv = new DataView(out.buffer);
+  odv.setUint32(0, a0, true); odv.setUint32(4, b0, true);
+  odv.setUint32(8, c0, true); odv.setUint32(12, d0, true);
+  return out;
+}
+
+// --- SHA-1 --------------------------------------------------------------
+
+function sha1(msg) {
+  const padded = padMessage(msg, 64, false, 8);
+  const dv = new DataView(padded.buffer);
+  let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
+  const w = new Uint32Array(80);
+  for (let off = 0; off < padded.length; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4, false);
+    for (let i = 16; i < 80; i++) w[i] = rotl32(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+    let a = h0, b = h1, c = h2, d = h3, e = h4;
+    for (let i = 0; i < 80; i++) {
+      let f, k;
+      if (i < 20) { f = (b & c) | (~b & d); k = 0x5A827999; }
+      else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
+      else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
+      else { f = b ^ c ^ d; k = 0xCA62C1D6; }
+      const t = (rotl32(a, 5) + f + e + k + w[i]) >>> 0;
+      e = d; d = c; c = rotl32(b, 30); b = a; a = t;
+    }
+    h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0;
+    h3 = (h3 + d) >>> 0; h4 = (h4 + e) >>> 0;
+  }
+  const out = new Uint8Array(20);
+  const odv = new DataView(out.buffer);
+  [h0, h1, h2, h3, h4].forEach((h, i) => odv.setUint32(i * 4, h, false));
+  return out;
+}
+
+// --- SHA-256 ------------------------------------------------------------
+
+const SHA256_K = new Uint32Array([
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+]);
+
+function rotr32(x, n) { return ((x >>> n) | (x << (32 - n))) >>> 0; }
+
+function sha256(msg) {
+  const padded = padMessage(msg, 64, false, 8);
+  const dv = new DataView(padded.buffer);
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a,
+    h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+  const w = new Uint32Array(64);
+  for (let off = 0; off < padded.length; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4, false);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr32(w[i - 15], 7) ^ rotr32(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rotr32(w[i - 2], 17) ^ rotr32(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+    let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, hh = h7;
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr32(e, 6) ^ rotr32(e, 11) ^ rotr32(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (hh + S1 + ch + SHA256_K[i] + w[i]) >>> 0;
+      const S0 = rotr32(a, 2) ^ rotr32(a, 13) ^ rotr32(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) >>> 0;
+      hh = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0;
+    h4 = (h4 + e) >>> 0; h5 = (h5 + f) >>> 0; h6 = (h6 + g) >>> 0; h7 = (h7 + hh) >>> 0;
+  }
+  const out = new Uint8Array(32);
+  const odv = new DataView(out.buffer);
+  [h0, h1, h2, h3, h4, h5, h6, h7].forEach((h, i) => odv.setUint32(i * 4, h, false));
+  return out;
+}
+
+// --- SHA-512 (BigInt, masked to 64 bits) --------------------------------
+
+const MASK64 = (1n << 64n) - 1n;
+const SHA512_K = [
+  0x428a2f98d728ae22n, 0x7137449123ef65cdn, 0xb5c0fbcfec4d3b2fn, 0xe9b5dba58189dbbcn,
+  0x3956c25bf348b538n, 0x59f111f1b605d019n, 0x923f82a4af194f9bn, 0xab1c5ed5da6d8118n,
+  0xd807aa98a3030242n, 0x12835b0145706fben, 0x243185be4ee4b28cn, 0x550c7dc3d5ffb4e2n,
+  0x72be5d74f27b896fn, 0x80deb1fe3b1696b1n, 0x9bdc06a725c71235n, 0xc19bf174cf692694n,
+  0xe49b69c19ef14ad2n, 0xefbe4786384f25e3n, 0x0fc19dc68b8cd5b5n, 0x240ca1cc77ac9c65n,
+  0x2de92c6f592b0275n, 0x4a7484aa6ea6e483n, 0x5cb0a9dcbd41fbd4n, 0x76f988da831153b5n,
+  0x983e5152ee66dfabn, 0xa831c66d2db43210n, 0xb00327c898fb213fn, 0xbf597fc7beef0ee4n,
+  0xc6e00bf33da88fc2n, 0xd5a79147930aa725n, 0x06ca6351e003826fn, 0x142929670a0e6e70n,
+  0x27b70a8546d22ffcn, 0x2e1b21385c26c926n, 0x4d2c6dfc5ac42aedn, 0x53380d139d95b3dfn,
+  0x650a73548baf63den, 0x766a0abb3c77b2a8n, 0x81c2c92e47edaee6n, 0x92722c851482353bn,
+  0xa2bfe8a14cf10364n, 0xa81a664bbc423001n, 0xc24b8b70d0f89791n, 0xc76c51a30654be30n,
+  0xd192e819d6ef5218n, 0xd69906245565a910n, 0xf40e35855771202an, 0x106aa07032bbd1b8n,
+  0x19a4c116b8d2d0c8n, 0x1e376c085141ab53n, 0x2748774cdf8eeb99n, 0x34b0bcb5e19b48a8n,
+  0x391c0cb3c5c95a63n, 0x4ed8aa4ae3418acbn, 0x5b9cca4f7763e373n, 0x682e6ff3d6b2b8a3n,
+  0x748f82ee5defb2fcn, 0x78a5636f43172f60n, 0x84c87814a1f0ab72n, 0x8cc702081a6439ecn,
+  0x90befffa23631e28n, 0xa4506cebde82bde9n, 0xbef9a3f7b2c67915n, 0xc67178f2e372532bn,
+  0xca273eceea26619cn, 0xd186b8c721c0c207n, 0xeada7dd6cde0eb1en, 0xf57d4f7fee6ed178n,
+  0x06f067aa72176fban, 0x0a637dc5a2c898a6n, 0x113f9804bef90daen, 0x1b710b35131c471bn,
+  0x28db77f523047d84n, 0x32caab7b40c72493n, 0x3c9ebe0a15c9bebcn, 0x431d67c49c100d4cn,
+  0x4cc5d4becb3e42b6n, 0x597f299cfc657e2an, 0x5fcb6fab3ad6faecn, 0x6c44198c4a475817n,
+];
+
+function rotr64(x, n) { return ((x >> n) | (x << (64n - n))) & MASK64; }
+
+function sha512(msg) {
+  const padded = padMessage(msg, 128, false, 16);
+  const dv = new DataView(padded.buffer);
+  const h = [
+    0x6a09e667f3bcc908n, 0xbb67ae8584caa73bn, 0x3c6ef372fe94f82bn, 0xa54ff53a5f1d36f1n,
+    0x510e527fade682d1n, 0x9b05688c2b3e6c1fn, 0x1f83d9abfb41bd6bn, 0x5be0cd19137e2179n,
+  ];
+  const w = new Array(80);
+  for (let off = 0; off < padded.length; off += 128) {
+    for (let i = 0; i < 16; i++) {
+      const hi = BigInt(dv.getUint32(off + i * 8, false));
+      const lo = BigInt(dv.getUint32(off + i * 8 + 4, false));
+      w[i] = (hi << 32n) | lo;
+    }
+    for (let i = 16; i < 80; i++) {
+      const s0 = rotr64(w[i - 15], 1n) ^ rotr64(w[i - 15], 8n) ^ (w[i - 15] >> 7n);
+      const s1 = rotr64(w[i - 2], 19n) ^ rotr64(w[i - 2], 61n) ^ (w[i - 2] >> 6n);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) & MASK64;
+    }
+    let a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+    for (let i = 0; i < 80; i++) {
+      const S1 = rotr64(e, 14n) ^ rotr64(e, 18n) ^ rotr64(e, 41n);
+      const ch = (e & f) ^ ((~e & MASK64) & g);
+      const t1 = (hh + S1 + ch + SHA512_K[i] + w[i]) & MASK64;
+      const S0 = rotr64(a, 28n) ^ rotr64(a, 34n) ^ rotr64(a, 39n);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) & MASK64;
+      hh = g; g = f; f = e; e = (d + t1) & MASK64; d = c; c = b; b = a; a = (t1 + t2) & MASK64;
+    }
+    h[0] = (h[0] + a) & MASK64; h[1] = (h[1] + b) & MASK64; h[2] = (h[2] + c) & MASK64;
+    h[3] = (h[3] + d) & MASK64; h[4] = (h[4] + e) & MASK64; h[5] = (h[5] + f) & MASK64;
+    h[6] = (h[6] + g) & MASK64; h[7] = (h[7] + hh) & MASK64;
+  }
+  const out = new Uint8Array(64);
+  const odv = new DataView(out.buffer);
+  for (let i = 0; i < 8; i++) {
+    odv.setUint32(i * 8, Number((h[i] >> 32n) & 0xffffffffn), false);
+    odv.setUint32(i * 8 + 4, Number(h[i] & 0xffffffffn), false);
+  }
+  return out;
+}
+
+// --- HMAC (RFC 2104) ----------------------------------------------------
+
+const HMAC_ALGOS = {
+  md5: { fn: md5, block: 64 },
+  sha1: { fn: sha1, block: 64 },
+  sha256: { fn: sha256, block: 64 },
+  sha512: { fn: sha512, block: 128 },
+};
+
+function concatTwoBytes(a, b) {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
+}
+
+function hmac(hashName, keyBytes, msgBytes) {
+  const cfg = HMAC_ALGOS[hashName];
+  if (!cfg) throw new Error('Unsupported hash for HMAC: ' + hashName);
+  let key = keyBytes;
+  if (key.length > cfg.block) key = cfg.fn(key);
+  const k = new Uint8Array(cfg.block); // zero-padded to block size
+  k.set(key);
+  const ipad = new Uint8Array(cfg.block);
+  const opad = new Uint8Array(cfg.block);
+  for (let i = 0; i < cfg.block; i++) {
+    ipad[i] = k[i] ^ 0x36;
+    opad[i] = k[i] ^ 0x5c;
+  }
+  const inner = cfg.fn(concatTwoBytes(ipad, msgBytes));
+  return cfg.fn(concatTwoBytes(opad, inner));
+}
+
+// =====================================================================
+// Section: random bytes / ids  (were getRandomBytes / makeId on the util.js global)
+// =====================================================================
+/*
+ * getRandomBytes(n):
+ * - Returns a Uint8Array of `n` cryptographically-random bytes via
+ *   crypto.getRandomValues (chunked past the 65536-byte per-call cap), falling
+ *   back to Math.random where getRandomValues is absent. NEVER uses the native
+ *   randomUUID() generator (the one on `crypto`) — it is secure-context-only and
+ *   throws over file:// and plain-HTTP LAN, which these tools must run under.
+ *
+ * makeId():
+ * - A short, collision-resistant, file://-safe id ("s_" + 16 hex chars) built
+ *   from getRandomBytes. For DOM ids / object keys, not for security tokens.
+ *   (Lives here, beside getRandomBytes, so CtUtil.mjs stays import-free.)
+ */
+function getRandomBytes(n) {
+  var out = new Uint8Array(n);
+  var g = (typeof globalThis !== 'undefined' ? globalThis : window).crypto;
+  if (g && typeof g.getRandomValues === 'function') {
+    for (var off = 0; off < n; off += 65536) {
+      g.getRandomValues(out.subarray(off, Math.min(off + 65536, n)));
+    }
+  } else {
+    for (var i = 0; i < n; i++) out[i] = Math.floor(Math.random() * 256);
+  }
+  return out;
+}
+
+function makeId() {
+  var b = getRandomBytes(8);
+  var hex = '';
+  for (var i = 0; i < b.length; i++) hex += (b[i] + 0x100).toString(16).slice(1);
+  return 's_' + hex;
+}
+
+
+// =====================================================================
+// Aggregator — static members REFERENCE the named functions above (single
+// implementation; nothing is reimplemented here). Defined LAST so every
+// function it points at already exists.
+// =====================================================================
+class CtByteUtil {
+  static crc32 = crc32;
+  static crc32Hex = crc32Hex;
+  static base64UrlToBytes = base64UrlToBytes;
+  static utf8ToBase64 = utf8ToBase64;
+  static formatBytes = formatBytes;
+  static textToBytes = textToBytes;
+  static bytesToHex = bytesToHex;
+  static bytesToBase64 = bytesToBase64;
+  static md5 = md5;
+  static sha1 = sha1;
+  static sha256 = sha256;
+  static sha512 = sha512;
+  static hmac = hmac;
+  static getRandomBytes = getRandomBytes;
+  static makeId = makeId;
+}
+// ===== end CtByteUtil (ES module) =====
+return { crc32, base64UrlToBytes, utf8ToBase64, formatBytes, textToBytes, bytesToHex, bytesToBase64, crc32Hex, md5, sha1, sha256, sha512, hmac, getRandomBytes, makeId, CtByteUtil };
+})();
+const { crc32, base64UrlToBytes, utf8ToBase64, formatBytes, textToBytes, bytesToHex, bytesToBase64, crc32Hex, md5, sha1, sha256, sha512, hmac, getRandomBytes, makeId, CtByteUtil } = __ct_utils_CtByteUtil;
+
+/* ct:module utils/CtUtil.mjs */
+const __ct_utils_CtUtil = (() => {
+// ===== Begin CtUtil (ES module) =====
+/*
+ * CtUtil — tiny, dependency-free runtime helpers for single-file tools (ES module;
+ * was the classic-script window-global in util.js, plus the posAt /
+ * slugify / wrapText modules, absorbed here — jbc ES6 modularization · Train 37 · R12).
+ * ---------------------------------------------------------------------------
+ *     import { onceFlag, downloadBlob, debounce } from '<rel>/jbc-include/CtUtil.mjs';
+ *     // (or `CtUtil.onceFlag` etc. via the aggregator class at the bottom — the
+ *     //  statics REFERENCE the named bindings, single implementation.)
+ *
+ * Bodies are moved VERBATIM from util.js (and posAt.mjs / slugify.mjs / wrapText.mjs);
+ * only the access path changed (the old util.js global's `X` -> named import `X`). SELF-CONTAINED: no
+ * imports (so flattening never drags another module's top-level names into a page).
+ * Where each former util.js helper went:
+ *   - getRandomBytes + makeId      -> CtByteUtil.mjs (makeId rides with getRandomBytes so
+ *                                      this module needs no import of CtByteUtil)
+ *   - showWarning / hideError / hideWarning / showBanner / hideBanner
+ *                                  -> components/CtComponents.mjs (next to showError)
+ *   - iconButton / wireTabs / ... / announce  -> components/CtComponents.mjs (R11)
+ *   - loadImageFile / canvasToBlob / canvasToPngBytes -> image/CtImageUtil.mjs
+ *
+ * These are the browser/DOM-facing idioms every tool re-rolled by hand. Most touch
+ * runtime-only surfaces (document / URL / localStorage / setTimeout) but only inside
+ * function bodies, so the module is safe to import from Node (the pure helpers —
+ * clamp/num/escape*, posAt/slugify/wrapText — are usable in a unit-tested logic.mjs).
+ *
+ * downloadBlob(data, filename, mime?):
+ * - Triggers a file download. `data` may be a Blob, a string, or a Uint8Array
+ *   (anything the Blob constructor accepts). A Blob is used as-is; anything
+ *   else is wrapped in a Blob (with `mime` as its type when given).
+ * - Creates an object URL, clicks a temporary hidden <a download>, then revokes
+ *   the URL on a short timeout so the download has time to start.
+ *
+ * debounce(fn, ms):
+ * - Returns a trailing-edge debounced wrapper: repeated calls reset the timer,
+ *   and `fn` runs once, `ms` after the last call, with the latest args and `this`.
+ *
+ * (formatBytes is NOT here: the single formatBytes(bytes, opts) lives in CtByteUtil.mjs. The old
+ *   compact util.js variant — no space, lowercase "b", 2 decimals — was removed; callers use
+ *   CtByteUtil.formatBytes, which prints "1.5 KB" style.)
+ *
+ * clamp(n, lo, hi):  Coerces `n` to a number and clamps it to [lo, hi]. Non-finite -> `lo`.
+ * num(v, fallback?): Coerces `v` to a finite number, else `fallback` (default 0).
+ * clampInt(v, lo, hi, fallback): parseInt(v, 10) then clamps to [lo, hi]; non-integer -> `fallback`.
+ *
+ * escapeHtml(s): Escapes & < > (safe for a text node; quotes left as-is).
+ * escapeAttr(s): escapeHtml plus " -> &quot; and ' -> &#39; (for attribute values).
+ * (escapeXml is NOT here: the canonical escapeXml(text, strict?) lives in formats/CtEscaper.mjs.
+ *   The old util.js escapeXml / escapeXmlBasic was folded into it.)
+ *
+ * persistState(key, defaults):
+ * - Versioned, best-effort localStorage persistence driven by a `defaults` shape.
+ *   Put a version in the key (e.g. "mytool:v1"). Returns { load, save }. `load()`
+ *   overlays stored values on the defaults, coercing by the default's TYPE and
+ *   dropping non-finite numbers; `save(state)` stores ONLY the keys in `defaults`.
+ *   All access is try/catch-guarded (private mode / disabled storage degrade silently).
+ *
+ * onceFlag(key):
+ * - A one-shot "have they seen this?" flag on `key`. Returns { seen, mark }.
+ *   `seen()` is true once `mark()` has run; a storage throw is treated as
+ *   already-seen (never re-nag). Used for first-load help auto-open.
+ *
+ * el(tag, props?, children?):
+ * - Hyperscript element factory. `props` keys: `class`/`className`, `text`/
+ *   `textContent`, `html`/`innerHTML`, any `data-*`/`aria-*` + `role`/`title`/
+ *   `for`/`type`/`value`/`name`/`href`/`id`/`placeholder` (set as attributes),
+ *   everything else assigned as a property; null/undefined values are skipped.
+ *   `children` is a node, a string/number (-> text node), or an array of those;
+ *   null/false entries are skipped.
+ *
+ * prefersReducedMotion(): True when the user asked for reduced motion (false if unavailable).
+ * restartAnimation(el, cls): remove `cls`, force reflow (`void el.offsetWidth`), re-add `cls`.
+ *
+ * setupHiDPICanvas(canvas, opts?):
+ * - Sizes a canvas' backing store for crisp rendering on high-DPR displays. CSS
+ *   size is opts.width/opts.height (CSS px) or the canvas' current
+ *   clientWidth/clientHeight. dpr = devicePixelRatio (capped at opts.maxDpr when
+ *   given). Sets canvas.width/height = round(css * dpr); sets the CSS pixel size
+ *   via style unless opts.style===false; gets the 2d context (unless
+ *   opts.context===false) and applies setTransform(dpr,0,0,dpr,0,0) unless
+ *   opts.transform===false. Returns { dpr, cssW, cssH, ctx }.
+ *
+ * posAt(text, index) / slugify(str, opts?) / wrapText(text, maxWidth, measure):
+ * - Pure text helpers (ex posAt.mjs / slugify.mjs / wrapText.mjs); full doc blocks
+ *   at their sections below.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit the canonical copy, re-vendor, run `npm run build`. Canonical source:
+ * html-single-file/assets/CtUtil.mjs
+ */
+
+// =====================================================================
+// Section: downloadBlob / debounce / clamp / num / clampInt
+// =====================================================================
+function downloadBlob(data, filename, mime) {
+  var blob = (data instanceof Blob)
+    ? data
+    : new Blob([data], mime ? { type: mime } : undefined);
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename == null ? '' : String(filename);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+function debounce(fn, ms) {
+  var t;
+  return function () {
+    var self = this, args = arguments;
+    clearTimeout(t);
+    t = setTimeout(function () { fn.apply(self, args); }, ms);
+  };
+}
+
+function clamp(n, lo, hi) {
+  var v = Number(n);
+  // NaN has no position on the number line → lo. ±Infinity DO: +Infinity clamps to hi,
+  // -Infinity to lo via the normal comparison below (#1014-O).
+  if (Number.isNaN(v)) return lo;
+  return v < lo ? lo : (v > hi ? hi : v);
+}
+
+function num(v, fallback) {
+  var n = Number(v);
+  return Number.isFinite(n) ? n : (fallback === undefined ? 0 : fallback);
+}
+
+function clampInt(v, lo, hi, fallback) {
+  var n = parseInt(v, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(lo, Math.min(hi, n));
+}
+
+// =====================================================================
+// Section: escapeHtml / escapeAttr  (escapeXml lives in CtEscaper)
+// =====================================================================
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// =====================================================================
+// Section: persistState / onceFlag
+// =====================================================================
+function persistState(key, defaults) {
+  function load() {
+    var out = {};
+    for (var k in defaults) {
+      if (Object.prototype.hasOwnProperty.call(defaults, k)) out[k] = defaults[k];
+    }
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return out;
+      var p = JSON.parse(raw);
+      if (!p || typeof p !== 'object') return out;
+      for (var k2 in defaults) {
+        if (!Object.prototype.hasOwnProperty.call(defaults, k2)) continue;
+        if (p[k2] === undefined) continue;
+        var d = defaults[k2];
+        if (typeof d === 'boolean') out[k2] = !!p[k2];
+        else if (typeof d === 'number') { var nn = Number(p[k2]); if (Number.isFinite(nn)) out[k2] = nn; }
+        else out[k2] = String(p[k2]);
+      }
+    } catch (e) { /* ignore malformed / disabled storage */ }
+    return out;
+  }
+  function save(state) {
+    var toStore = {};
+    for (var k in defaults) {
+      if (!Object.prototype.hasOwnProperty.call(defaults, k)) continue;
+      if (state && state[k] !== undefined) toStore[k] = state[k];
+    }
+    try { localStorage.setItem(key, JSON.stringify(toStore)); } catch (e) { /* best-effort */ }
+  }
+  return { load: load, save: save };
+}
+
+function onceFlag(key) {
+  return {
+    seen: function () { try { return localStorage.getItem(key) === '1'; } catch (e) { return true; } },
+    mark: function () { try { localStorage.setItem(key, '1'); } catch (e) { /* best-effort */ } }
+  };
+}
+
+// =====================================================================
+// Section: el (hyperscript factory)
+// =====================================================================
+var ATTR_KEYS = { role: 1, title: 1, 'for': 1, type: 1, value: 1, name: 1, href: 1, id: 1, placeholder: 1 };
+function el(tag, props, children) {
+  var node = document.createElement(tag);
+  if (props) {
+    for (var k in props) {
+      if (!Object.prototype.hasOwnProperty.call(props, k)) continue;
+      var v = props[k];
+      if (v == null) continue;
+      if (k === 'class' || k === 'className') node.className = v;
+      else if (k === 'text' || k === 'textContent') node.textContent = v;
+      else if (k === 'html' || k === 'innerHTML') node.innerHTML = v;
+      else if (k.indexOf('data-') === 0 || k.indexOf('aria-') === 0 || ATTR_KEYS[k]) node.setAttribute(k, v);
+      else node[k] = v;
+    }
+  }
+  var kids = (children == null) ? [] : (Array.isArray(children) ? children : [children]);
+  for (var i = 0; i < kids.length; i++) {
+    var c = kids[i];
+    if (c == null || c === false) continue;
+    node.appendChild((typeof c === 'string' || typeof c === 'number') ? document.createTextNode(String(c)) : c);
+  }
+  return node;
+}
+
+// =====================================================================
+// Section: prefersReducedMotion / restartAnimation / setupHiDPICanvas
+// =====================================================================
+function prefersReducedMotion() {
+  try {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (e) { return false; }
+}
+
+function restartAnimation(elm, cls) {
+  if (!elm) return;
+  if (cls) elm.classList.remove(cls);
+  void elm.offsetWidth;
+  if (cls) elm.classList.add(cls);
+}
+
+function setupHiDPICanvas(canvas, opts) {
+  opts = opts || {};
+  var cssW = (opts.width != null) ? opts.width : (canvas.clientWidth || 0);
+  var cssH = (opts.height != null) ? opts.height : (canvas.clientHeight || 0);
+  var dpr = window.devicePixelRatio || 1;
+  if (opts.maxDpr != null) dpr = Math.min(dpr, opts.maxDpr);
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  if (opts.style !== false) {
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+  }
+  var ctx = (opts.context === false) ? null : canvas.getContext('2d');
+  if (ctx && opts.transform !== false) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { dpr: dpr, cssW: cssW, cssH: cssH, ctx: ctx };
+}
+
+// =====================================================================
+// Section: posAt  (was posAt.mjs — jbcPosAt)
+// =====================================================================
+/*
+ * posAt(text, index) -> { line, column }
+ * ---------------------------------------------------------------------------
+ * Map a 0-based character offset into `text` to a 1-based { line, column }
+ * position — the readout a parser wants when reporting where an error occurred.
+ * Lines are split on `\n`; `column` counts characters from the line start
+ * (1-based). `index` is clamped to `text.length`, so an offset at or past the
+ * end returns the position just after the final character. Every other character
+ * (including `\r` and `\t`) advances the column by one.
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * needs offset->line/column imports this module directly (so `node --test` can
+ * load it); the single-file build inlines this module body into the shipped
+ * index.html — stripping the `export` — so the shipped tool stays
+ * dependency-free and file://-openable. See the consuming repo's build docs
+ * (§ "Build-assembled tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function posAt(text, index) {
+  let line = 1;
+  let col = 1;
+  const end = Math.min(index, text.length);
+  for (let i = 0; i < end; i++) {
+    if (text[i] === '\n') { line++; col = 1; } else { col++; }
+  }
+  return { line, column: col };
+}
+
+// =====================================================================
+// Section: slugify  (was slugify.mjs — jbcSlugify)
+// =====================================================================
+/*
+ * slugify(str, opts?) -> string
+ * ---------------------------------------------------------------------------
+ * Turn arbitrary text into a filename-safe ASCII slug: trim, lowercase, drop
+ * straight/curly-free quotes, collapse every run of non-alphanumeric characters
+ * to a single hyphen, strip leading/trailing hyphens, and cap the result at 60
+ * characters. `null`/`undefined` become `''`. This is the conservative, ASCII
+ * form used for download filenames (e.g. "My Card!" -> "my-card").
+ *
+ * With NO options this is exactly the historical ASCII slugifier, so an
+ * option-free call is byte-identical to the pre-parameterization function.
+ *
+ * DIACRITIC-AWARE VARIANT — `slugify(str, { diacritics: true, cap? })`. Some
+ * tools need "Café Menu" -> "cafe-menu" (the default ASCII form drops the
+ * accented letters). Passing `diacritics: true` selects a different pipeline
+ * that (1) NFKD-normalizes and strips combining diacritical marks (U+0300–U+036F)
+ * so "é" -> "e", then (2) splits into words with a camelCase / acronym / digit-
+ * run-aware splitter (the text-toolkit word model: "fooBar" -> foo, Bar;
+ * "HTMLParser" -> HTML, Parser; "foo2bar" -> foo, 2, bar), lowercases each, and
+ * joins with '-'. This is NOT the same word model as the default (which collapses
+ * every non-alphanumeric run) — it is the diacritic slug several text tools rolled
+ * by hand. `opts.cap` (a number) caps the length; omitted / null leaves it
+ * UNCAPPED (text-toolkit's slug is uncapped).
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * needs a slug imports this module directly (so `node --test` can load it); the
+ * single-file build inlines this module body into the shipped index.html —
+ * stripping the `export` — so the shipped tool stays dependency-free and
+ * file://-openable. See the consuming repo's build docs (§ "Build-assembled
+ * tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function slugify(str, opts) {
+  opts = opts || {};
+  if (opts.diacritics) {
+    if (str == null) return '';
+    const stripped = String(str).normalize('NFKD').replace(/[̀-ͯ]/g, '');
+    const words = stripped.match(/[A-Z]+(?=[A-Z][a-z])|[A-Z][a-z]+|[A-Z]+|[a-z]+|[0-9]+/g) || [];
+    const slug = words.map((w) => w.toLowerCase()).join('-');
+    // Strip a trailing hyphen the cap may have left mid-separator (#1014-O).
+    return opts.cap == null ? slug : slug.slice(0, opts.cap).replace(/-+$/g, '');
+  }
+  return String(str == null ? '' : str)
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/g, ''); // the 60-char cap can land mid-separator, re-stripping a trailing hyphen (#1014-O)
+}
+
+// =====================================================================
+// Section: wrapText  (was wrapText.mjs — jbcWrapText)
+// =====================================================================
+/*
+ * wrapText(text, maxWidth, measure) -> string[]
+ * ---------------------------------------------------------------------------
+ * Greedy word-wrap of `text` to a maximum width, returning an array of lines
+ * (always at least one, possibly `''`). Explicit newlines are honored as hard
+ * breaks first; within a paragraph, words are packed greedily and a single word
+ * wider than `maxWidth` is kept whole on its own line (never dropped or split).
+ *
+ * Width is measured by the injected `measure(str) -> number` callback — the
+ * pure wrapping logic lives here; the canvas/DOM text-measurement stays at the
+ * call site (pass `ctx.measureText(s).width`). `maxWidth` is coerced to a finite
+ * number (non-finite -> 0); a limit of 0 (or less) disables width-wrapping, so
+ * only explicit newlines break the text and `measure` is never called.
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * wraps text imports this module directly (so `node --test` can load it, feeding
+ * a deterministic `measure`); the single-file build inlines this module body
+ * into the shipped index.html — stripping the `export` — so the shipped tool
+ * stays dependency-free and file://-openable. See the consuming repo's build
+ * docs (§ "Build-assembled tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function wrapText(text, maxWidth, measure) {
+  const src = text == null ? '' : String(text);
+  const mw = Number(maxWidth);
+  const limit = Number.isFinite(mw) ? mw : 0;
+  const paras = src.split('\n');
+  const out = [];
+  for (const para of paras) {
+    const words = para.split(/(\s+)/).filter((t) => t.length > 0);
+    if (words.length === 0) { out.push(''); continue; }
+    let line = '';
+    for (const token of words) {
+      const isSpace = /^\s+$/.test(token);
+      const candidate = line + token;
+      if (line === '') {
+        line = isSpace ? '' : token;
+        continue;
+      }
+      if (limit > 0 && measure(candidate) > limit && !isSpace) {
+        out.push(line.replace(/\s+$/, ''));
+        line = token;
+      } else {
+        line = candidate;
+      }
+    }
+    out.push(line.replace(/\s+$/, ''));
+  }
+  return out.length ? out : [''];
+}
+
+// =====================================================================
+// Aggregator — static members REFERENCE the named functions above (single
+// implementation; nothing is reimplemented here). Defined LAST.
+// =====================================================================
+class CtUtil {
+  static downloadBlob = downloadBlob;
+  static debounce = debounce;
+  static clamp = clamp;
+  static num = num;
+  static clampInt = clampInt;
+  static escapeHtml = escapeHtml;
+  static escapeAttr = escapeAttr;
+  static persistState = persistState;
+  static onceFlag = onceFlag;
+  static el = el;
+  static prefersReducedMotion = prefersReducedMotion;
+  static restartAnimation = restartAnimation;
+  static setupHiDPICanvas = setupHiDPICanvas;
+  static posAt = posAt;
+  static slugify = slugify;
+  static wrapText = wrapText;
+}
+// ===== end CtUtil (ES module) =====
+return { downloadBlob, debounce, clamp, num, clampInt, escapeHtml, escapeAttr, persistState, onceFlag, el, prefersReducedMotion, restartAnimation, setupHiDPICanvas, posAt, slugify, wrapText, CtUtil };
+})();
+const { downloadBlob, debounce, clamp, num, clampInt, escapeHtml, escapeAttr, persistState, onceFlag, el, prefersReducedMotion, restartAnimation, setupHiDPICanvas, posAt, slugify, wrapText, CtUtil } = __ct_utils_CtUtil;
+
+/* ct:module components/CtClipboardUtil.mjs */
+const __ct_components_CtClipboardUtil = (() => {
+// ===== Begin CtClipboardUtil (ES module) =====
+/*
+ * CtClipboardUtil — copy-to-clipboard + button-flash helpers (ES module; was copy.js)
+ * ---------------------------------------------------------------------------
+ * import { copy, flash } from '<rel>/jbc-include/components/CtClipboardUtil.mjs';
+ * (or `CtClipboardUtil.copy` / `CtClipboardUtil.flash` via the aggregator class
+ * at the bottom — statics REFERENCE the named bindings, single implementation.)
+ *
+ * Formerly the pasteable IIFE copy.js exposing the jbcCopy / jbcFlash window globals;
+ * those globals are GONE. `copy` = ex-jbcCopy, `flash` = ex-jbcFlash — bodies
+ * unchanged. The `.ctc-flash` CSS still self-injects on the first `flash()` call
+ * (ensureStyles) and the `window.ctCopyStyles = false` opt-out is still honored.
+ *
+ * copy(text) -> Promise<boolean>
+ * flash(el, opts?) -> void
+ *
+ *     btn.addEventListener('click', async () => {
+ *       if (!text) return;
+ *       const ok = await copy(text);
+ *       if (!ok) return;
+ *       flash(btn, { label: '✅', revertTo: '📋' });
+ *     });
+ *
+ * copy(text):
+ * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
+ *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
+ *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
+ *   Clipboard API is unavailable or denied.
+ * - Always RESOLVES — never rejects/throws. Resolves `true` on success,
+ *   `false` if every copy path failed (denied permission, unsupported
+ *   browser, etc.) — callers check the boolean rather than try/catch.
+ *
+ * flash(el, opts?):
+ * - Transient "copied" feedback on a button: swaps `el.textContent` to
+ *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
+ *   reverts and clears the timer.
+ * - Revert target: `opts.revertTo` if given (for icon-only buttons that
+ *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
+ *   current text — captured once and reused if `flash` is called again on
+ *   the same element before the previous flash reverted (rapid re-clicks
+ *   don't lose the true original label).
+ * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
+ *   decorative scale pulse (see STYLING below) — no functional behavior
+ *   depends on it.
+ *
+ * STYLING:
+ * - The only visual injected is the optional `.ctc-flash` pulse animation,
+ *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
+ *   text swap + revert timing are unaffected either way).
+ * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
+ *   `flash` call and no styles are injected.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtClipboardUtil.mjs
+ */
+
+
+function copy(text) {
+  text = String(text == null ? '' : text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      function () { return true; },
+      function () { return fallbackCopy(text); }
+    );
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+var STYLE_ID = 'ctc-copy-style';
+function ensureStyles() {
+  if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = [
+    '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+    '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+    '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+    '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+var flashTimeouts = new WeakMap();
+function flash(el, opts) {
+  opts = opts || {};
+  var ms = opts.ms != null ? opts.ms : 1000;
+  var label = opts.label != null ? opts.label : '✅';
+
+  ensureStyles();
+  clearTimeout(flashTimeouts.get(el));
+
+  var original;
+  if (opts.revertTo != null) {
+    original = opts.revertTo;
+  } else if (el.dataset.ctcFlashOriginal != null) {
+    original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+  } else {
+    original = el.textContent;
+  }
+  el.dataset.ctcFlashOriginal = original;
+
+  el.textContent = label;
+  el.classList.remove('ctc-flash');
+  void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+  el.classList.add('ctc-flash');
+
+  var t = setTimeout(function () {
+    el.textContent = original;
+    el.classList.remove('ctc-flash');
+    delete el.dataset.ctcFlashOriginal;
+    flashTimeouts.delete(el);
+  }, ms);
+  flashTimeouts.set(el, t);
+}
+
+/** Aggregator (decision #3): statics REFERENCE the named exports above. */
+class CtClipboardUtil {
+  static copy = copy;
+  static flash = flash;
+}
+// ===== end CtClipboardUtil =====
+return { copy, flash, CtClipboardUtil };
+})();
+const { copy, flash, CtClipboardUtil } = __ct_components_CtClipboardUtil;
+
+/* ct:module components/CtConfirm.mjs */
+const __ct_components_CtConfirm = (() => {
+// ===== Begin CtConfirm (ES module) =====
+/*
+ * confirmDialog(message?) -> Promise<boolean>   (ES module; was the jbcConfirm window global)
+ * ---------------------------------------------------------------------------
+ * A tiny, dependency-free confirm dialog for single-file tools.
+ *
+ *     import { confirmDialog } from '<rel>/jbc-include/components/CtConfirm.mjs';
+ *     // (or `CtConfirm.confirm` via the aggregator class at the bottom — the
+ *     //  static REFERENCES the named binding, single implementation. The named
+ *     //  export is `confirmDialog`, NOT `confirm`, so it never shadows window.confirm.)
+ *
+ *     if (await confirmDialog('Remove this color?')) { ...do it... }
+ *
+ * - Returns a Promise<boolean>: true = confirmed, false = cancelled.
+ * - message is optional; null/empty/whitespace becomes "Are you sure?".
+ * - "Yes" is the highlighted default: Enter confirms. Esc / "Cancel" /
+ *   backdrop-click cancel. Focus is trapped and returned to the caller's
+ *   element on close. role="dialog", aria-modal, labelled by the message.
+ *
+ * STYLING — the component adapts to each tool's look:
+ * - It injects only structural CSS; every VISUAL choice reads from a CSS
+ *   variable with a theme-aware system-color fallback, so it looks right with
+ *   no theming AND matches your tool if you set a few variables anywhere in
+ *   scope (e.g. your :root / body theme block):
+ *     --ctc-accent, --ctc-accent-fg   (the "Yes" button)
+ *     --ctc-bg, --ctc-fg              (dialog surface + text)
+ *     --ctc-backdrop                  (overlay behind the dialog)
+ *     --ctc-radius, --ctc-btn-radius  (corner rounding)
+ *     --ctc-shadow, --ctc-font        (dialog shadow + font)
+ *     --ctc-cancel-border, --ctc-focus, --ctc-max-width
+ * - Full opt-out: set `window.ctConfirmStyles = false` BEFORE the first call
+ *   and NO styles are injected — your tool then supplies all `.ctc-*` CSS
+ *   (.ctc-overlay/.ctc-dialog/.ctc-message/.ctc-buttons/.ctc-btn/
+ *   .ctc-btn--cancel/.ctc-btn--yes).
+ *
+ * Formerly a pasteable IIFE script exposing the old `jbcConfirm` window global
+ * (vendored copies called it `ctConfirm`); those globals are GONE — `confirmDialog` =
+ * ex-jbcConfirm, body unchanged. The CSS still self-injects on the first call
+ * (ensureConfirmStyles) and the `window.ctConfirmStyles = false` opt-out is still honored.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtConfirm.mjs
+ */
+
+var CONFIRM_STYLE_ID = 'ctc-style';
+function ensureConfirmStyles() {
+  if (window.ctConfirmStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(CONFIRM_STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = CONFIRM_STYLE_ID;
+  style.textContent = [
+    '.ctc-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;',
+    'align-items:center;justify-content:center;padding:1rem;',
+    'color-scheme:light dark;background:var(--ctc-backdrop,rgba(0,0,0,0.5));}',
+    '.ctc-dialog{box-sizing:border-box;width:100%;',
+    'max-width:var(--ctc-max-width,22rem);padding:1.25rem 1.25rem 1rem;',
+    'background:var(--ctc-bg,Canvas);color:var(--ctc-fg,CanvasText);',
+    'border-radius:var(--ctc-radius,12px);',
+    'box-shadow:var(--ctc-shadow,0 10px 40px rgba(0,0,0,0.3));',
+    'font-family:var(--ctc-font,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);}',
+    '.ctc-message{margin:0 0 1.1rem;font-size:1rem;line-height:1.45;}',
+    '.ctc-buttons{display:flex;justify-content:flex-end;gap:0.6rem;}',
+    '.ctc-btn{box-sizing:border-box;min-height:44px;padding:0.5rem 1.1rem;',
+    'border-radius:var(--ctc-btn-radius,8px);font:inherit;font-weight:600;',
+    'cursor:pointer;border:1px solid transparent;}',
+    '.ctc-btn:focus-visible{outline:2px solid var(--ctc-focus,AccentColor);',
+    'outline-offset:2px;}',
+    '.ctc-btn--cancel{background:transparent;color:inherit;',
+    'border-color:var(--ctc-cancel-border,rgba(128,128,128,0.5));}',
+    '.ctc-btn--cancel:hover{background:rgba(128,128,128,0.15);}',
+    '.ctc-btn--yes{background:var(--ctc-accent,AccentColor);',
+    'color:var(--ctc-accent-fg,AccentColorText);}',
+    '.ctc-btn--yes:hover{filter:brightness(1.08);}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+function confirmDialog(message) {
+  ensureConfirmStyles();
+  var text = (message == null || String(message).trim() === '')
+    ? 'Are you sure?' : String(message);
+
+  return new Promise(function (resolve) {
+    var previouslyFocused = document.activeElement;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'ctc-overlay';
+
+    var dialog = document.createElement('div');
+    dialog.className = 'ctc-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+
+    var msgEl = document.createElement('p');
+    msgEl.className = 'ctc-message';
+    msgEl.textContent = text;
+    var msgId = 'ctc-msg-' + Math.random().toString(36).slice(2);
+    msgEl.id = msgId;
+    dialog.setAttribute('aria-labelledby', msgId);
+
+    var buttons = document.createElement('div');
+    buttons.className = 'ctc-buttons';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'ctc-btn ctc-btn--cancel';
+    cancelBtn.textContent = 'Cancel';
+
+    var yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'ctc-btn ctc-btn--yes';
+    yesBtn.textContent = 'Yes';
+
+    buttons.appendChild(cancelBtn);
+    buttons.appendChild(yesBtn);
+    dialog.appendChild(msgEl);
+    dialog.appendChild(buttons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    var done = false;
+    function close(result) {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKeydown, true);
+      overlay.remove();
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        try { previouslyFocused.focus(); } catch (e) { /* ignore */ }
+      }
+      resolve(result);
+    }
+
+    function onKeydown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        close(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        close(false);
+      } else if (e.key === 'Tab') {
+        // trap focus between the two buttons
+        e.preventDefault();
+        var order = [cancelBtn, yesBtn];
+        var idx = order.indexOf(document.activeElement);
+        var next = e.shiftKey ? idx - 1 : idx + 1;
+        if (next < 0) next = order.length - 1;
+        if (next >= order.length) next = 0;
+        order[next].focus();
+      }
+    }
+
+    document.addEventListener('keydown', onKeydown, true);
+    overlay.addEventListener('mousedown', function (e) {
+      if (e.target === overlay) close(false);
+    });
+    cancelBtn.addEventListener('click', function () { close(false); });
+    yesBtn.addEventListener('click', function () { close(true); });
+
+    yesBtn.focus(); // "Yes" is the default
+  });
+}
+
+/** Aggregator (decision #3): static REFERENCES the named export above. */
+class CtConfirm {
+  static confirm = confirmDialog;
+}
+// ===== end CtConfirm =====
+return { confirmDialog, CtConfirm };
+})();
+const { confirmDialog, CtConfirm } = __ct_components_CtConfirm;
+
+/* ct:module components/CtLicense.mjs */
+const __ct_components_CtLicense = (() => {
+/* CtLicense — shared License modal (components/CtLicense.mjs).
+   An ES module with a SIDE-EFFECT: importing it wires a global click listener
+   (once) that opens the modal on any [data-ct-license] trigger (the footer link in
+   components/footer.html). Every tool that carries the footer imports this module in its
+   app.mjs, so the footer link works for free; the footer no longer inlines a script.
+   Also callable as `openLicense()` / `CtLicense.open()` (there is no window global
+   any more). Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (e.g. a tool that bundles a wasm codec — a per-tool DATA config hook, read at
+   open time). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. Module-private names carry a "License"
+   qualifier so the build's import-flattening cannot collide with app.mjs top-levels. */
+var LICENSE_REPO = 'https://github.com/codercowboy/claude-tools';
+var LICENSE_REPO_LABEL = LICENSE_REPO.replace(/^https?:\/\//, '');
+var LICENSE_MIT_TEXT = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Jason and Claude (Anthropic)',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+
+var licenseOverlay, licenseDialog, licensePrevFocus, licenseStyleEl;
+
+function escapeLicenseHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function injectLicenseStyles() {
+  if (licenseStyleEl) return;
+  licenseStyleEl = document.createElement('style');
+  licenseStyleEl.textContent =
+    '.jbcl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+    '.jbcl-overlay[hidden]{display:none!important;}' +
+    '@media (prefers-reduced-motion:no-preference){.jbcl-overlay{animation:jbcl-fade .15s ease;}@keyframes jbcl-fade{from{opacity:0}to{opacity:1}}}' +
+    '.jbcl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+    '.jbcl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+    '.jbcl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+    '.jbcl-dialog a{color:LinkText;}' +
+    '.jbcl-lead{margin:0 0 .8rem;}' +
+    '.jbcl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+    '.jbcl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.jbcl-tp li{margin-bottom:.3rem;}' +
+    '.jbcl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+    '.jbcl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+    '.jbcl-close:hover{background:rgba(127,127,127,.18);}' +
+    '.jbcl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+  (document.head || document.documentElement).appendChild(licenseStyleEl);
+}
+
+function buildLicenseDialog() {
+  injectLicenseStyles();
+  licenseOverlay = document.createElement('div');
+  licenseOverlay.className = 'jbcl-overlay';
+  licenseOverlay.hidden = true;
+  licenseOverlay.setAttribute('data-testid', 'license-overlay');
+  licenseOverlay.innerHTML =
+    '<div class="jbcl-dialog" role="dialog" aria-modal="true" aria-labelledby="jbcl-title" data-testid="license-modal">' +
+      '<button type="button" class="jbcl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+      '<h2 id="jbcl-title">License</h2>' +
+      '<div class="jbcl-body"></div>' +
+    '</div>';
+  document.body.appendChild(licenseOverlay);
+  licenseDialog = licenseOverlay.querySelector('.jbcl-dialog');
+  licenseOverlay.querySelector('.jbcl-close').addEventListener('click', closeLicense);
+  licenseOverlay.addEventListener('mousedown', function (e) {
+    if (e.target === licenseOverlay) { e.preventDefault(); closeLicense(); }
+  });
+}
+
+function renderLicenseBody() {
+  var html =
+    '<p class="jbcl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+    '<a href="' + LICENSE_REPO + '" target="_blank" rel="noopener noreferrer">' + LICENSE_REPO_LABEL + '</a></p>' +
+    '<pre class="jbcl-text">' + escapeLicenseHtml(LICENSE_MIT_TEXT) + '</pre>';
+  var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+  if (tp.length) {
+    html += '<h3>Bundled third-party libraries</h3><ul class="jbcl-tp">';
+    tp.forEach(function (d) {
+      var label = escapeLicenseHtml(d.name || '') + (d.version ? ' ' + escapeLicenseHtml(d.version) : '');
+      var lic = d.license ? ' &mdash; ' + escapeLicenseHtml(d.license) : '';
+      var link = d.url ? ' &middot; <a href="' + escapeLicenseHtml(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+      html += '<li>' + label + lic + link + '</li>';
+    });
+    html += '</ul><p class="jbcl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+  } else {
+    html += '<p class="jbcl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+  }
+  licenseOverlay.querySelector('.jbcl-body').innerHTML = html;
+}
+
+function licenseFocusables() {
+  return Array.prototype.slice
+    .call(licenseDialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+    .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+}
+
+function onLicenseKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeLicense(); return; }
+  if (e.key !== 'Tab') return;
+  var f = licenseFocusables();
+  if (!f.length) return;
+  e.preventDefault();
+  var i = f.indexOf(document.activeElement);
+  var n = e.shiftKey ? i - 1 : i + 1;
+  if (n < 0) n = f.length - 1;
+  if (n >= f.length) n = 0;
+  f[n].focus();
+}
+
+function openLicense() {
+  if (!licenseOverlay) buildLicenseDialog();
+  renderLicenseBody();
+  licensePrevFocus = document.activeElement;
+  // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+  var host = document.fullscreenElement || document.body;
+  if (licenseOverlay.parentNode !== host) host.appendChild(licenseOverlay);
+  licenseOverlay.hidden = false;
+  document.addEventListener('keydown', onLicenseKey, true);
+  licenseDialog.scrollTop = 0;
+  licenseOverlay.querySelector('.jbcl-close').focus({ preventScroll: true });
+}
+
+function closeLicense() {
+  if (!licenseOverlay || licenseOverlay.hidden) return;
+  licenseOverlay.hidden = true;
+  document.removeEventListener('keydown', onLicenseKey, true);
+  if (licenseOverlay.parentNode !== document.body) document.body.appendChild(licenseOverlay);
+  if (licensePrevFocus && typeof licensePrevFocus.focus === 'function') { try { licensePrevFocus.focus(); } catch (e) {} }
+  licensePrevFocus = null;
+}
+
+var licenseTriggerWired = false;
+function wireLicenseTrigger() {
+  if (licenseTriggerWired || typeof document === 'undefined') return; // idempotent
+  licenseTriggerWired = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); openLicense(); }
+  });
+}
+wireLicenseTrigger(); // self-wire on module evaluation
+
+class CtLicense {
+  static open = openLicense;
+}
+return { openLicense, CtLicense };
+})();
+const { openLicense, CtLicense } = __ct_components_CtLicense;
+
+
+'use strict';
+
+/* ============================================================================
+ * Hand-rolled QR Code encoder (ISO/IEC 18004, Model 2), byte mode only.
+ * No external library. Implements: UTF-8 -> byte-mode segment -> pad ->
+ * Reed-Solomon ECC (GF(256)) -> interleave -> matrix (finders/timing/
+ * alignment/dark module/format+version info) -> zig-zag data placement ->
+ * masking (8 candidates, 4 penalty rules, pick lowest).
+ *
+ * Every table/formula below was cross-checked against ISO/IEC 18004 Annex
+ * tables (via Nayuki's MIT-licensed QR-Code-generator reference values and
+ * thonky.com's published tutorial tables) and round-trip verified with an
+ * independent jsQR decoder across all 40 versions x 4 EC levels before
+ * shipping. See PLAN.md for the full derivation.
+ * ==========================================================================*/
+
+// ===== BEGIN PURE-LOGIC (unit-tested by tests/unit/*.test.mjs via
+// tests/unit/extract-inline-module.mjs — see docs/conventions.md) =====
+
+// ---- 1a. Total codewords per version (data+EC combined; version-only, not
+// EC-level-dependent) ----
+const TOTAL_CODEWORDS = [
+  0, // unused index 0 (versions are 1-based)
+  26, 44, 70, 100, 134, 172, 196, 242, 292, 346,
+  404, 466, 532, 581, 655, 733, 815, 901, 991, 1085,
+  1156, 1258, 1364, 1474, 1588, 1706, 1828, 1921, 2051, 2185,
+  2323, 2465, 2611, 2761, 2876, 3034, 3196, 3362, 3532, 3706,
+];
+
+// ---- 1b. Remainder bits per version: after interleaving, this many extra
+// 0 bits are appended before module placement (some versions' bitstream
+// doesn't exactly fill a whole number of modules) ----
+const REMAINDER_BITS = [
+  0,
+  0, 7, 7, 7, 7, 7, 0, 0, 0, 0,
+  0, 0, 0, 3, 3, 3, 3, 3, 3, 3,
+  4, 4, 4, 4, 4, 4, 4, 3, 3, 3,
+  3, 3, 3, 3, 0, 0, 0, 0, 0, 0,
+];
+
+// ---- 1c. EC codewords-per-block and block counts, per version x EC level.
+// Source: Nayuki's QR-Code-generator (MIT) ECC_CODEWORDS_PER_BLOCK /
+// NUM_ERROR_CORRECTION_BLOCKS tables. Verified (see PLAN.md worker notes):
+// self-consistency across all 160 (version, level) rows against
+// TOTAL_CODEWORDS above, the version-1 spot-check row for all 4 levels, a
+// known thonky.com v5-Q row (18/2x15+2x16), and the two well-known
+// max-byte-capacity spot checks (V1-L=17 bytes, V40-H=1273 bytes) — all
+// matched exactly.
+const ECC_CODEWORDS_PER_BLOCK = {
+  L: [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+  M: [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+  Q: [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+  H: [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+};
+const NUM_EC_BLOCKS = {
+  L: [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
+  M: [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
+  Q: [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
+  H: [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81],
+};
+
+// Derives the block-splitting plan (group1 = "short" blocks, group2 =
+// "long" blocks, each with 1 extra data codeword) for a version+EC level.
+// This is the standard construction: total data codewords D split across
+// numBlocks blocks as evenly as possible; if D isn't a multiple of
+// numBlocks, the remainder blocks get one extra codeword and are placed
+// last (group 2).
+function getBlockPlan(version, ecLevel) {
+  const ecCodewordsPerBlock = ECC_CODEWORDS_PER_BLOCK[ecLevel][version];
+  const numBlocks = NUM_EC_BLOCKS[ecLevel][version];
+  const totalDataCodewords = TOTAL_CODEWORDS[version] - ecCodewordsPerBlock * numBlocks;
+  const shortLen = Math.floor(totalDataCodewords / numBlocks);
+  const numLongBlocks = totalDataCodewords % numBlocks;
+  const numShortBlocks = numBlocks - numLongBlocks;
+  return {
+    totalDataCodewords,
+    ecCodewordsPerBlock,
+    numBlocksGroup1: numShortBlocks,
+    dataCodewordsGroup1: shortLen,
+    numBlocksGroup2: numLongBlocks,
+    dataCodewordsGroup2: numLongBlocks > 0 ? shortLen + 1 : 0,
+  };
+}
+function getDataCodewordCount(version, ecLevel) {
+  return getBlockPlan(version, ecLevel).totalDataCodewords;
+}
+
+// ---- 1d. Alignment pattern center coordinates, computed algorithmically
+// (avoids hand-transcribing the ~39-row ISO Annex E table). Verified
+// against known-good vectors: v2 -> [6,18], v7 -> [6,22,38],
+// v23 -> [6,30,54,78,102], v32 -> [6,34,60,86,112,138] (the special-cased
+// step=26 version) — all confirmed against thonky.com's published table and
+// round-trip decode.
+function getAlignmentPatternPositions(version) {
+  if (version === 1) return [];
+  const numAlign = Math.floor(version / 7) + 2;
+  const step = (version === 32) ? 26 : Math.ceil((version * 4 + 4) / (numAlign * 2 - 2)) * 2;
+  const positions = [6];
+  const last = (4 * version) + 10; // = size - 7
+  for (let i = numAlign - 2; i >= 0; i--) positions.push(last - i * step);
+  return positions;
+}
+
+// ---- 2. UTF-8 + byte-mode segment + padding ----
+
+function utf8Bytes(str) {
+  return new TextEncoder().encode(str); // handles all Unicode incl. astral/emoji
+}
+
+// Byte-mode character-count-indicator length (ISO/IEC 18004 Table 3): 8
+// bits for v1-9, 16 bits for v10-40 (byte mode doesn't change again at v27
+// unlike numeric/alphanumeric/kanji).
+function charCountBits(version) {
+  return version <= 9 ? 8 : 16;
+}
+
+// Minimal MSB-first bit buffer.
+class BitWriter {
+  constructor() { this.bits = []; }
+  get bitLength() { return this.bits.length; }
+  writeBits(value, n) {
+    for (let i = n - 1; i >= 0; i--) this.bits.push((value >>> i) & 1);
+  }
+  toBytes() {
+    const out = new Uint8Array(this.bits.length / 8);
+    for (let i = 0; i < out.length; i++) {
+      let b = 0;
+      for (let j = 0; j < 8; j++) b = (b << 1) | this.bits[i * 8 + j];
+      out[i] = b;
+    }
+    return out;
+  }
+  toBitArray() { return this.bits.slice(); }
+}
+
+function buildByteModeSegmentBits(bytes, version) {
+  const bits = new BitWriter();
+  bits.writeBits(0b0100, 4); // mode indicator: byte mode
+  bits.writeBits(bytes.length, charCountBits(version));
+  for (const b of bytes) bits.writeBits(b, 8);
+  return bits;
+}
+
+// Appends terminator (up to 4 zero bits), pads to a byte boundary, then
+// pads with alternating 0xEC/0x11 codewords until the segment exactly fills
+// the version's data-codeword capacity.
+function padToCapacity(bits, dataCodewordCount) {
+  const capacityBits = dataCodewordCount * 8;
+  if (bits.bitLength > capacityBits) throw new Error('segment exceeds capacity');
+  const term = Math.min(4, capacityBits - bits.bitLength);
+  bits.writeBits(0, term);
+  const padBits = (8 - (bits.bitLength % 8)) % 8;
+  bits.writeBits(0, padBits);
+  let padByte = 0xEC;
+  while (bits.bitLength < capacityBits) {
+    bits.writeBits(padByte, 8);
+    padByte = padByte === 0xEC ? 0x11 : 0xEC;
+  }
+  return bits;
+}
+
+// Picks the smallest version (1..40) whose data-codeword capacity fits the
+// byte-mode segment at the given EC level. Terminator/padding only ever
+// consume slack up to the byte-aligned capacity, so this bit-length check
+// alone (without simulating terminator/padding) is sufficient.
+function selectVersion(byteLength, ecLevel) {
+  for (let version = 1; version <= 40; version++) {
+    const dataCodewordCount = getDataCodewordCount(version, ecLevel);
+    const headerBits = 4 + charCountBits(version);
+    const neededBits = headerBits + byteLength * 8;
+    if (neededBits <= dataCodewordCount * 8) return version;
+  }
+  return null; // exceeds V40 capacity at this EC level
+}
+
+// ---- 3. Reed-Solomon error correction over GF(256) ----
+// Primitive polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11D), primitive element 2.
+
+const GF_EXP = new Uint8Array(512); // double-length so gfMul can index without a modulo
+const GF_LOG = new Uint8Array(256);
+(function initGF() {
+  let x = 1;
+  for (let i = 0; i < 255; i++) {
+    GF_EXP[i] = x;
+    GF_LOG[x] = i;
+    x <<= 1;
+    if (x & 0x100) x ^= 0x11D;
+  }
+  for (let i = 255; i < 512; i++) GF_EXP[i] = GF_EXP[i - 255];
+})();
+
+function gfMul(a, b) {
+  if (a === 0 || b === 0) return 0;
+  return GF_EXP[GF_LOG[a] + GF_LOG[b]];
+}
+
+const genPolyCache = new Map();
+function rsGeneratorPoly(n) {
+  if (genPolyCache.has(n)) return genPolyCache.get(n);
+  let poly = [1]; // coefficients, highest degree first
+  for (let i = 0; i < n; i++) {
+    const next = new Array(poly.length + 1).fill(0);
+    for (let j = 0; j < poly.length; j++) {
+      next[j] ^= poly[j];
+      next[j + 1] ^= gfMul(poly[j], GF_EXP[i]);
+    }
+    poly = next;
+  }
+  genPolyCache.set(n, poly);
+  return poly;
+}
+
+// Polynomial long division via LFSR: returns the ecCount-byte remainder,
+// i.e. the error-correction codewords for one data block.
+function rsComputeRemainder(dataCodewords, ecCount) {
+  const gen = rsGeneratorPoly(ecCount);
+  const result = new Uint8Array(dataCodewords.length + ecCount);
+  result.set(dataCodewords);
+  for (let i = 0; i < dataCodewords.length; i++) {
+    const coef = result[i];
+    if (coef === 0) continue;
+    for (let j = 0; j < gen.length; j++) result[i + j] ^= gfMul(gen[j], coef);
+  }
+  return result.slice(dataCodewords.length);
+}
+
+// ---- 4. Block splitting + interleaving ----
+
+function splitIntoBlocks(dataCodewords, plan) {
+  const blocks = [];
+  let offset = 0;
+  for (let i = 0; i < plan.numBlocksGroup1; i++) {
+    blocks.push(dataCodewords.slice(offset, offset + plan.dataCodewordsGroup1));
+    offset += plan.dataCodewordsGroup1;
+  }
+  for (let i = 0; i < plan.numBlocksGroup2; i++) {
+    blocks.push(dataCodewords.slice(offset, offset + plan.dataCodewordsGroup2));
+    offset += plan.dataCodewordsGroup2;
+  }
+  return blocks;
+}
+
+// Interleaves data codewords by index across blocks, then EC codewords by
+// index across blocks (blocks that run out simply stop contributing).
+function interleave(blocks) {
+  const out = [];
+  const maxData = Math.max(...blocks.map((b) => b.data.length));
+  for (let i = 0; i < maxData; i++) {
+    for (const b of blocks) if (i < b.data.length) out.push(b.data[i]);
+  }
+  const maxEc = Math.max(...blocks.map((b) => b.ec.length));
+  for (let i = 0; i < maxEc; i++) {
+    for (const b of blocks) if (i < b.ec.length) out.push(b.ec[i]);
+  }
+  return out;
+}
+
+function bytesToBits(bytes) {
+  const bits = [];
+  for (const b of bytes) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  return bits;
+}
+
+// ---- 5. Matrix construction ----
+
+// Builds every function pattern (finders + separators, timing, alignment,
+// dark module) and reserves the format-info/version-info areas, tracked in
+// a parallel isFunction grid so data placement (§6) knows what to skip.
+function buildFunctionPatterns(size, version) {
+  const modules = Array.from({ length: size }, () => new Array(size).fill(false));
+  const isFunction = Array.from({ length: size }, () => new Array(size).fill(false));
+
+  function setF(r, c, dark) {
+    if (r < 0 || r >= size || c < 0 || c >= size) return;
+    modules[r][c] = dark;
+    isFunction[r][c] = true;
+  }
+
+  // Finder pattern (7x7, dark border ring + dark 3x3 center) plus its
+  // 1-module light separator ring. Looping dr/dc over -1..7 and clipping
+  // out-of-bounds cells naturally produces the correct 8x8 footprint at
+  // every one of the three matrix corners (the off-matrix side of each
+  // corner's separator ring is simply clipped away).
+  function placeFinder(topR, topC) {
+    for (let dr = -1; dr <= 7; dr++) {
+      for (let dc = -1; dc <= 7; dc++) {
+        const r = topR + dr, c = topC + dc;
+        let dark;
+        if (dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6) {
+          dark = (dr === 0 || dr === 6 || dc === 0 || dc === 6) || (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4);
+        } else {
+          dark = false; // separator: always light
+        }
+        setF(r, c, dark);
+      }
+    }
+  }
+  placeFinder(0, 0);
+  placeFinder(0, size - 7);
+  placeFinder(size - 7, 0);
+
+  // Timing patterns: row 6 / column 6, alternating dark/light starting dark,
+  // spanning the gap between the finder+separator footprints.
+  for (let i = 8; i <= size - 9; i++) {
+    const dark = i % 2 === 0;
+    setF(6, i, dark);
+    setF(i, 6, dark);
+  }
+
+  // Alignment patterns: 5x5 (dark ring at distance 2, light ring at
+  // distance 1, dark center), skipping any center that overlaps a finder's
+  // 8x8 footprint. Placed after timing so alignment correctly overrides the
+  // timing track where the two overlap (matches the spec).
+  const aligns = getAlignmentPatternPositions(version);
+  for (const row of aligns) {
+    for (const col of aligns) {
+      if (row <= 7 && col <= 7) continue; // top-left finder
+      if (row <= 7 && col >= size - 8) continue; // top-right finder
+      if (row >= size - 8 && col <= 7) continue; // bottom-left finder
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          const d = Math.max(Math.abs(dr), Math.abs(dc));
+          setF(row + dr, col + dc, d !== 1);
+        }
+      }
+    }
+  }
+
+  // Dark module: always dark, fixed position, independent of mask/format.
+  setF(4 * version + 9, 8, true);
+
+  // Reserve format-info areas (15 bits, written twice) — value doesn't
+  // matter yet, just excluded from data placement; real bits are written
+  // per-candidate-mask in writeFormatInfo().
+  for (let i = 0; i <= 5; i++) setF(8, i, false);
+  setF(8, 7, false);
+  setF(8, 8, false);
+  setF(7, 8, false);
+  for (let i = 0; i <= 5; i++) setF(i, 8, false);
+  for (let i = size - 8; i <= size - 1; i++) setF(8, i, false);
+  for (let i = size - 7; i <= size - 1; i++) setF(i, 8, false);
+
+  // Reserve version-info areas (18 bits, two 3x6 blocks), versions >= 7 only.
+  if (version >= 7) {
+    for (let r = size - 11; r <= size - 9; r++) for (let c = 0; c <= 5; c++) setF(r, c, false);
+    for (let r = 0; r <= 5; r++) for (let c = size - 11; c <= size - 9; c++) setF(r, c, false);
+  }
+
+  return { modules, isFunction };
+}
+
+// Places the final bitstream into every non-function module, walking the
+// standard upward/downward 2-column zig-zag from the bottom-right corner,
+// skipping the timing column (6) entirely.
+function placeData(modules, isFunction, bits, size) {
+  let bitIndex = 0;
+  let upward = true;
+  for (let right = size - 1; right >= 1; right -= 2) {
+    if (right === 6) right = 5;
+    for (let vert = 0; vert < size; vert++) {
+      const row = upward ? size - 1 - vert : vert;
+      for (let j = 0; j < 2; j++) {
+        const col = right - j;
+        if (isFunction[row][col]) continue;
+        const bit = bitIndex < bits.length ? bits[bitIndex] : 0;
+        modules[row][col] = !!bit;
+        bitIndex++;
+      }
+    }
+    upward = !upward;
+  }
+  return bitIndex;
+}
+
+// ---- 6. Masking ----
+
+const MASK_FNS = [
+  (r, c) => (r + c) % 2 === 0,
+  (r, c) => r % 2 === 0,
+  (r, c) => c % 3 === 0,
+  (r, c) => (r + c) % 3 === 0,
+  (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+  (r, c) => ((r * c) % 2) + ((r * c) % 3) === 0,
+  (r, c) => (((r * c) % 2) + ((r * c) % 3)) % 2 === 0,
+  (r, c) => (((r + c) % 2) + ((r * c) % 3)) % 2 === 0,
+];
+
+function applyMask(rawModules, isFunction, maskIndex, size) {
+  const maskFn = MASK_FNS[maskIndex];
+  const out = rawModules.map((row) => row.slice());
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (isFunction[r][c]) continue;
+      if (maskFn(r, c)) out[r][c] = !out[r][c];
+    }
+  }
+  return out;
+}
+
+// 4 penalty rules (ISO/IEC 18004 §7.8.3). Lower total is better.
+function scorePenalty(modules, size) {
+  let penalty = 0;
+
+  // Rule 1: runs of 5+ same-color modules, per row then per column.
+  function runPenalty(getVal) {
+    let total = 0;
+    for (let i = 0; i < size; i++) {
+      let runLen = 1;
+      let prev = getVal(i, 0);
+      for (let j = 1; j < size; j++) {
+        const v = getVal(i, j);
+        if (v === prev) {
+          runLen++;
+        } else {
+          if (runLen >= 5) total += 3 + (runLen - 5);
+          runLen = 1;
+          prev = v;
+        }
+      }
+      if (runLen >= 5) total += 3 + (runLen - 5);
+    }
+    return total;
+  }
+  penalty += runPenalty((i, j) => modules[i][j]); // rows
+  penalty += runPenalty((i, j) => modules[j][i]); // columns
+
+  // Rule 2: every 2x2 block of same-color modules (overlapping blocks each
+  // count separately).
+  for (let r = 0; r < size - 1; r++) {
+    for (let c = 0; c < size - 1; c++) {
+      const v = modules[r][c];
+      if (v === modules[r][c + 1] && v === modules[r + 1][c] && v === modules[r + 1][c + 1]) penalty += 3;
+    }
+  }
+
+  // Rule 3: finder-like 1:1:3:1:1 patterns (1011101) with 4 light modules
+  // on one side (0000 1011101 or 1011101 0000), scanned as an 11-wide
+  // sliding window per row/column. Out-of-bounds treated as light.
+  const patternDarkFirst = [true, false, true, true, true, false, true, false, false, false, false];
+  const patternLightFirst = [false, false, false, false, true, false, true, true, true, false, true];
+  function getRow(r, c) { return c < 0 || c >= size ? false : modules[r][c]; }
+  function getCol(c, r) { return r < 0 || r >= size ? false : modules[r][c]; }
+  function matches(getFn, fixed, start, pattern) {
+    for (let k = 0; k < 11; k++) if (getFn(fixed, start + k) !== pattern[k]) return false;
+    return true;
+  }
+  for (let r = 0; r < size; r++) {
+    for (let start = -4; start <= size - 7; start++) {
+      if (matches(getRow, r, start, patternDarkFirst)) penalty += 40;
+      if (matches(getRow, r, start, patternLightFirst)) penalty += 40;
+    }
+  }
+  for (let c = 0; c < size; c++) {
+    for (let start = -4; start <= size - 7; start++) {
+      if (matches(getCol, c, start, patternDarkFirst)) penalty += 40;
+      if (matches(getCol, c, start, patternLightFirst)) penalty += 40;
+    }
+  }
+
+  // Rule 4: proportion of dark modules, penalized the further it strays
+  // from 50%.
+  let dark = 0;
+  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (modules[r][c]) dark++;
+  const percent = (dark * 100) / (size * size);
+  const prevMultipleOf5 = Math.floor(percent / 5) * 5;
+  const a = Math.abs(prevMultipleOf5 - 50) / 5;
+  const b = Math.abs(prevMultipleOf5 + 5 - 50) / 5;
+  penalty += Math.min(a, b) * 10;
+
+  return penalty;
+}
+
+// ---- 7. Format info / version info (BCH codes) ----
+// Both verified byte-for-byte against the published ISO/IEC 18004 Annex C/D
+// reference tables (all 32 format strings, all 34 version strings, v7-40).
+
+const EC_LEVEL_BITS = { L: 0b01, M: 0b00, Q: 0b11, H: 0b10 }; // fixed spec mapping, not alphabetical
+
+function computeFormatBits(ecLevel, maskIndex) {
+  const data = (EC_LEVEL_BITS[ecLevel] << 3) | maskIndex; // 5 bits
+  let rem = data << 10;
+  const GEN = 0b10100110111; // degree-10 generator polynomial
+  for (let i = 4; i >= 0; i--) if ((rem >> (10 + i)) & 1) rem ^= GEN << i;
+  const bch = (data << 10) | (rem & 0x3ff);
+  return bch ^ 0b101010000010010; // fixed XOR mask
+}
+
+function computeVersionBits(version) {
+  let rem = version << 12;
+  const GEN = 0b1111100100101; // degree-12 generator polynomial
+  for (let i = 5; i >= 0; i--) if ((rem >> (12 + i)) & 1) rem ^= GEN << i;
+  return (version << 12) | (rem & 0xfff);
+}
+
+// Writes the 15-bit format info twice, in the two standard L-shaped
+// locations flanking the finders.
+function writeFormatInfo(modules, ecLevel, maskIndex, size) {
+  const bits15 = computeFormatBits(ecLevel, maskIndex);
+  const bitAt = (k) => (bits15 >> k) & 1; // k: 14 (MSB) down to 0
+
+  // Copy A: row 8 cols 0-5, then (8,7), (8,8), (7,8), then col 8 rows 5-0.
+  const copyACoords = [];
+  for (let c = 0; c <= 5; c++) copyACoords.push([8, c]);
+  copyACoords.push([8, 7]);
+  copyACoords.push([8, 8]);
+  copyACoords.push([7, 8]);
+  for (let r = 5; r >= 0; r--) copyACoords.push([r, 8]);
+  for (let idx = 0; idx < 15; idx++) {
+    const [r, c] = copyACoords[idx];
+    modules[r][c] = !!bitAt(14 - idx);
+  }
+
+  // Copy B: bits 14->7 along row 8, cols size-1 down to size-8 (right to
+  // left); bits 6->0 down column 8, rows size-7 to size-1 (top to bottom).
+  let idx2 = 0;
+  for (let c = size - 1; c >= size - 8; c--) {
+    modules[8][c] = !!bitAt(14 - idx2);
+    idx2++;
+  }
+  for (let r = size - 7; r <= size - 1; r++) {
+    modules[r][8] = !!bitAt(14 - idx2);
+    idx2++;
+  }
+}
+
+// Writes the 18-bit version info into both reserved 3x6 blocks
+// (versions >= 7 only). Bit k (0=LSB..17=MSB) maps to (row=k%3, col=k/3)
+// in the bottom-left block, and the transpose in the top-right block.
+function writeVersionInfo(modules, version, size) {
+  if (version < 7) return;
+  const bits18 = computeVersionBits(version);
+  const bitAt = (k) => (bits18 >> k) & 1;
+  for (let k = 0; k < 18; k++) {
+    const row = k % 3;
+    const col = Math.floor(k / 3);
+    modules[size - 11 + row][col] = !!bitAt(k);
+  }
+  for (let k = 0; k < 18; k++) {
+    const row = Math.floor(k / 3);
+    const col = k % 3;
+    modules[row][size - 11 + col] = !!bitAt(k);
+  }
+}
+
+// Tries all 8 masks (writing format+version info into each candidate before
+// scoring, per spec), returns the lowest-penalty one. Ties keep the lowest
+// mask index (scan order + strict `<`).
+function selectBestMask(rawModules, isFunction, size, version, ecLevel) {
+  let best = null;
+  for (let m = 0; m < 8; m++) {
+    const candidate = applyMask(rawModules, isFunction, m, size);
+    writeFormatInfo(candidate, ecLevel, m, size);
+    if (version >= 7) writeVersionInfo(candidate, version, size);
+    const penalty = scorePenalty(candidate, size);
+    if (best === null || penalty < best.penalty) best = { mask: m, modules: candidate, penalty };
+  }
+  return { mask: best.mask, modules: best.modules };
+}
+
+// ---- 8. Public pure API ----
+//
+// encodeToMatrix(text, ecLevel) -> { version, mask, size, modules }
+// modules: boolean[][], true = dark. Pure — no DOM access, safe to call
+// from tests. Auto-picks the smallest version that fits; throws a clear
+// Error for empty input or input exceeding V40 capacity.
+function encodeToMatrix(text, ecLevel = 'H') {
+  if (!['L', 'M', 'Q', 'H'].includes(ecLevel)) throw new Error('invalid ecLevel: ' + ecLevel);
+  const bytes = utf8Bytes(text ?? '');
+  if (bytes.length === 0) throw new Error('empty input');
+  const version = selectVersion(bytes.length, ecLevel);
+  if (version === null) {
+    throw new Error(`Input too large for a QR code at EC level ${ecLevel} (exceeds version 40 capacity).`);
+  }
+
+  const segmentBits = buildByteModeSegmentBits(bytes, version);
+  const dataCodewordCount = getDataCodewordCount(version, ecLevel);
+  padToCapacity(segmentBits, dataCodewordCount);
+  const dataCodewords = segmentBits.toBytes(); // exactly dataCodewordCount bytes
+
+  const blockPlan = getBlockPlan(version, ecLevel);
+  const blocks = splitIntoBlocks(dataCodewords, blockPlan).map((block) => ({
+    data: block,
+    ec: rsComputeRemainder(block, blockPlan.ecCodewordsPerBlock),
+  }));
+  const interleaved = interleave(blocks);
+  const finalBits = bytesToBits(interleaved).concat(new Array(REMAINDER_BITS[version]).fill(0));
+
+  const size = 17 + 4 * version;
+  const { modules: rawModules, isFunction } = buildFunctionPatterns(size, version);
+  const consumed = placeData(rawModules, isFunction, finalBits, size);
+  if (consumed !== finalBits.length) {
+    // Structural invariant — should never happen if the tables above are
+    // correct; surfaced loudly rather than silently producing a bad matrix.
+    throw new Error(`internal error: placed ${consumed} bits, expected ${finalBits.length}`);
+  }
+
+  const { mask, modules } = selectBestMask(rawModules, isFunction, size, version, ecLevel);
+  return { version, mask, size, modules };
+}
+
+export {
+  encodeToMatrix,
+  utf8Bytes,
+  charCountBits,
+  selectVersion,
+  getDataCodewordCount,
+  getBlockPlan,
+  getAlignmentPatternPositions,
+  buildByteModeSegmentBits,
+  padToCapacity,
+  BitWriter,
+  gfMul,
+  rsGeneratorPoly,
+  rsComputeRemainder,
+  splitIntoBlocks,
+  interleave,
+  bytesToBits,
+  buildFunctionPatterns,
+  placeData,
+  applyMask,
+  computeFormatBits,
+  computeVersionBits,
+  writeFormatInfo,
+  writeVersionInfo,
+  selectBestMask,
+  MASK_FNS,
+  scorePenalty,
+  TOTAL_CODEWORDS,
+  REMAINDER_BITS,
+  ECC_CODEWORDS_PER_BLOCK,
+  NUM_EC_BLOCKS,
+};
+// ===== END PURE-LOGIC =====
+
+/* ============================================================================
+ * Rendering: canvas, SVG, downloads
+ * ==========================================================================*/
+
+function renderToCanvas(canvas, matrixResult, options) {
+  const { size, modules } = matrixResult;
+  const { scale = 8, quietZone = 4, fg = '#000000', bg = '#ffffff' } = options || {};
+  const total = size + quietZone * 2;
+  canvas.width = total * scale;
+  canvas.height = total * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = fg;
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (modules[r][c]) ctx.fillRect((c + quietZone) * scale, (r + quietZone) * scale, scale, scale);
+    }
+  }
+}
+
+// Repo/attribution constants shared by the PNG tEXt chunks (below) and the
+// SVG metadata block, so both export paths agree on the exact same strings.
+const TOOL_AUTHOR = 'claude tools';
+const TOOL_REPO_URL = 'https://github.com/codercowboy/claude-tools';
+const TOOL_SOFTWARE = 'claude-tools qr-generator';
+
+// Embeds attribution metadata in the exported SVG: a leading XML comment
+// (visible to anyone who opens the file as text) plus a Dublin-Core
+// <metadata> block (machine-readable, standard SVG/XML practice) — same
+// author + repo URL as the PNG's tEXt chunks. Purely additive markup; the
+// visible <rect>/<path> geometry is unchanged, so the code stays crisp and
+// scannable.
+function toSVGString(matrixResult, options) {
+  const { size, modules } = matrixResult;
+  const { quietZone = 4, fg = '#000000', bg = '#ffffff' } = options || {};
+  const total = size + quietZone * 2;
+  let path = '';
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (modules[r][c]) path += `M${c + quietZone},${r + quietZone}h1v1h-1z`;
+    }
+  }
+  const comment = `<!-- Generated by ${TOOL_SOFTWARE} — ${TOOL_REPO_URL} -->`;
+  const metadata =
+    `<metadata><dc:creator>${TOOL_AUTHOR}</dc:creator><dc:source>${TOOL_REPO_URL}</dc:source></metadata>`;
+  return (
+    comment +
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:dc="http://purl.org/dc/elements/1.1/" viewBox="0 0 ${total} ${total}" width="${total * 8}" height="${total * 8}" shape-rendering="crispEdges">` +
+    metadata +
+    `<rect width="${total}" height="${total}" fill="${bg}"/>` +
+    `<path d="${path}" fill="${fg}"/>` +
+    `</svg>`
+  );
+}
+
+/* ----------------------------------------------------------------------
+ * Hand-rolled PNG tEXt-chunk injector (no library).
+ *
+ * canvas.toDataURL('image/png')/toBlob() produce a PNG with no custom
+ * metadata — there's no browser API to add ancillary chunks. This parses
+ * the PNG chunk stream (8-byte signature, then a sequence of
+ * length(4 BE) + type(4 ASCII) + data(length) + CRC-32(4) chunks per the
+ * PNG spec / ISO/IEC 15948) and inserts new tEXt chunks just before IEND.
+ * Every other chunk — including IHDR and all IDAT (pixel) data — is copied
+ * through byte-for-byte and never touched, so the rendered QR code's pixels
+ * (and therefore its decodability) are completely unaffected; only chunk
+ * framing is added.
+ * ------------------------------------------------------------------- */
+
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+// Standard CRC-32 (ISO 3309 / ITU-T V.42), the exact algorithm the PNG spec
+// requires for each chunk's trailing CRC. Shared impl: jbc-include/crc32.js,
+// the crc32 export of the CtByteUtil module inlined ahead of this one.
+
+// Builds one complete chunk (length + 4-char type + data + CRC) as bytes.
+function buildPngChunk(type, data) {
+  const out = new Uint8Array(12 + data.length);
+  const view = new DataView(out.buffer);
+  view.setUint32(0, data.length, false);
+  for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+  out.set(data, 8);
+  view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)), false);
+  return out;
+}
+
+// tEXt chunk data = keyword (Latin-1, 1-79 chars) + 0x00 separator + text
+// (Latin-1, uncompressed). Keywords/text used by this tool are known-good
+// ASCII, so no further Latin-1 validation/escaping is needed here.
+function buildTextChunk(keyword, text) {
+  const data = new Uint8Array(keyword.length + 1 + text.length);
+  for (let i = 0; i < keyword.length; i++) data[i] = keyword.charCodeAt(i) & 0xff;
+  data[keyword.length] = 0x00;
+  for (let i = 0; i < text.length; i++) data[keyword.length + 1 + i] = text.charCodeAt(i) & 0xff;
+  return buildPngChunk('tEXt', data);
+}
+
+// Walks the chunk stream into { type, bytes } entries (bytes = the chunk's
+// full length+type+data+crc span), so chunks can be reassembled verbatim.
+function parsePngChunks(bytes) {
+  for (let i = 0; i < 8; i++) {
+    if (bytes[i] !== PNG_SIGNATURE[i]) throw new Error('not a PNG (bad signature)');
+  }
+  const chunks = [];
+  let offset = 8;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  while (offset < bytes.length) {
+    const length = view.getUint32(offset, false);
+    const type = String.fromCharCode(
+      bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7],
+    );
+    const chunkEnd = offset + 12 + length;
+    chunks.push({ type, bytes: bytes.subarray(offset, chunkEnd) });
+    offset = chunkEnd;
+  }
+  return chunks;
+}
+
+// Returns a new PNG byte stream with tEXt chunks for each { keyword, text }
+// entry inserted immediately before IEND. Throws if `pngBytes` doesn't look
+// like a PNG or has no IEND — callers should catch and fall back to the
+// original, unmodified bytes.
+function injectPngTextChunks(pngBytes, entries) {
+  const chunks = parsePngChunks(pngBytes);
+  const iendIndex = chunks.findIndex((c) => c.type === 'IEND');
+  if (iendIndex === -1) throw new Error('no IEND chunk found');
+  const textChunks = entries.map(({ keyword, text }) => buildTextChunk(keyword, text));
+  const totalLength =
+    8 +
+    chunks.reduce((sum, c) => sum + c.bytes.length, 0) +
+    textChunks.reduce((sum, c) => sum + c.length, 0);
+  const out = new Uint8Array(totalLength);
+  out.set(PNG_SIGNATURE, 0);
+  let pos = 8;
+  for (let i = 0; i < iendIndex; i++) {
+    out.set(chunks[i].bytes, pos);
+    pos += chunks[i].bytes.length;
+  }
+  for (const tc of textChunks) {
+    out.set(tc, pos);
+    pos += tc.length;
+  }
+  out.set(chunks[iendIndex].bytes, pos);
+  return out;
+}
+
+function dataUrlToBytes(dataUrl) {
+  const binary = atob(dataUrl.split(',')[1]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// The metadata embedded in every downloaded PNG (Author + repo URL, plus a
+// Software tag) — same attribution as the SVG export's <metadata> block.
+const PNG_METADATA_ENTRIES = [
+  { keyword: 'Author', text: TOOL_AUTHOR },
+  { keyword: 'Source', text: TOOL_REPO_URL },
+  { keyword: 'Software', text: TOOL_SOFTWARE },
+];
+
+// Takes a canvas's plain `toDataURL('image/png')` data URL and returns a
+// same-content PNG data URL with the tEXt metadata chunks injected. Never
+// throws: any failure anywhere in the injection falls back to returning the
+// original, unmodified data URL, so a download can never break because of
+// this best-effort enhancement.
+function addPngMetadata(dataUrl) {
+  try {
+    const bytes = dataUrlToBytes(dataUrl);
+    const withMetadata = injectPngTextChunks(bytes, PNG_METADATA_ENTRIES);
+    let binary = '';
+    for (let i = 0; i < withMetadata.length; i++) binary += String.fromCharCode(withMetadata[i]);
+    return 'data:image/png;base64,' + btoa(binary);
+  } catch (err) {
+    return dataUrl;
+  }
+}
+
+/* ============================================================================
+ * Contrast check (WCAG relative luminance / contrast ratio)
+ * ==========================================================================*/
+
+function hexToRgb(hex) {
+  const clean = hex.replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((ch) => ch + ch).join('') : clean;
+  const n = parseInt(full, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+function relLuminance(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const chan = (v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
+}
+function contrastRatio(hex1, hex2) {
+  const l1 = relLuminance(hex1);
+  const l2 = relLuminance(hex2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/* ============================================================================
+ * UI wiring
+ * ==========================================================================*/
+
+const inputEl = document.getElementById('qr-input');
+const ecLevelEl = document.getElementById('ec-level-select');
+const scaleEl = document.getElementById('scale-input');
+const quietZoneEl = document.getElementById('quiet-zone-input');
+const fgEl = document.getElementById('fg-color-input');
+const bgEl = document.getElementById('bg-color-input');
+const canvasEl = document.getElementById('qr-canvas');
+const captionEl = document.getElementById('qr-caption');
+const capacityHintEl = document.getElementById('capacity-hint');
+const errorEl = document.getElementById('error-message');
+const contrastWarningEl = document.getElementById('contrast-warning');
+const downloadPngBtn = document.getElementById('download-png-btn');
+const downloadSvgBtn = document.getElementById('download-svg-btn');
+const copyInputBtn = document.querySelector('[data-testid="qr-input-copy"]');
+const helpButtonEl = document.getElementById('help-button');
+const helpOverlayEl = document.querySelector('[data-testid="help-overlay"]');
+const helpDialogEl = document.querySelector('[data-testid="help-modal"]');
+const helpCloseXEl = document.querySelector('[data-testid="help-modal"] [data-testid="modal-close-x"]');
+
+let currentMatrix = null;
+
+/* ============================================================================
+ * Persistence: UI state (input + options) survives a reload via localStorage.
+ * Namespaced, versioned key; best-effort — every read/write is wrapped in
+ * try/catch and degrades silently, so the tool works fully with no stored
+ * state (localStorage can be unavailable under file://, private mode, quota,
+ * or browser policy). The rendered QR/canvas/matrix is DERIVED and is never
+ * persisted — it's recomputed from the restored input+options on load.
+ * ==========================================================================*/
+
+const STORAGE_KEY = 'qr-generator:v1';
+const HELP_SEEN_KEY = 'qr-generator:help-seen:v1';
+
+function saveState() {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        input: inputEl.value,
+        ecLevel: ecLevelEl.value,
+        scale: scaleEl.value,
+        quietZone: quietZoneEl.value,
+        fg: fgEl.value,
+        bg: bgEl.value,
+      }),
+    );
+  } catch (err) {
+    // Best-effort: localStorage unavailable (file://, private mode, quota,
+    // browser policy). Degrade silently to in-memory only.
+  }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+// Applies stored state onto the live form fields, validating each field
+// independently and falling back to the field's current markup default
+// whenever a stored value is missing or malformed. Never touches the
+// canvas/matrix (derived — re-rendered separately by the caller).
+function applyStoredState() {
+  const stored = loadState();
+  if (!stored) return;
+  if (typeof stored.input === 'string') inputEl.value = stored.input;
+  if (typeof stored.ecLevel === 'string' && ['L', 'M', 'Q', 'H'].includes(stored.ecLevel)) {
+    ecLevelEl.value = stored.ecLevel;
+  }
+  if (typeof stored.scale === 'string' || typeof stored.scale === 'number') {
+    scaleEl.value = String(stored.scale);
+  }
+  if (typeof stored.quietZone === 'string' || typeof stored.quietZone === 'number') {
+    quietZoneEl.value = String(stored.quietZone);
+  }
+  if (typeof stored.fg === 'string' && /^#[0-9a-fA-F]{6}$/.test(stored.fg)) fgEl.value = stored.fg;
+  if (typeof stored.bg === 'string' && /^#[0-9a-fA-F]{6}$/.test(stored.bg)) bgEl.value = stored.bg;
+}
+
+// Whether the visitor has already dismissed the Help modal at least once.
+// If localStorage throws/is unavailable, treat it as already-seen so we
+// don't nag on every load — the least-annoying safe fallback (the ?
+// button is always there if they want the modal later).
+function hasSeenHelp() {
+  try {
+    return localStorage.getItem(HELP_SEEN_KEY) === '1';
+  } catch (err) {
+    return true;
+  }
+}
+
+function markHelpSeen() {
+  try {
+    localStorage.setItem(HELP_SEEN_KEY, '1');
+  } catch (err) {
+    // Best-effort, same as saveState().
+  }
+}
+
+function truncate(str, n) {
+  return str.length > n ? str.slice(0, n - 1) + '…' : str;
+}
+
+function currentOptions() {
+  return {
+    scale: Math.max(1, Math.min(40, parseInt(scaleEl.value, 10) || 8)),
+    quietZone: Math.max(0, Math.min(20, parseInt(quietZoneEl.value, 10) || 0)),
+    fg: fgEl.value || '#000000',
+    bg: bgEl.value || '#ffffff',
+  };
+}
+
+function showError(message) {
+  errorEl.textContent = message;
+  errorEl.classList.add('visible');
+}
+function clearError() {
+  errorEl.textContent = '';
+  errorEl.classList.remove('visible');
+}
+
+function clearCanvas() {
+  canvasEl.classList.add('hidden');
+  const ctx = canvasEl.getContext('2d');
+  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+}
+
+function disableDownloads() {
+  downloadPngBtn.disabled = true;
+  downloadSvgBtn.disabled = true;
+}
+function enableDownloads() {
+  downloadPngBtn.disabled = false;
+  downloadSvgBtn.disabled = false;
+}
+
+function updateContrastWarning() {
+  const { fg, bg } = currentOptions();
+  let ratio;
+  try {
+    ratio = contrastRatio(fg, bg);
+  } catch {
+    ratio = 21; // malformed color input — don't warn
+  }
+  if (ratio < 3) {
+    contrastWarningEl.textContent = 'Low contrast between foreground and background — this code may not scan reliably.';
+    contrastWarningEl.classList.add('visible');
+  } else {
+    contrastWarningEl.textContent = '';
+    contrastWarningEl.classList.remove('visible');
+  }
+}
+
+function doRender() {
+  const text = inputEl.value;
+  const ecLevel = ecLevelEl.value;
+  clearError();
+  updateContrastWarning();
+
+  if (text.trim() === '') {
+    clearCanvas();
+    disableDownloads();
+    captionEl.textContent = '';
+    capacityHintEl.textContent = 'Enter text or a URL above to generate a QR code.';
+    currentMatrix = null;
+    return;
+  }
+
+  try {
+    currentMatrix = encodeToMatrix(text, ecLevel);
+  } catch (err) {
+    clearCanvas();
+    disableDownloads();
+    showError(err.message);
+    capacityHintEl.textContent = '';
+    captionEl.textContent = '';
+    currentMatrix = null;
+    return;
+  }
+
+  canvasEl.classList.remove('hidden');
+  renderToCanvas(canvasEl, currentMatrix, currentOptions());
+  captionEl.textContent = `Version ${currentMatrix.version} · Level ${ecLevel}`;
+  capacityHintEl.textContent = `Version ${currentMatrix.version} of 40 · Level ${ecLevel}`;
+  canvasEl.setAttribute('aria-label', `QR code for: ${truncate(text, 60)}`);
+  enableDownloads();
+}
+
+// In-field copy on the editable text/URL input: revealed only when the field
+// is non-empty (CSS can't read a value, so the tool toggles [hidden]). The QR
+// output is an image, so this input is the one copyable text value in the tool.
+function syncCopyBtn() {
+  if (copyInputBtn) copyInputBtn.hidden = inputEl.value.trim() === '';
+}
+
+if (copyInputBtn) {
+  copyInputBtn.addEventListener('click', async () => {
+    const text = inputEl.value;
+    if (!text) return;
+    const ok = await copy(text);
+    if (!ok) return;
+    flash(copyInputBtn, { label: '✅', revertTo: '📋' });
+  });
+}
+
+// Shared trailing-edge debounce (jbc-include/util.js, inlined as a global).
+const scheduleRender = debounce(doRender, 150);
+
+[inputEl, ecLevelEl, scaleEl, quietZoneEl, fgEl, bgEl].forEach((el) => {
+  el.addEventListener('input', () => {
+    saveState();
+    scheduleRender();
+  });
+});
+
+// Keep the in-field copy button's visibility in sync with the input's value.
+inputEl.addEventListener('input', syncCopyBtn);
+
+downloadPngBtn.addEventListener('click', () => {
+  if (!currentMatrix) return;
+  const rawUrl = canvasEl.toDataURL('image/png');
+  // Best-effort: embed Author/Source/Software tEXt metadata; addPngMetadata
+  // never throws, so a bad injection just falls back to the plain PNG.
+  const url = addPngMetadata(rawUrl);
+  // addPngMetadata returns a PNG data URL (metadata-injected, or the original
+  // on best-effort failure); decode it to bytes so the shared download helper
+  // (jbc-include/util.js) can save the exact PNG content.
+  const bytes = dataUrlToBytes(url);
+  downloadBlob(new Blob([bytes], { type: 'image/png' }), `qr-code-v${currentMatrix.version}-${ecLevelEl.value}.png`);
+});
+
+downloadSvgBtn.addEventListener('click', () => {
+  if (!currentMatrix) return;
+  const svg = toSVGString(currentMatrix, currentOptions());
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  // Shared download helper (jbc-include/util.js, inlined as a global).
+  downloadBlob(blob, `qr-code-v${currentMatrix.version}-${ecLevelEl.value}.svg`);
+});
+
+/* ============================================================================
+ * Help modal -- purely informational (what the tool does + how to use it),
+ * so it's its own small dedicated dialog rather than confirmDialog (which is a
+ * yes/no destructive-action confirm). Markup is static in the document
+ * (shown/hidden via [hidden]) rather than built/torn down per open/close.
+ * Structure/focus-handling mirrors tools/hat-picker and tools/color-designer
+ * (see docs/conventions.md "First-load help popup (all tools)").
+ * ==========================================================================*/
+
+let helpPreviouslyFocused = null;
+
+function getHelpFocusable() {
+  return Array.from(
+    helpDialogEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+  ).filter((el) => !el.disabled && el.getClientRects().length > 0);
+}
+
+function onHelpKeydown(e) {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeHelp();
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  const focusable = getHelpFocusable();
+  if (focusable.length === 0) return;
+  e.preventDefault();
+  const idx = focusable.indexOf(document.activeElement);
+  let next = e.shiftKey ? idx - 1 : idx + 1;
+  if (next < 0) next = focusable.length - 1;
+  if (next >= focusable.length) next = 0;
+  focusable[next].focus();
+}
+
+function openHelp() {
+  helpPreviouslyFocused = document.activeElement;
+  helpOverlayEl.hidden = false;
+  document.addEventListener('keydown', onHelpKeydown, true);
+  helpDialogEl.scrollTop = 0;
+  helpCloseXEl.focus({ preventScroll: true });
+}
+
+function closeHelp() {
+  if (helpOverlayEl.hidden) return;
+  helpOverlayEl.hidden = true;
+  document.removeEventListener('keydown', onHelpKeydown, true);
+  if (helpPreviouslyFocused && typeof helpPreviouslyFocused.focus === 'function') {
+    try { helpPreviouslyFocused.focus(); } catch (err) { /* ignore */ }
+  }
+  helpPreviouslyFocused = null;
+}
+
+helpButtonEl.addEventListener('click', () => openHelp());
+helpCloseXEl.addEventListener('click', () => closeHelp());
+helpOverlayEl.addEventListener('mousedown', (e) => {
+  if (e.target === helpOverlayEl) closeHelp();
+});
+
+// Restore persisted UI state (input + options) before the initial paint;
+// best-effort — falls back to the markup defaults when there's nothing
+// stored or it can't be read (see Persistence above). The canvas/matrix
+// itself is never stored — this only re-renders it from restored inputs.
+applyStoredState();
+
+// Reflect the restored input value in the in-field copy button's visibility
+// (applyStoredState sets .value directly, which fires no `input` event).
+syncCopyBtn();
+
+// Initial paint.
+doRender();
+
+// Auto-show the Help modal once, on a genuinely fresh visit only. Marking
+// it seen right away (rather than on close) keeps this a true "once" --
+// even if the visitor navigates away without explicitly closing it, it
+// won't auto-show again next time.
+if (!hasSeenHelp()) {
+  markHelpSeen();
+  openHelp();
+}
+
+/* ============================================================================
+ * Testability: window.__qr namespace (inert for normal users)
+ * ==========================================================================*/
+
+window.__qr = {
+  encodeToMatrix,
+  utf8Bytes,
+  charCountBits,
+  selectVersion,
+  getDataCodewordCount,
+  getBlockPlan,
+  getAlignmentPatternPositions,
+  gfMul,
+  rsGeneratorPoly,
+  rsComputeRemainder,
+  computeFormatBits,
+  computeVersionBits,
+  MASK_FNS,
+  scorePenalty,
+  renderToCanvas,
+  toSVGString,
+  crc32,
+  buildPngChunk,
+  buildTextChunk,
+  parsePngChunks,
+  injectPngTextChunks,
+  addPngMetadata,
+  PNG_METADATA_ENTRIES,
+  TOOL_AUTHOR,
+  TOOL_REPO_URL,
+  TOOL_SOFTWARE,
+  STORAGE_KEY,
+  HELP_SEEN_KEY,
+  hasSeenHelp,
+  markHelpSeen,
+  openHelp,
+  closeHelp,
+  syncCopyBtn,
+  get currentMatrix() {
+    return currentMatrix ? { ...currentMatrix, modules: currentMatrix.modules.map((r) => r.slice()) } : null;
+  },
+};
+
+</script>
+</body>
+</html>

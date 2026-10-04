@@ -1,0 +1,2206 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Color Converter</title>
+<meta property="og:title"       content="Color Converter">
+<meta property="og:description" content="Convert a batch of intermixed rgba()/hex colors into one consistent format. Type or bulk-paste, see swatches, copy them out.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+/* ===== Begin ct-base ===== */
+/* Shared single-file-tool base styles — inlined by the build
+   near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
+   This is the single source of truth: edit here, run `npm run build`. See
+   the html-single-file conventions (web-craft.md).
+   It sits near the TOP of the <style> block (after any reset) so a tool's own
+   later rules can still layer colors on top; for <select>, keep the tool's fill as
+   `background-color` (not the `background` shorthand, which would wipe the chevron). */
+html { touch-action: manipulation; } /* double-tap won't zoom the page; pinch-zoom + scroll still work. Gesture canvases keep their own touch-action:none. */
+[hidden] { display: none !important; } /* an author `display:` rule must never defeat the hidden attribute */
+.visually-hidden { /* screen-reader-only (kept in the a11y tree, unlike display:none) */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* iOS/Safari sizes a native <select> from font-size and ignores height/min-height
+   (renders ~half as tall as inputs). Opt out of the native control so the box model
+   applies, and supply our own chevron (appearance:none removes the native one). */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  font-size: 16px; /* >=16px also stops iOS zoom-on-focus */
+  padding-right: 2rem; /* room for the chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.6 6 6.4l5-4.8' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.72rem;
+}
+/* ===== end ct-base ===== */
+/* ===== Begin ct-controls ===== */
+/* Shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the jbc:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See web-craft.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use CtClipboardUtil copy/flash for behavior
+   (components/CtClipboardUtil.mjs). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */
+
+
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --focus: #2f6fed;
+    --radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* CtConfirm theming — reuse this tool's tokens */
+    --ctc-accent: var(--accent);
+    --ctc-accent-fg: var(--accent-contrast);
+    --ctc-bg: var(--panel);
+    --ctc-fg: var(--text);
+    --ctc-radius: var(--radius);
+    --ctc-btn-radius: var(--radius);
+    --ctc-focus: var(--focus);
+    --ctc-cancel-border: var(--border-strong);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  /* Textarea-heavy tool (paste box + two "one per line" output textareas), so
+     the working areas WIDEN with the viewport instead of sitting in a narrow
+     fixed column with empty margins — docs/conventions.md § "Responsive &
+     mobile" (scale UP on large screens). Generous cap keeps ultra-wide
+     monitors sane while letting content fill real width at ≥1400px. */
+  .app {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+    margin: 0;
+  }
+
+  h2 {
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  .hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  /* ---------- Header row (title + Help button) ---------- */
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  textarea, input[type="text"] {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    /* Matches the button rule below — the paste box and per-row inputs are
+       the main tap/type surfaces, so they get the same double-tap-to-zoom
+       guard on mobile. */
+    touch-action: manipulation;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    /* Tells mobile browsers this control only needs tap/pan-through, not
+       double-tap-to-zoom — removes any residual gesture-recognition delay or
+       ambiguity on a real touch device before the click is dispatched. No
+       visible/behavioral effect on desktop (mouse) input. */
+    touch-action: manipulation;
+  }
+
+  /* Excludes .ctc-btn (the pasted CtConfirm "Yes"/"Cancel" buttons — that
+     component owns its own hover styling and must not be repainted by this
+     generic rule) and .modal-close-x (the modal's top-right ✕ — same
+     specificity trap: this rule's 0,3,1 would otherwise beat
+     .modal-close-x:hover's transparent-to-gray hover with the generic
+     light-gray tint). Fixes an adversarial-review finding: this selector's
+     specificity, 0,2,0 (or 0,2,1 with :not(:disabled)), previously beat
+     .ctc-btn--yes:hover's filter-only rule, 0,2,0, repainting the filled
+     accent "Yes" button near-white while its text stayed white, i.e.
+     invisible. docs/conventions.md's CtConfirm hover-specificity note.
+     Also excludes .ct-copy-btn (the shared in-field copy affordance owns its
+     own subtle hover in controls.css — this generic light-gray fill would
+     wash it out). */
+  button:hover:not(:disabled):not(.ctc-btn):not(.modal-close-x):not(.ct-copy-btn) {
+    background: #eef1f8;
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Paste section ---------- */
+
+  .paste-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  #pasteInput {
+    width: 100%;
+    padding: 0.6rem 0.7rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+  }
+
+  .paste-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  #parseSummary {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Rows section ---------- */
+
+  .rows-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .rows-header {
+    display: grid;
+    grid-template-columns: 1fr 28px 190px 220px 32px;
+    gap: 0.5rem;
+    padding: 0 0.1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .rows-header span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rows-header .swatch-label {
+    /* The swatch column is only 28px wide (sized for the 22px color
+       swatch box, not for text) so it gets no label — the swatches are
+       self-evident. Keeping the cell present (rather than removing it)
+       preserves column alignment with the data rows' grid. */
+    font-size: 0;
+  }
+
+  #rowsList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 28px 190px 220px 32px;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .row-input {
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+  }
+
+  .row.invalid .row-input {
+    border-color: var(--danger);
+  }
+
+  .swatch {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    background-color: var(--swatch-color, transparent);
+    background-image: none;
+    justify-self: center;
+  }
+
+  .swatch.alpha {
+    background-image:
+      linear-gradient(var(--swatch-color), var(--swatch-color)),
+      repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%);
+    background-size: 100% 100%, 8px 8px;
+    background-repeat: no-repeat, repeat;
+  }
+
+  .swatch.invalid {
+    background-color: transparent;
+    background-image: repeating-linear-gradient(45deg, #f88 0 4px, #fff 4px 8px);
+  }
+
+  .swatch.empty {
+    background: transparent;
+  }
+
+  /* ---------- Per-row value fields (in-field copy, controls.css) ----------
+     Each hex/rgba value is a read-only <input> in a `.ct-field` with a
+     `.ct-copy-btn` pinned inside at the right (controls.css supplies the base
+     structure + the copy button). The input carries its own border/radius from
+     the global input rule and shares the standard control height. */
+  .row .ct-field {
+    min-width: 0;
+  }
+
+  .row .ct-field > input {
+    /* Monospace value; padding SHORTHAND here would reset controls.css's
+       reserved right room (the `<select>`/input padding trap in
+       docs/conventions.md), so re-declare padding-right LONGHAND right after
+       it (icon room = 2.6rem). */
+    padding: 0.4rem 0.5rem;
+    padding-right: 2.6rem;
+    font: 0.85rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--panel);
+    color: var(--text);
+  }
+
+  .trash-btn {
+    justify-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--panel);
+    line-height: 1;
+  }
+
+  .rows-actions {
+    display: flex;
+    gap: 0.6rem;
+  }
+
+  /* ---------- Outputs section ---------- */
+
+  .outputs-section {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .output-col {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .output-col .ct-field { width: 100%; }
+
+  .output-col textarea {
+    width: 100%;
+    min-height: 160px;
+    /* padding SHORTHAND resets controls.css's reserved right room, so
+       re-declare padding-right LONGHAND after it so the top line's text never
+       runs under the top-right copy button (docs/conventions.md padding trap). */
+    padding: 0.6rem 0.7rem;
+    padding-right: 2.6rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+    background: #fafafc;
+  }
+
+  /* Readable emoji glyph in the shared in-field copy button. */
+  .ct-copy-btn { font-size: 0.95rem; }
+
+  /* ---------- Help modal ----------
+     Reference pattern: tools/hat-picker's Help modal (see
+     docs/conventions.md "First-load help popup"). Static markup in the
+     document (shown/hidden via [hidden]) rather than built/torn down per
+     open, mirroring hat-picker/mancala. */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(28, 28, 31, 0.55);
+  }
+  /* [hidden] cascade trap (docs/conventions.md): an author display:flex rule
+     out-specifies the UA [hidden]{display:none} rule, so pair it with an
+     explicit !important override. */
+  .help-overlay[hidden] { display: none !important; }
+
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30rem;
+    max-height: min(85vh, 640px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    padding: 1.25rem 3rem 1.1rem 1.35rem;
+  }
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.15rem; }
+  .help-dialog p { margin: 0 0 0.65rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.75rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.35rem; }
+  .help-note {
+    margin-top: 0.75rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  /* ---------- Modal close ✕ (docs/conventions.md "Every content modal has
+     a close ✕ in its top-right corner") ---------- */
+  .modal-close-x {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .modal-close-x:hover:not(:disabled) {
+    background: rgba(127, 127, 127, .18);
+  }
+  .modal-close-x:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 700px) {
+    .rows-header { display: none; }
+
+    /* One-line rows even at phone widths: swap the grid (which put each of
+       the raw-input/hex/rgba controls on its own full-width line) for flex,
+       and let those three text controls shrink (flex: 1 1 auto; min-width:
+       0) instead of being pinned to 100%/full-row width — the swatch, raw
+       input, hex field, rgba field, and trash all share one row. */
+    .row {
+      display: flex;
+      flex-wrap: nowrap;
+    }
+
+    .row-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      width: auto;
+    }
+
+    .row .swatch,
+    .row .trash-btn {
+      flex: 0 0 auto;
+    }
+
+    .row .ct-field.hex-field,
+    .row .ct-field.rgba-field {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .outputs-section {
+      flex-direction: column;
+    }
+
+    /* Finger-friendly tap targets (~44px) on narrow/touch screens. Control
+       height (44px) already comes from controls.css; widen the per-row in-field
+       copy button and the trash button to a full 44px WIDTH here (and reserve
+       matching room inside the value fields so text never runs under the wider
+       button). Desktop sizing is untouched. */
+    .row .ct-copy-btn { width: 44px; }
+    .row .ct-field > input { padding-right: 2.9rem; }
+    .trash-btn { min-width: 44px; }
+
+    .help-dialog {
+      padding: 1rem 2.75rem 0.9rem 1rem;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Color Converter</h1>
+        <p class="hint">Paste or type mixed rgba/hex colors, convert them all to one format.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <section class="paste-section" data-testid="paste-section">
+    <label for="pasteInput">Paste colors, one per line (rgba or hex, mixed is fine)</label>
+    <textarea id="pasteInput" data-testid="paste-input" rows="6" placeholder="#ff0000&#10;rgba(0, 255, 0, 0.5)&#10;rgb(0 0 255 / 0.8)"></textarea>
+    <div class="paste-actions">
+      <button id="convertBtn" type="button" data-testid="convert-btn">Convert</button>
+      <button id="clearPasteBtn" type="button" data-testid="clear-paste-btn">Clear</button>
+      <p id="parseSummary" data-testid="parse-summary" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="rows-section" data-testid="rows-section">
+    <h2>Rows</h2>
+    <div class="rows-header" aria-hidden="true">
+      <span>Input</span><span class="swatch-label">Swatch</span><span>Hex</span><span>RGBA</span><span></span>
+    </div>
+    <ul id="rowsList" data-testid="rows-list"></ul>
+    <div class="rows-actions">
+      <button id="addRowBtn" type="button" data-testid="add-row-btn">Add row</button>
+      <button id="removeAllBtn" type="button" data-testid="remove-all-btn" disabled>Remove all</button>
+    </div>
+  </section>
+
+  <section class="outputs-section" data-testid="outputs-section">
+    <div class="output-col" data-testid="rgba-output-col">
+      <label for="rgbaOutput">RGBA (one per line)</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="rgbaOutput" data-testid="rgba-output" readonly aria-label="RGBA output, one per line"></textarea>
+        <button id="rgbaOutputCopyBtn" type="button" class="ct-copy-btn" data-testid="rgba-output-copy" aria-label="Copy RGBA output" title="Copy RGBA output">📋</button>
+      </div>
+      <button id="rgbaCopyAllBtn" type="button" data-testid="rgba-copy-all-btn" aria-label="Copy all RGBA values" title="Copy all RGBA values">Copy all</button>
+    </div>
+    <div class="output-col" data-testid="hex-output-col">
+      <label for="hexOutput">HEX (one per line)</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="hexOutput" data-testid="hex-output" readonly aria-label="HEX output, one per line"></textarea>
+        <button id="hexOutputCopyBtn" type="button" class="ct-copy-btn" data-testid="hex-output-copy" aria-label="Copy HEX output" title="Copy HEX output">📋</button>
+      </div>
+      <button id="hexCopyAllBtn" type="button" data-testid="hex-copy-all-btn" aria-label="Copy all HEX values" title="Copy all HEX values">Copy all</button>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">How Color Converter works</h2>
+    <p>Paste or type colors — <code>rgba()</code> (or <code>rgb()</code>) and hex, mixed together is fine — one per line, into the box at the top, then tap <strong>Convert</strong> to turn each line into its own row below with a live color swatch and both formats.</p>
+    <ul>
+      <li><strong>Convert.</strong> Replaces the rows below with a fresh row for every non-blank line you pasted or typed — swatch, hex, and rgba are generated for each. Lines that can't be parsed as a color get an <code>INVALID: …</code> row instead, so you can find and fix them.</li>
+      <li><strong>Rows.</strong> Each row shows a swatch preview plus editable hex and rgba fields with their own copy (📋) buttons — edit a row's input directly and its swatch and fields update as you type. Add row starts a new blank row; the trash icon removes a single row (asks you to confirm first).</li>
+      <li><strong>Copy all.</strong> The Hex and RGBA output boxes list every row's value, one per line, in the order the rows appear — use their "Copy all" buttons to grab the whole list at once.</li>
+      <li><strong>Clear / Remove all.</strong> Clear empties the paste box; Remove all empties every row. Both ask you to confirm first, since they can't be undone.</li>
+    </ul>
+    <p class="help-note">Your rows and the paste box's text are saved on this device, so they're still here next time you open Color Converter.</p>
+  </div>
+</div>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<!---- end footer -->
+
+
+<script type="module">
+/* ct:module components/CtConfirm.mjs */
+const __ct_components_CtConfirm = (() => {
+// ===== Begin CtConfirm (ES module) =====
+/*
+ * confirmDialog(message?) -> Promise<boolean>   (ES module; was the jbcConfirm window global)
+ * ---------------------------------------------------------------------------
+ * A tiny, dependency-free confirm dialog for single-file tools.
+ *
+ *     import { confirmDialog } from '<rel>/jbc-include/components/CtConfirm.mjs';
+ *     // (or `CtConfirm.confirm` via the aggregator class at the bottom — the
+ *     //  static REFERENCES the named binding, single implementation. The named
+ *     //  export is `confirmDialog`, NOT `confirm`, so it never shadows window.confirm.)
+ *
+ *     if (await confirmDialog('Remove this color?')) { ...do it... }
+ *
+ * - Returns a Promise<boolean>: true = confirmed, false = cancelled.
+ * - message is optional; null/empty/whitespace becomes "Are you sure?".
+ * - "Yes" is the highlighted default: Enter confirms. Esc / "Cancel" /
+ *   backdrop-click cancel. Focus is trapped and returned to the caller's
+ *   element on close. role="dialog", aria-modal, labelled by the message.
+ *
+ * STYLING — the component adapts to each tool's look:
+ * - It injects only structural CSS; every VISUAL choice reads from a CSS
+ *   variable with a theme-aware system-color fallback, so it looks right with
+ *   no theming AND matches your tool if you set a few variables anywhere in
+ *   scope (e.g. your :root / body theme block):
+ *     --ctc-accent, --ctc-accent-fg   (the "Yes" button)
+ *     --ctc-bg, --ctc-fg              (dialog surface + text)
+ *     --ctc-backdrop                  (overlay behind the dialog)
+ *     --ctc-radius, --ctc-btn-radius  (corner rounding)
+ *     --ctc-shadow, --ctc-font        (dialog shadow + font)
+ *     --ctc-cancel-border, --ctc-focus, --ctc-max-width
+ * - Full opt-out: set `window.ctConfirmStyles = false` BEFORE the first call
+ *   and NO styles are injected — your tool then supplies all `.ctc-*` CSS
+ *   (.ctc-overlay/.ctc-dialog/.ctc-message/.ctc-buttons/.ctc-btn/
+ *   .ctc-btn--cancel/.ctc-btn--yes).
+ *
+ * Formerly a pasteable IIFE script exposing the old `jbcConfirm` window global
+ * (vendored copies called it `ctConfirm`); those globals are GONE — `confirmDialog` =
+ * ex-jbcConfirm, body unchanged. The CSS still self-injects on the first call
+ * (ensureConfirmStyles) and the `window.ctConfirmStyles = false` opt-out is still honored.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtConfirm.mjs
+ */
+
+var CONFIRM_STYLE_ID = 'ctc-style';
+function ensureConfirmStyles() {
+  if (window.ctConfirmStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(CONFIRM_STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = CONFIRM_STYLE_ID;
+  style.textContent = [
+    '.ctc-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;',
+    'align-items:center;justify-content:center;padding:1rem;',
+    'color-scheme:light dark;background:var(--ctc-backdrop,rgba(0,0,0,0.5));}',
+    '.ctc-dialog{box-sizing:border-box;width:100%;',
+    'max-width:var(--ctc-max-width,22rem);padding:1.25rem 1.25rem 1rem;',
+    'background:var(--ctc-bg,Canvas);color:var(--ctc-fg,CanvasText);',
+    'border-radius:var(--ctc-radius,12px);',
+    'box-shadow:var(--ctc-shadow,0 10px 40px rgba(0,0,0,0.3));',
+    'font-family:var(--ctc-font,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);}',
+    '.ctc-message{margin:0 0 1.1rem;font-size:1rem;line-height:1.45;}',
+    '.ctc-buttons{display:flex;justify-content:flex-end;gap:0.6rem;}',
+    '.ctc-btn{box-sizing:border-box;min-height:44px;padding:0.5rem 1.1rem;',
+    'border-radius:var(--ctc-btn-radius,8px);font:inherit;font-weight:600;',
+    'cursor:pointer;border:1px solid transparent;}',
+    '.ctc-btn:focus-visible{outline:2px solid var(--ctc-focus,AccentColor);',
+    'outline-offset:2px;}',
+    '.ctc-btn--cancel{background:transparent;color:inherit;',
+    'border-color:var(--ctc-cancel-border,rgba(128,128,128,0.5));}',
+    '.ctc-btn--cancel:hover{background:rgba(128,128,128,0.15);}',
+    '.ctc-btn--yes{background:var(--ctc-accent,AccentColor);',
+    'color:var(--ctc-accent-fg,AccentColorText);}',
+    '.ctc-btn--yes:hover{filter:brightness(1.08);}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+function confirmDialog(message) {
+  ensureConfirmStyles();
+  var text = (message == null || String(message).trim() === '')
+    ? 'Are you sure?' : String(message);
+
+  return new Promise(function (resolve) {
+    var previouslyFocused = document.activeElement;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'ctc-overlay';
+
+    var dialog = document.createElement('div');
+    dialog.className = 'ctc-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+
+    var msgEl = document.createElement('p');
+    msgEl.className = 'ctc-message';
+    msgEl.textContent = text;
+    var msgId = 'ctc-msg-' + Math.random().toString(36).slice(2);
+    msgEl.id = msgId;
+    dialog.setAttribute('aria-labelledby', msgId);
+
+    var buttons = document.createElement('div');
+    buttons.className = 'ctc-buttons';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'ctc-btn ctc-btn--cancel';
+    cancelBtn.textContent = 'Cancel';
+
+    var yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'ctc-btn ctc-btn--yes';
+    yesBtn.textContent = 'Yes';
+
+    buttons.appendChild(cancelBtn);
+    buttons.appendChild(yesBtn);
+    dialog.appendChild(msgEl);
+    dialog.appendChild(buttons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    var done = false;
+    function close(result) {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKeydown, true);
+      overlay.remove();
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        try { previouslyFocused.focus(); } catch (e) { /* ignore */ }
+      }
+      resolve(result);
+    }
+
+    function onKeydown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        close(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        close(false);
+      } else if (e.key === 'Tab') {
+        // trap focus between the two buttons
+        e.preventDefault();
+        var order = [cancelBtn, yesBtn];
+        var idx = order.indexOf(document.activeElement);
+        var next = e.shiftKey ? idx - 1 : idx + 1;
+        if (next < 0) next = order.length - 1;
+        if (next >= order.length) next = 0;
+        order[next].focus();
+      }
+    }
+
+    document.addEventListener('keydown', onKeydown, true);
+    overlay.addEventListener('mousedown', function (e) {
+      if (e.target === overlay) close(false);
+    });
+    cancelBtn.addEventListener('click', function () { close(false); });
+    yesBtn.addEventListener('click', function () { close(true); });
+
+    yesBtn.focus(); // "Yes" is the default
+  });
+}
+
+/** Aggregator (decision #3): static REFERENCES the named export above. */
+class CtConfirm {
+  static confirm = confirmDialog;
+}
+// ===== end CtConfirm =====
+return { confirmDialog, CtConfirm };
+})();
+const { confirmDialog, CtConfirm } = __ct_components_CtConfirm;
+
+/* ct:module components/CtClipboardUtil.mjs */
+const __ct_components_CtClipboardUtil = (() => {
+// ===== Begin CtClipboardUtil (ES module) =====
+/*
+ * CtClipboardUtil — copy-to-clipboard + button-flash helpers (ES module; was copy.js)
+ * ---------------------------------------------------------------------------
+ * import { copy, flash } from '<rel>/jbc-include/components/CtClipboardUtil.mjs';
+ * (or `CtClipboardUtil.copy` / `CtClipboardUtil.flash` via the aggregator class
+ * at the bottom — statics REFERENCE the named bindings, single implementation.)
+ *
+ * Formerly the pasteable IIFE copy.js exposing the jbcCopy / jbcFlash window globals;
+ * those globals are GONE. `copy` = ex-jbcCopy, `flash` = ex-jbcFlash — bodies
+ * unchanged. The `.ctc-flash` CSS still self-injects on the first `flash()` call
+ * (ensureStyles) and the `window.ctCopyStyles = false` opt-out is still honored.
+ *
+ * copy(text) -> Promise<boolean>
+ * flash(el, opts?) -> void
+ *
+ *     btn.addEventListener('click', async () => {
+ *       if (!text) return;
+ *       const ok = await copy(text);
+ *       if (!ok) return;
+ *       flash(btn, { label: '✅', revertTo: '📋' });
+ *     });
+ *
+ * copy(text):
+ * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
+ *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
+ *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
+ *   Clipboard API is unavailable or denied.
+ * - Always RESOLVES — never rejects/throws. Resolves `true` on success,
+ *   `false` if every copy path failed (denied permission, unsupported
+ *   browser, etc.) — callers check the boolean rather than try/catch.
+ *
+ * flash(el, opts?):
+ * - Transient "copied" feedback on a button: swaps `el.textContent` to
+ *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
+ *   reverts and clears the timer.
+ * - Revert target: `opts.revertTo` if given (for icon-only buttons that
+ *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
+ *   current text — captured once and reused if `flash` is called again on
+ *   the same element before the previous flash reverted (rapid re-clicks
+ *   don't lose the true original label).
+ * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
+ *   decorative scale pulse (see STYLING below) — no functional behavior
+ *   depends on it.
+ *
+ * STYLING:
+ * - The only visual injected is the optional `.ctc-flash` pulse animation,
+ *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
+ *   text swap + revert timing are unaffected either way).
+ * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
+ *   `flash` call and no styles are injected.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtClipboardUtil.mjs
+ */
+
+
+function copy(text) {
+  text = String(text == null ? '' : text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      function () { return true; },
+      function () { return fallbackCopy(text); }
+    );
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+var STYLE_ID = 'ctc-copy-style';
+function ensureStyles() {
+  if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = [
+    '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+    '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+    '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+    '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+var flashTimeouts = new WeakMap();
+function flash(el, opts) {
+  opts = opts || {};
+  var ms = opts.ms != null ? opts.ms : 1000;
+  var label = opts.label != null ? opts.label : '✅';
+
+  ensureStyles();
+  clearTimeout(flashTimeouts.get(el));
+
+  var original;
+  if (opts.revertTo != null) {
+    original = opts.revertTo;
+  } else if (el.dataset.ctcFlashOriginal != null) {
+    original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+  } else {
+    original = el.textContent;
+  }
+  el.dataset.ctcFlashOriginal = original;
+
+  el.textContent = label;
+  el.classList.remove('ctc-flash');
+  void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+  el.classList.add('ctc-flash');
+
+  var t = setTimeout(function () {
+    el.textContent = original;
+    el.classList.remove('ctc-flash');
+    delete el.dataset.ctcFlashOriginal;
+    flashTimeouts.delete(el);
+  }, ms);
+  flashTimeouts.set(el, t);
+}
+
+/** Aggregator (decision #3): statics REFERENCE the named exports above. */
+class CtClipboardUtil {
+  static copy = copy;
+  static flash = flash;
+}
+// ===== end CtClipboardUtil =====
+return { copy, flash, CtClipboardUtil };
+})();
+const { copy, flash, CtClipboardUtil } = __ct_components_CtClipboardUtil;
+
+/* ct:module utils/CtUtil.mjs */
+const __ct_utils_CtUtil = (() => {
+// ===== Begin CtUtil (ES module) =====
+/*
+ * CtUtil — tiny, dependency-free runtime helpers for single-file tools (ES module;
+ * was the classic-script window-global in util.js, plus the posAt /
+ * slugify / wrapText modules, absorbed here — jbc ES6 modularization · Train 37 · R12).
+ * ---------------------------------------------------------------------------
+ *     import { onceFlag, downloadBlob, debounce } from '<rel>/jbc-include/CtUtil.mjs';
+ *     // (or `CtUtil.onceFlag` etc. via the aggregator class at the bottom — the
+ *     //  statics REFERENCE the named bindings, single implementation.)
+ *
+ * Bodies are moved VERBATIM from util.js (and posAt.mjs / slugify.mjs / wrapText.mjs);
+ * only the access path changed (the old util.js global's `X` -> named import `X`). SELF-CONTAINED: no
+ * imports (so flattening never drags another module's top-level names into a page).
+ * Where each former util.js helper went:
+ *   - getRandomBytes + makeId      -> CtByteUtil.mjs (makeId rides with getRandomBytes so
+ *                                      this module needs no import of CtByteUtil)
+ *   - showWarning / hideError / hideWarning / showBanner / hideBanner
+ *                                  -> components/CtComponents.mjs (next to showError)
+ *   - iconButton / wireTabs / ... / announce  -> components/CtComponents.mjs (R11)
+ *   - loadImageFile / canvasToBlob / canvasToPngBytes -> image/CtImageUtil.mjs
+ *
+ * These are the browser/DOM-facing idioms every tool re-rolled by hand. Most touch
+ * runtime-only surfaces (document / URL / localStorage / setTimeout) but only inside
+ * function bodies, so the module is safe to import from Node (the pure helpers —
+ * clamp/num/escape*, posAt/slugify/wrapText — are usable in a unit-tested logic.mjs).
+ *
+ * downloadBlob(data, filename, mime?):
+ * - Triggers a file download. `data` may be a Blob, a string, or a Uint8Array
+ *   (anything the Blob constructor accepts). A Blob is used as-is; anything
+ *   else is wrapped in a Blob (with `mime` as its type when given).
+ * - Creates an object URL, clicks a temporary hidden <a download>, then revokes
+ *   the URL on a short timeout so the download has time to start.
+ *
+ * debounce(fn, ms):
+ * - Returns a trailing-edge debounced wrapper: repeated calls reset the timer,
+ *   and `fn` runs once, `ms` after the last call, with the latest args and `this`.
+ *
+ * (formatBytes is NOT here: the single formatBytes(bytes, opts) lives in CtByteUtil.mjs. The old
+ *   compact util.js variant — no space, lowercase "b", 2 decimals — was removed; callers use
+ *   CtByteUtil.formatBytes, which prints "1.5 KB" style.)
+ *
+ * clamp(n, lo, hi):  Coerces `n` to a number and clamps it to [lo, hi]. Non-finite -> `lo`.
+ * num(v, fallback?): Coerces `v` to a finite number, else `fallback` (default 0).
+ * clampInt(v, lo, hi, fallback): parseInt(v, 10) then clamps to [lo, hi]; non-integer -> `fallback`.
+ *
+ * escapeHtml(s): Escapes & < > (safe for a text node; quotes left as-is).
+ * escapeAttr(s): escapeHtml plus " -> &quot; and ' -> &#39; (for attribute values).
+ * (escapeXml is NOT here: the canonical escapeXml(text, strict?) lives in formats/CtEscaper.mjs.
+ *   The old util.js escapeXml / escapeXmlBasic was folded into it.)
+ *
+ * persistState(key, defaults):
+ * - Versioned, best-effort localStorage persistence driven by a `defaults` shape.
+ *   Put a version in the key (e.g. "mytool:v1"). Returns { load, save }. `load()`
+ *   overlays stored values on the defaults, coercing by the default's TYPE and
+ *   dropping non-finite numbers; `save(state)` stores ONLY the keys in `defaults`.
+ *   All access is try/catch-guarded (private mode / disabled storage degrade silently).
+ *
+ * onceFlag(key):
+ * - A one-shot "have they seen this?" flag on `key`. Returns { seen, mark }.
+ *   `seen()` is true once `mark()` has run; a storage throw is treated as
+ *   already-seen (never re-nag). Used for first-load help auto-open.
+ *
+ * el(tag, props?, children?):
+ * - Hyperscript element factory. `props` keys: `class`/`className`, `text`/
+ *   `textContent`, `html`/`innerHTML`, any `data-*`/`aria-*` + `role`/`title`/
+ *   `for`/`type`/`value`/`name`/`href`/`id`/`placeholder` (set as attributes),
+ *   everything else assigned as a property; null/undefined values are skipped.
+ *   `children` is a node, a string/number (-> text node), or an array of those;
+ *   null/false entries are skipped.
+ *
+ * prefersReducedMotion(): True when the user asked for reduced motion (false if unavailable).
+ * restartAnimation(el, cls): remove `cls`, force reflow (`void el.offsetWidth`), re-add `cls`.
+ *
+ * setupHiDPICanvas(canvas, opts?):
+ * - Sizes a canvas' backing store for crisp rendering on high-DPR displays. CSS
+ *   size is opts.width/opts.height (CSS px) or the canvas' current
+ *   clientWidth/clientHeight. dpr = devicePixelRatio (capped at opts.maxDpr when
+ *   given). Sets canvas.width/height = round(css * dpr); sets the CSS pixel size
+ *   via style unless opts.style===false; gets the 2d context (unless
+ *   opts.context===false) and applies setTransform(dpr,0,0,dpr,0,0) unless
+ *   opts.transform===false. Returns { dpr, cssW, cssH, ctx }.
+ *
+ * posAt(text, index) / slugify(str, opts?) / wrapText(text, maxWidth, measure):
+ * - Pure text helpers (ex posAt.mjs / slugify.mjs / wrapText.mjs); full doc blocks
+ *   at their sections below.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit the canonical copy, re-vendor, run `npm run build`. Canonical source:
+ * html-single-file/assets/CtUtil.mjs
+ */
+
+// =====================================================================
+// Section: downloadBlob / debounce / clamp / num / clampInt
+// =====================================================================
+function downloadBlob(data, filename, mime) {
+  var blob = (data instanceof Blob)
+    ? data
+    : new Blob([data], mime ? { type: mime } : undefined);
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename == null ? '' : String(filename);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+function debounce(fn, ms) {
+  var t;
+  return function () {
+    var self = this, args = arguments;
+    clearTimeout(t);
+    t = setTimeout(function () { fn.apply(self, args); }, ms);
+  };
+}
+
+function clamp(n, lo, hi) {
+  var v = Number(n);
+  // NaN has no position on the number line → lo. ±Infinity DO: +Infinity clamps to hi,
+  // -Infinity to lo via the normal comparison below (#1014-O).
+  if (Number.isNaN(v)) return lo;
+  return v < lo ? lo : (v > hi ? hi : v);
+}
+
+function num(v, fallback) {
+  var n = Number(v);
+  return Number.isFinite(n) ? n : (fallback === undefined ? 0 : fallback);
+}
+
+function clampInt(v, lo, hi, fallback) {
+  var n = parseInt(v, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(lo, Math.min(hi, n));
+}
+
+// =====================================================================
+// Section: escapeHtml / escapeAttr  (escapeXml lives in CtEscaper)
+// =====================================================================
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// =====================================================================
+// Section: persistState / onceFlag
+// =====================================================================
+function persistState(key, defaults) {
+  function load() {
+    var out = {};
+    for (var k in defaults) {
+      if (Object.prototype.hasOwnProperty.call(defaults, k)) out[k] = defaults[k];
+    }
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return out;
+      var p = JSON.parse(raw);
+      if (!p || typeof p !== 'object') return out;
+      for (var k2 in defaults) {
+        if (!Object.prototype.hasOwnProperty.call(defaults, k2)) continue;
+        if (p[k2] === undefined) continue;
+        var d = defaults[k2];
+        if (typeof d === 'boolean') out[k2] = !!p[k2];
+        else if (typeof d === 'number') { var nn = Number(p[k2]); if (Number.isFinite(nn)) out[k2] = nn; }
+        else out[k2] = String(p[k2]);
+      }
+    } catch (e) { /* ignore malformed / disabled storage */ }
+    return out;
+  }
+  function save(state) {
+    var toStore = {};
+    for (var k in defaults) {
+      if (!Object.prototype.hasOwnProperty.call(defaults, k)) continue;
+      if (state && state[k] !== undefined) toStore[k] = state[k];
+    }
+    try { localStorage.setItem(key, JSON.stringify(toStore)); } catch (e) { /* best-effort */ }
+  }
+  return { load: load, save: save };
+}
+
+function onceFlag(key) {
+  return {
+    seen: function () { try { return localStorage.getItem(key) === '1'; } catch (e) { return true; } },
+    mark: function () { try { localStorage.setItem(key, '1'); } catch (e) { /* best-effort */ } }
+  };
+}
+
+// =====================================================================
+// Section: el (hyperscript factory)
+// =====================================================================
+var ATTR_KEYS = { role: 1, title: 1, 'for': 1, type: 1, value: 1, name: 1, href: 1, id: 1, placeholder: 1 };
+function el(tag, props, children) {
+  var node = document.createElement(tag);
+  if (props) {
+    for (var k in props) {
+      if (!Object.prototype.hasOwnProperty.call(props, k)) continue;
+      var v = props[k];
+      if (v == null) continue;
+      if (k === 'class' || k === 'className') node.className = v;
+      else if (k === 'text' || k === 'textContent') node.textContent = v;
+      else if (k === 'html' || k === 'innerHTML') node.innerHTML = v;
+      else if (k.indexOf('data-') === 0 || k.indexOf('aria-') === 0 || ATTR_KEYS[k]) node.setAttribute(k, v);
+      else node[k] = v;
+    }
+  }
+  var kids = (children == null) ? [] : (Array.isArray(children) ? children : [children]);
+  for (var i = 0; i < kids.length; i++) {
+    var c = kids[i];
+    if (c == null || c === false) continue;
+    node.appendChild((typeof c === 'string' || typeof c === 'number') ? document.createTextNode(String(c)) : c);
+  }
+  return node;
+}
+
+// =====================================================================
+// Section: prefersReducedMotion / restartAnimation / setupHiDPICanvas
+// =====================================================================
+function prefersReducedMotion() {
+  try {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (e) { return false; }
+}
+
+function restartAnimation(elm, cls) {
+  if (!elm) return;
+  if (cls) elm.classList.remove(cls);
+  void elm.offsetWidth;
+  if (cls) elm.classList.add(cls);
+}
+
+function setupHiDPICanvas(canvas, opts) {
+  opts = opts || {};
+  var cssW = (opts.width != null) ? opts.width : (canvas.clientWidth || 0);
+  var cssH = (opts.height != null) ? opts.height : (canvas.clientHeight || 0);
+  var dpr = window.devicePixelRatio || 1;
+  if (opts.maxDpr != null) dpr = Math.min(dpr, opts.maxDpr);
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  if (opts.style !== false) {
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+  }
+  var ctx = (opts.context === false) ? null : canvas.getContext('2d');
+  if (ctx && opts.transform !== false) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { dpr: dpr, cssW: cssW, cssH: cssH, ctx: ctx };
+}
+
+// =====================================================================
+// Section: posAt  (was posAt.mjs — jbcPosAt)
+// =====================================================================
+/*
+ * posAt(text, index) -> { line, column }
+ * ---------------------------------------------------------------------------
+ * Map a 0-based character offset into `text` to a 1-based { line, column }
+ * position — the readout a parser wants when reporting where an error occurred.
+ * Lines are split on `\n`; `column` counts characters from the line start
+ * (1-based). `index` is clamped to `text.length`, so an offset at or past the
+ * end returns the position just after the final character. Every other character
+ * (including `\r` and `\t`) advances the column by one.
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * needs offset->line/column imports this module directly (so `node --test` can
+ * load it); the single-file build inlines this module body into the shipped
+ * index.html — stripping the `export` — so the shipped tool stays
+ * dependency-free and file://-openable. See the consuming repo's build docs
+ * (§ "Build-assembled tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function posAt(text, index) {
+  let line = 1;
+  let col = 1;
+  const end = Math.min(index, text.length);
+  for (let i = 0; i < end; i++) {
+    if (text[i] === '\n') { line++; col = 1; } else { col++; }
+  }
+  return { line, column: col };
+}
+
+// =====================================================================
+// Section: slugify  (was slugify.mjs — jbcSlugify)
+// =====================================================================
+/*
+ * slugify(str, opts?) -> string
+ * ---------------------------------------------------------------------------
+ * Turn arbitrary text into a filename-safe ASCII slug: trim, lowercase, drop
+ * straight/curly-free quotes, collapse every run of non-alphanumeric characters
+ * to a single hyphen, strip leading/trailing hyphens, and cap the result at 60
+ * characters. `null`/`undefined` become `''`. This is the conservative, ASCII
+ * form used for download filenames (e.g. "My Card!" -> "my-card").
+ *
+ * With NO options this is exactly the historical ASCII slugifier, so an
+ * option-free call is byte-identical to the pre-parameterization function.
+ *
+ * DIACRITIC-AWARE VARIANT — `slugify(str, { diacritics: true, cap? })`. Some
+ * tools need "Café Menu" -> "cafe-menu" (the default ASCII form drops the
+ * accented letters). Passing `diacritics: true` selects a different pipeline
+ * that (1) NFKD-normalizes and strips combining diacritical marks (U+0300–U+036F)
+ * so "é" -> "e", then (2) splits into words with a camelCase / acronym / digit-
+ * run-aware splitter (the text-toolkit word model: "fooBar" -> foo, Bar;
+ * "HTMLParser" -> HTML, Parser; "foo2bar" -> foo, 2, bar), lowercases each, and
+ * joins with '-'. This is NOT the same word model as the default (which collapses
+ * every non-alphanumeric run) — it is the diacritic slug several text tools rolled
+ * by hand. `opts.cap` (a number) caps the length; omitted / null leaves it
+ * UNCAPPED (text-toolkit's slug is uncapped).
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * needs a slug imports this module directly (so `node --test` can load it); the
+ * single-file build inlines this module body into the shipped index.html —
+ * stripping the `export` — so the shipped tool stays dependency-free and
+ * file://-openable. See the consuming repo's build docs (§ "Build-assembled
+ * tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function slugify(str, opts) {
+  opts = opts || {};
+  if (opts.diacritics) {
+    if (str == null) return '';
+    const stripped = String(str).normalize('NFKD').replace(/[̀-ͯ]/g, '');
+    const words = stripped.match(/[A-Z]+(?=[A-Z][a-z])|[A-Z][a-z]+|[A-Z]+|[a-z]+|[0-9]+/g) || [];
+    const slug = words.map((w) => w.toLowerCase()).join('-');
+    // Strip a trailing hyphen the cap may have left mid-separator (#1014-O).
+    return opts.cap == null ? slug : slug.slice(0, opts.cap).replace(/-+$/g, '');
+  }
+  return String(str == null ? '' : str)
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/g, ''); // the 60-char cap can land mid-separator, re-stripping a trailing hyphen (#1014-O)
+}
+
+// =====================================================================
+// Section: wrapText  (was wrapText.mjs — jbcWrapText)
+// =====================================================================
+/*
+ * wrapText(text, maxWidth, measure) -> string[]
+ * ---------------------------------------------------------------------------
+ * Greedy word-wrap of `text` to a maximum width, returning an array of lines
+ * (always at least one, possibly `''`). Explicit newlines are honored as hard
+ * breaks first; within a paragraph, words are packed greedily and a single word
+ * wider than `maxWidth` is kept whole on its own line (never dropped or split).
+ *
+ * Width is measured by the injected `measure(str) -> number` callback — the
+ * pure wrapping logic lives here; the canvas/DOM text-measurement stays at the
+ * call site (pass `ctx.measureText(s).width`). `maxWidth` is coerced to a finite
+ * number (non-finite -> 0); a limit of 0 (or less) disables width-wrapping, so
+ * only explicit newlines break the text and `measure` is never called.
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * wraps text imports this module directly (so `node --test` can load it, feeding
+ * a deterministic `measure`); the single-file build inlines this module body
+ * into the shipped index.html — stripping the `export` — so the shipped tool
+ * stays dependency-free and file://-openable. See the consuming repo's build
+ * docs (§ "Build-assembled tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function wrapText(text, maxWidth, measure) {
+  const src = text == null ? '' : String(text);
+  const mw = Number(maxWidth);
+  const limit = Number.isFinite(mw) ? mw : 0;
+  const paras = src.split('\n');
+  const out = [];
+  for (const para of paras) {
+    const words = para.split(/(\s+)/).filter((t) => t.length > 0);
+    if (words.length === 0) { out.push(''); continue; }
+    let line = '';
+    for (const token of words) {
+      const isSpace = /^\s+$/.test(token);
+      const candidate = line + token;
+      if (line === '') {
+        line = isSpace ? '' : token;
+        continue;
+      }
+      if (limit > 0 && measure(candidate) > limit && !isSpace) {
+        out.push(line.replace(/\s+$/, ''));
+        line = token;
+      } else {
+        line = candidate;
+      }
+    }
+    out.push(line.replace(/\s+$/, ''));
+  }
+  return out.length ? out : [''];
+}
+
+// =====================================================================
+// Aggregator — static members REFERENCE the named functions above (single
+// implementation; nothing is reimplemented here). Defined LAST.
+// =====================================================================
+class CtUtil {
+  static downloadBlob = downloadBlob;
+  static debounce = debounce;
+  static clamp = clamp;
+  static num = num;
+  static clampInt = clampInt;
+  static escapeHtml = escapeHtml;
+  static escapeAttr = escapeAttr;
+  static persistState = persistState;
+  static onceFlag = onceFlag;
+  static el = el;
+  static prefersReducedMotion = prefersReducedMotion;
+  static restartAnimation = restartAnimation;
+  static setupHiDPICanvas = setupHiDPICanvas;
+  static posAt = posAt;
+  static slugify = slugify;
+  static wrapText = wrapText;
+}
+// ===== end CtUtil (ES module) =====
+return { downloadBlob, debounce, clamp, num, clampInt, escapeHtml, escapeAttr, persistState, onceFlag, el, prefersReducedMotion, restartAnimation, setupHiDPICanvas, posAt, slugify, wrapText, CtUtil };
+})();
+const { downloadBlob, debounce, clamp, num, clampInt, escapeHtml, escapeAttr, persistState, onceFlag, el, prefersReducedMotion, restartAnimation, setupHiDPICanvas, posAt, slugify, wrapText, CtUtil } = __ct_utils_CtUtil;
+
+/* ct:module components/CtLicense.mjs */
+const __ct_components_CtLicense = (() => {
+/* CtLicense — shared License modal (components/CtLicense.mjs).
+   An ES module with a SIDE-EFFECT: importing it wires a global click listener
+   (once) that opens the modal on any [data-ct-license] trigger (the footer link in
+   components/footer.html). Every tool that carries the footer imports this module in its
+   app.mjs, so the footer link works for free; the footer no longer inlines a script.
+   Also callable as `openLicense()` / `CtLicense.open()` (there is no window global
+   any more). Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (e.g. a tool that bundles a wasm codec — a per-tool DATA config hook, read at
+   open time). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. Module-private names carry a "License"
+   qualifier so the build's import-flattening cannot collide with app.mjs top-levels. */
+var LICENSE_REPO = 'https://github.com/codercowboy/claude-tools';
+var LICENSE_REPO_LABEL = LICENSE_REPO.replace(/^https?:\/\//, '');
+var LICENSE_MIT_TEXT = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Jason and Claude (Anthropic)',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+
+var licenseOverlay, licenseDialog, licensePrevFocus, licenseStyleEl;
+
+function escapeLicenseHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function injectLicenseStyles() {
+  if (licenseStyleEl) return;
+  licenseStyleEl = document.createElement('style');
+  licenseStyleEl.textContent =
+    '.jbcl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+    '.jbcl-overlay[hidden]{display:none!important;}' +
+    '@media (prefers-reduced-motion:no-preference){.jbcl-overlay{animation:jbcl-fade .15s ease;}@keyframes jbcl-fade{from{opacity:0}to{opacity:1}}}' +
+    '.jbcl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+    '.jbcl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+    '.jbcl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+    '.jbcl-dialog a{color:LinkText;}' +
+    '.jbcl-lead{margin:0 0 .8rem;}' +
+    '.jbcl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+    '.jbcl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.jbcl-tp li{margin-bottom:.3rem;}' +
+    '.jbcl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+    '.jbcl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+    '.jbcl-close:hover{background:rgba(127,127,127,.18);}' +
+    '.jbcl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+  (document.head || document.documentElement).appendChild(licenseStyleEl);
+}
+
+function buildLicenseDialog() {
+  injectLicenseStyles();
+  licenseOverlay = document.createElement('div');
+  licenseOverlay.className = 'jbcl-overlay';
+  licenseOverlay.hidden = true;
+  licenseOverlay.setAttribute('data-testid', 'license-overlay');
+  licenseOverlay.innerHTML =
+    '<div class="jbcl-dialog" role="dialog" aria-modal="true" aria-labelledby="jbcl-title" data-testid="license-modal">' +
+      '<button type="button" class="jbcl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+      '<h2 id="jbcl-title">License</h2>' +
+      '<div class="jbcl-body"></div>' +
+    '</div>';
+  document.body.appendChild(licenseOverlay);
+  licenseDialog = licenseOverlay.querySelector('.jbcl-dialog');
+  licenseOverlay.querySelector('.jbcl-close').addEventListener('click', closeLicense);
+  licenseOverlay.addEventListener('mousedown', function (e) {
+    if (e.target === licenseOverlay) { e.preventDefault(); closeLicense(); }
+  });
+}
+
+function renderLicenseBody() {
+  var html =
+    '<p class="jbcl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+    '<a href="' + LICENSE_REPO + '" target="_blank" rel="noopener noreferrer">' + LICENSE_REPO_LABEL + '</a></p>' +
+    '<pre class="jbcl-text">' + escapeLicenseHtml(LICENSE_MIT_TEXT) + '</pre>';
+  var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+  if (tp.length) {
+    html += '<h3>Bundled third-party libraries</h3><ul class="jbcl-tp">';
+    tp.forEach(function (d) {
+      var label = escapeLicenseHtml(d.name || '') + (d.version ? ' ' + escapeLicenseHtml(d.version) : '');
+      var lic = d.license ? ' &mdash; ' + escapeLicenseHtml(d.license) : '';
+      var link = d.url ? ' &middot; <a href="' + escapeLicenseHtml(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+      html += '<li>' + label + lic + link + '</li>';
+    });
+    html += '</ul><p class="jbcl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+  } else {
+    html += '<p class="jbcl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+  }
+  licenseOverlay.querySelector('.jbcl-body').innerHTML = html;
+}
+
+function licenseFocusables() {
+  return Array.prototype.slice
+    .call(licenseDialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+    .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+}
+
+function onLicenseKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeLicense(); return; }
+  if (e.key !== 'Tab') return;
+  var f = licenseFocusables();
+  if (!f.length) return;
+  e.preventDefault();
+  var i = f.indexOf(document.activeElement);
+  var n = e.shiftKey ? i - 1 : i + 1;
+  if (n < 0) n = f.length - 1;
+  if (n >= f.length) n = 0;
+  f[n].focus();
+}
+
+function openLicense() {
+  if (!licenseOverlay) buildLicenseDialog();
+  renderLicenseBody();
+  licensePrevFocus = document.activeElement;
+  // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+  var host = document.fullscreenElement || document.body;
+  if (licenseOverlay.parentNode !== host) host.appendChild(licenseOverlay);
+  licenseOverlay.hidden = false;
+  document.addEventListener('keydown', onLicenseKey, true);
+  licenseDialog.scrollTop = 0;
+  licenseOverlay.querySelector('.jbcl-close').focus({ preventScroll: true });
+}
+
+function closeLicense() {
+  if (!licenseOverlay || licenseOverlay.hidden) return;
+  licenseOverlay.hidden = true;
+  document.removeEventListener('keydown', onLicenseKey, true);
+  if (licenseOverlay.parentNode !== document.body) document.body.appendChild(licenseOverlay);
+  if (licensePrevFocus && typeof licensePrevFocus.focus === 'function') { try { licensePrevFocus.focus(); } catch (e) {} }
+  licensePrevFocus = null;
+}
+
+var licenseTriggerWired = false;
+function wireLicenseTrigger() {
+  if (licenseTriggerWired || typeof document === 'undefined') return; // idempotent
+  licenseTriggerWired = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); openLicense(); }
+  });
+}
+wireLicenseTrigger(); // self-wire on module evaluation
+
+class CtLicense {
+  static open = openLicense;
+}
+return { openLicense, CtLicense };
+})();
+const { openLicense, CtLicense } = __ct_components_CtLicense;
+
+
+  // =====================================================================
+  // 1. DOM references
+  // =====================================================================
+  const pasteInputEl = document.getElementById('pasteInput');
+  const convertBtn = document.getElementById('convertBtn');
+  const clearPasteBtn = document.getElementById('clearPasteBtn');
+  const parseSummaryEl = document.getElementById('parseSummary');
+
+  const rowsList = document.getElementById('rowsList');
+  const addRowBtn = document.getElementById('addRowBtn');
+  const removeAllBtn = document.getElementById('removeAllBtn');
+
+  const rgbaOutputEl = document.getElementById('rgbaOutput');
+  const hexOutputEl = document.getElementById('hexOutput');
+  const rgbaCopyAllBtn = document.getElementById('rgbaCopyAllBtn');
+  const hexCopyAllBtn = document.getElementById('hexCopyAllBtn');
+  const rgbaOutputCopyBtn = document.getElementById('rgbaOutputCopyBtn');
+  const hexOutputCopyBtn = document.getElementById('hexOutputCopyBtn');
+
+  const helpButton = document.getElementById('help-button');
+  const helpOverlay = document.querySelector('[data-testid="help-overlay"]');
+  const helpDialog = document.querySelector('[data-testid="help-modal"]');
+  const helpCloseXButton = helpDialog.querySelector('[data-testid="modal-close-x"]');
+
+  // =====================================================================
+  // 2. State
+  // =====================================================================
+  let nextId = 1;
+
+  const state = {
+    rows: [
+      // { id, rawText, parsed: {r,g,b,a} | null }
+    ],
+  };
+
+  // Versioned localStorage key — docs/conventions.md § "Persist UI state
+  // (localStorage)" (hat-picker is the exemplar). Bump the version if the
+  // stored shape ever changes.
+  const STORAGE_KEY = 'color-converter:v1';
+
+  // First-load Help popup — docs/conventions.md § "First-load help popup
+  // (all tools)". Separate versioned key from STORAGE_KEY so bumping one
+  // never affects the other.
+  const HELP_SEEN_KEY = 'color-converter:help-seen:v1';
+
+  // Per-row DOM references, keyed by row object, so live typing can update
+  // just this row's visuals without a full renderRows() (which would steal
+  // focus from the input the user is actively typing in).
+  const rowEls = new WeakMap(); // row -> { li, input, swatch, hexOutput, rgbaOutput, hexField, rgbaField }
+
+  // ===== BEGIN PURE-LOGIC (unit-tested — see tests/unit/extract-inline-module.mjs) =====
+  // =====================================================================
+  // 3. parseColor + helpers (pure, no DOM)
+  // =====================================================================
+  const HEX_RE = /^#?([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+  // Comma form: rgb(r, g, b) / rgba(r, g, b, a) — alpha optional.
+  // No `%` support: percentage channels are out of scope (DESIGN.md), so a
+  // line like "rgb(50%, 0%, 0%)" simply fails to match and falls through to
+  // null rather than being partially parsed.
+  const RGB_COMMA_RE =
+    /^rgba?\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*(?:,\s*(-?[\d.]+)\s*)?\)$/i;
+
+  // Modern slash form: rgb(r g b / a) — space-separated channels, required
+  // alpha after a slash. Mixing comma and slash syntax matches neither regex.
+  const RGB_SLASH_RE =
+    /^rgba?\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s*\/\s*(-?[\d.]+)\s*\)$/i;
+
+  function clampChannel(n) { return Math.round(Math.min(255, Math.max(0, n))); }
+  function clampAlpha(n) { return Math.min(1, Math.max(0, n)); }
+
+  function parseHex(digits) {
+    const d = digits.toLowerCase();
+    if (d.length === 3 || d.length === 4) {
+      const r = parseInt(d[0] + d[0], 16);
+      const g = parseInt(d[1] + d[1], 16);
+      const b = parseInt(d[2] + d[2], 16);
+      const a = d.length === 4 ? parseInt(d[3] + d[3], 16) / 255 : 1;
+      return { r, g, b, a };
+    }
+    // length 6 or 8
+    const r = parseInt(d.slice(0, 2), 16);
+    const g = parseInt(d.slice(2, 4), 16);
+    const b = parseInt(d.slice(4, 6), 16);
+    const a = d.length === 8 ? parseInt(d.slice(6, 8), 16) / 255 : 1;
+    return { r, g, b, a };
+  }
+
+  // Shared by both functional-form regexes. alphaGroup is undefined for the
+  // comma form with no 4th argument -> alpha defaults to 1.
+  function buildRgba(rGroup, gGroup, bGroup, alphaGroup) {
+    const rNum = Number(rGroup);
+    const gNum = Number(gGroup);
+    const bNum = Number(bGroup);
+    if (Number.isNaN(rNum) || Number.isNaN(gNum) || Number.isNaN(bNum)) return null;
+
+    let a = 1;
+    if (alphaGroup !== undefined) {
+      const aNum = Number(alphaGroup);
+      if (Number.isNaN(aNum)) return null;
+      a = clampAlpha(aNum);
+    }
+
+    return {
+      r: clampChannel(rNum),
+      g: clampChannel(gNum),
+      b: clampChannel(bNum),
+      a,
+    };
+  }
+
+  function parseColor(str) {
+    const s = String(str ?? '').trim();
+    if (s === '') return null;
+
+    const hexMatch = s.match(HEX_RE);
+    if (hexMatch) return parseHex(hexMatch[1]);
+
+    const comma = s.match(RGB_COMMA_RE);
+    if (comma) return buildRgba(comma[1], comma[2], comma[3], comma[4]);
+
+    const slash = s.match(RGB_SLASH_RE);
+    if (slash) return buildRgba(slash[1], slash[2], slash[3], slash[4]);
+
+    return null;
+  }
+
+  // =====================================================================
+  // 4. Canonical formatters (pure, match color-picker)
+  // =====================================================================
+  function rgbaString({ r, g, b, a }) {
+    const alpha = Number.isInteger(a) ? a : Math.round(a * 1000) / 1000;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function hexString({ r, g, b, a }) {
+    const h = (n) => n.toString(16).padStart(2, '0');
+    const base = `#${h(r)}${h(g)}${h(b)}`;
+    return a < 1 ? `${base}${h(Math.round(a * 255))}` : base;
+  }
+
+  export { parseColor, parseHex, buildRgba, clampChannel, clampAlpha, rgbaString, hexString };
+  // ===== END PURE-LOGIC =====
+
+  // =====================================================================
+  // 5. Persistence (localStorage) — docs/conventions.md § "Persist UI state
+  // (localStorage)". The rows are the single source of truth (see DESIGN.md),
+  // so only each row's raw text and the paste-box text are persisted — the
+  // parsed color and the two derived output textareas are DERIVED and are
+  // recomputed from rawText on restore, never stored. Best-effort: every
+  // read/write is try/catch-wrapped and failures degrade silently — the tool
+  // works fully with no stored (or unreadable/corrupt) state.
+  // =====================================================================
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        rows: state.rows.map((r) => r.rawText),
+        paste: pasteInputEl.value,
+      }));
+    } catch { /* localStorage unavailable/throwing (file://, private mode, quota, policy) — in-memory only */ }
+  }
+
+  // Reads + validates the stored blob. Always returns a usable
+  // { rows: string[], paste: string } shape — {rows: [], paste: ''} for
+  // missing/unreadable/malformed storage, so callers never need a fallback.
+  function restoreState() {
+    const fallback = { rows: [], paste: '' };
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return fallback;
+      const rows = Array.isArray(parsed.rows) ? parsed.rows.filter((r) => typeof r === 'string') : [];
+      const paste = typeof parsed.paste === 'string' ? parsed.paste : '';
+      return { rows, paste };
+    } catch {
+      return fallback; // localStorage unavailable/throwing, or corrupt JSON
+    }
+  }
+
+  // Whether the visitor has already dismissed the Help modal at least once.
+  // If localStorage throws/is unavailable, treat it as already-seen so we
+  // don't nag on every load — the least-annoying safe fallback (the ? button
+  // is always there if they want the modal later).
+  function hasSeenHelp() {
+    try {
+      return localStorage.getItem(HELP_SEEN_KEY) === '1';
+    } catch {
+      return true;
+    }
+  }
+
+  function markHelpSeen() {
+    try {
+      localStorage.setItem(HELP_SEEN_KEY, '1');
+    } catch {
+      // Best-effort, same as saveState().
+    }
+  }
+
+  // =====================================================================
+  // 6. Row management
+  // =====================================================================
+  function addRow(rawText = '') {
+    const row = { id: nextId++, rawText, parsed: parseColor(rawText) };
+    state.rows.push(row); // append — newest at the bottom (reading order)
+    renderRows();
+    renderOutputs();
+    saveState();
+    return row;
+  }
+
+  function removeRow(id) {
+    state.rows = state.rows.filter((r) => r.id !== id);
+    renderRows();
+    renderOutputs();
+    saveState();
+  }
+
+  function removeAllRows() {
+    state.rows = [];
+    renderRows();
+    renderOutputs();
+    saveState();
+  }
+
+  function updateRemoveAllDisabled() {
+    removeAllBtn.disabled = state.rows.length === 0;
+  }
+
+  // =====================================================================
+  // 7. Row rendering
+  // =====================================================================
+  function renderRows() {
+    rowsList.innerHTML = '';
+    for (const row of state.rows) {
+      rowsList.appendChild(buildRow(row));
+    }
+    updateRemoveAllDisabled();
+  }
+
+  function buildRow(row) {
+    const li = document.createElement('li');
+    li.className = 'row';
+    li.dataset.testid = 'color-row';
+    li.dataset.id = String(row.id);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'row-input';
+    input.dataset.testid = 'row-input';
+    input.setAttribute('aria-label', 'Color (rgba or hex)');
+    input.value = row.rawText;
+    input.addEventListener('input', () => onRowInput(row, input));
+    li.appendChild(input);
+
+    const swatch = document.createElement('span');
+    swatch.className = 'swatch';
+    swatch.dataset.testid = 'row-swatch';
+    li.appendChild(swatch);
+
+    const hexField = buildField('hex-field', 'row-hex-output', 'row-hex-copy', 'Copy hex value', 'Hex output');
+    const rgbaField = buildField('rgba-field', 'row-rgba-output', 'row-rgba-copy', 'Copy rgba value', 'RGBA output');
+    li.appendChild(hexField.wrap);
+    li.appendChild(rgbaField.wrap);
+
+    const trashBtn = document.createElement('button');
+    trashBtn.type = 'button';
+    trashBtn.className = 'trash-btn';
+    trashBtn.dataset.testid = 'row-trash';
+    trashBtn.setAttribute('aria-label', 'Remove row');
+    trashBtn.title = 'Remove row';
+    trashBtn.textContent = '🗑';
+    // UI path goes through the shared confirmDialog dialog;
+    // window.__colorConverter.removeRow remains a direct, non-modal function
+    // for programmatic/test use (and is what this handler calls on confirm).
+    trashBtn.addEventListener('click', async () => {
+      if (await confirmDialog('Remove this color?')) removeRow(row.id);
+    });
+    li.appendChild(trashBtn);
+
+    rowEls.set(row, {
+      li,
+      input,
+      swatch,
+      hexOutput: hexField.input,
+      rgbaOutput: rgbaField.input,
+    });
+
+    updateRowVisuals(row);
+    return li;
+  }
+
+  // Per-color value field: read-only <input> wrapped in a `.ct-field` with an
+  // in-field `.ct-copy-btn` at its right edge (docs/conventions.md § "Standard
+  // control height & in-field copy — controls.css"). These are OUTPUT fields,
+  // so the copy button shows always (no reveal-when-non-empty toggle).
+  function buildField(fieldClass, inputTestId, copyTestId, copyLabel, fieldLabel) {
+    const wrap = document.createElement('div');
+    wrap.className = `ct-field ${fieldClass}`;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.readOnly = true;
+    input.dataset.testid = inputTestId;
+    input.setAttribute('aria-label', fieldLabel);
+    wrap.appendChild(input);
+
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'ct-copy-btn';
+    copyBtn.dataset.testid = copyTestId;
+    copyBtn.setAttribute('aria-label', copyLabel);
+    copyBtn.title = copyLabel;
+    copyBtn.textContent = '📋';
+    copyBtn.addEventListener('click', () => handleCopyClick(copyBtn, input.value));
+    wrap.appendChild(copyBtn);
+
+    return { wrap, input };
+  }
+
+  // Debounced live-parse on input. Deliberately does NOT call renderRows()
+  // (full rebuild) — that would destroy/recreate the input mid-keystroke and
+  // lose focus/cursor position. Instead mutate row state directly and touch
+  // only this row's cached elements.
+  // Shared trailing-edge debounce (jbc-include/util.js, inlined as a global).
+  // Each row keeps its own debounced handler so an input only defers its own row.
+  function onRowInput(row, inputEl) {
+    if (!row._debouncedInput) {
+      row._debouncedInput = debounce(() => {
+        row.rawText = inputEl.value;
+        row.parsed = parseColor(row.rawText);
+        updateRowVisuals(row);
+        renderOutputs(); // cheap full recompute, safe every debounced input
+        saveState();
+      }, 150);
+    }
+    row._debouncedInput();
+  }
+
+  function updateRowVisuals(row) {
+    const els = rowEls.get(row);
+    if (!els) return;
+    const { li, swatch, hexOutput, rgbaOutput } = els;
+
+    const isEmpty = row.rawText.trim() === '';
+    const isInvalid = !isEmpty && row.parsed === null;
+
+    li.classList.toggle('invalid', isInvalid);
+
+    if (isEmpty) {
+      swatch.className = 'swatch empty';
+      swatch.style.removeProperty('--swatch-color');
+      hexOutput.value = '';
+      rgbaOutput.value = '';
+    } else if (isInvalid) {
+      swatch.className = 'swatch invalid';
+      swatch.style.removeProperty('--swatch-color');
+      hexOutput.value = '';
+      rgbaOutput.value = '';
+    } else {
+      swatch.className = row.parsed.a < 1 ? 'swatch alpha' : 'swatch';
+      swatch.style.setProperty('--swatch-color', rgbaString(row.parsed));
+      hexOutput.value = hexString(row.parsed);
+      rgbaOutput.value = rgbaString(row.parsed);
+    }
+  }
+
+  addRowBtn.addEventListener('click', () => {
+    const row = addRow('');
+    const els = rowEls.get(row);
+    if (els) els.input.focus();
+  });
+
+  // =====================================================================
+  // 8. Derived outputs (RGBA-per-line, HEX-per-line)
+  // =====================================================================
+  // Invalid-line placeholder: a literal token that can't collide with a
+  // real color value, keeping the original text visible so the user can
+  // find and fix the offending row. Documented in the README.
+  function invalidLine(rawText) {
+    return `INVALID: ${rawText}`;
+  }
+
+  function rowToRgbaLine(row) {
+    if (row.rawText.trim() === '') return '';
+    return row.parsed ? rgbaString(row.parsed) : invalidLine(row.rawText);
+  }
+
+  function rowToHexLine(row) {
+    if (row.rawText.trim() === '') return '';
+    return row.parsed ? hexString(row.parsed) : invalidLine(row.rawText);
+  }
+
+  function rgbaOutput() {
+    return state.rows.map(rowToRgbaLine).join('\n');
+  }
+
+  function hexOutput() {
+    return state.rows.map(rowToHexLine).join('\n');
+  }
+
+  function renderOutputs() {
+    rgbaOutputEl.value = rgbaOutput();
+    hexOutputEl.value = hexOutput();
+  }
+
+  // =====================================================================
+  // 9. Copy (per-field + copy-all) — shared copy/flash (tools/include/
+  // copy.js, pasted above as a classic <script>)
+  // =====================================================================
+  async function handleCopyClick(btn, text) {
+    if (!text) return; // nothing to copy on an empty/invalid row's output field
+    const ok = await copy(text);
+    if (!ok) return;
+    const current = btn.dataset.ctcFlashOriginal ?? btn.textContent;
+    flash(btn, { label: current === 'Copy all' ? 'Copied!' : '✅' });
+  }
+
+  rgbaCopyAllBtn.addEventListener('click', () => handleCopyClick(rgbaCopyAllBtn, rgbaOutputEl.value));
+  hexCopyAllBtn.addEventListener('click', () => handleCopyClick(hexCopyAllBtn, hexOutputEl.value));
+
+  // In-field copy buttons pinned to each "one per line" output textarea's
+  // top-right (docs/conventions.md § controls.css in-field copy; textareas use
+  // .ct-field--multiline). Outputs, so they show always; they copy the whole
+  // textarea and complement the standalone "Copy all" buttons below.
+  rgbaOutputCopyBtn.addEventListener('click', () => handleCopyClick(rgbaOutputCopyBtn, rgbaOutputEl.value));
+  hexOutputCopyBtn.addEventListener('click', () => handleCopyClick(hexOutputCopyBtn, hexOutputEl.value));
+
+  // =====================================================================
+  // 9b. Help modal — purely informational (what the tool does + how to use
+  // it), so it's its own small dedicated dialog rather than confirmDialog (which
+  // is a yes/no destructive-action confirm). Markup is static in the
+  // document (shown/hidden via [hidden]) rather than built/torn down per
+  // open/close. Structure/focus-handling mirrors tools/hat-picker's Help
+  // modal, the reference implementation for this convention (see
+  // docs/conventions.md "First-load help popup (all tools)").
+  // =====================================================================
+  let helpPreviouslyFocused = null;
+
+  function getHelpFocusable() {
+    return Array.from(
+      helpDialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter((el) => !el.disabled && el.getClientRects().length > 0);
+  }
+
+  function onHelpKeydown(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeHelp();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const focusable = getHelpFocusable();
+    if (focusable.length === 0) return;
+    e.preventDefault();
+    const idx = focusable.indexOf(document.activeElement);
+    let next = e.shiftKey ? idx - 1 : idx + 1;
+    if (next < 0) next = focusable.length - 1;
+    if (next >= focusable.length) next = 0;
+    focusable[next].focus();
+  }
+
+  function openHelp() {
+    helpPreviouslyFocused = document.activeElement;
+    helpOverlay.hidden = false;
+    document.addEventListener('keydown', onHelpKeydown, true);
+    helpDialog.scrollTop = 0;
+    helpCloseXButton.focus({ preventScroll: true });
+  }
+
+  function closeHelp() {
+    if (helpOverlay.hidden) return;
+    helpOverlay.hidden = true;
+    document.removeEventListener('keydown', onHelpKeydown, true);
+    if (helpPreviouslyFocused && typeof helpPreviouslyFocused.focus === 'function') {
+      try { helpPreviouslyFocused.focus(); } catch { /* ignore */ }
+    }
+    helpPreviouslyFocused = null;
+  }
+
+  helpButton.addEventListener('click', () => openHelp());
+  helpCloseXButton.addEventListener('click', () => closeHelp());
+  helpOverlay.addEventListener('mousedown', (e) => {
+    if (e.target === helpOverlay) closeHelp();
+  });
+
+  // =====================================================================
+  // 10. Bulk convert
+  // =====================================================================
+  // REPLACE semantics: Convert first erases all current rows (which, via
+  // renderOutputs(), also clears both derived output textareas), then
+  // regenerates rows fresh from the given text. It does not accumulate
+  // across repeated calls — a second Convert reflects only the latest paste
+  // contents, not the union of every past Convert.
+  function bulkConvert(text) {
+    state.rows = [];
+    const lines = text.split('\n').map((l) => l.trim()).filter((l) => l !== '');
+    let invalidCount = 0;
+    for (const line of lines) {
+      const row = { id: nextId++, rawText: line, parsed: parseColor(line) };
+      if (row.parsed === null) invalidCount++;
+      state.rows.push(row);
+    }
+    renderRows();
+    renderOutputs();
+    showParseSummary(lines.length, invalidCount);
+    saveState();
+    return { added: lines.length, invalid: invalidCount };
+  }
+
+  function showParseSummary(generated, invalid) {
+    parseSummaryEl.textContent =
+      invalid > 0
+        ? `Generated ${generated} row${generated === 1 ? '' : 's'} — ${invalid} couldn't be parsed.`
+        : `Generated ${generated} row${generated === 1 ? '' : 's'}.`;
+  }
+
+  convertBtn.addEventListener('click', () => {
+    bulkConvert(pasteInputEl.value);
+    // Paste text is intentionally left in place (only "Clear" empties it) so
+    // the user can cross-check what was just converted. The paste box is the
+    // source of truth for regeneration, not something Convert consumes.
+    // Convert is this tool's commit/submit action: dismiss the mobile
+    // keyboard on a successful run by blurring the active element (the paste
+    // textarea) — docs/conventions.md § Responsive & mobile.
+    document.activeElement?.blur();
+  });
+
+  // Clear (paste box), per-row trash, and Remove all are the three
+  // destructive actions in this tool. Each is guarded by the shared
+  // confirmDialog dialog (components/CtConfirm.mjs) with an
+  // action-specific message; the underlying mutation only runs if the user
+  // confirms. Per-row trash is wired in buildRow() above.
+  clearPasteBtn.addEventListener('click', async () => {
+    if (await confirmDialog('Clear the paste box?')) {
+      pasteInputEl.value = ''; // clears only the paste box, never rows
+      saveState();
+    }
+  });
+
+  removeAllBtn.addEventListener('click', async () => {
+    if (state.rows.length === 0) return; // defensive; button is disabled when empty
+    if (await confirmDialog('Remove all rows?')) removeAllRows();
+  });
+
+  // The paste box's own draft text is persisted independently of rows/
+  // Convert — it's part of "where the user left off", not something Convert
+  // consumes (Convert leaves it in place; only Clear empties it).
+  pasteInputEl.addEventListener('input', () => saveState());
+
+  // =====================================================================
+  // 11. Initial render + restore
+  // =====================================================================
+  // Restore-on-load: rows (and the derived output textareas) are rebuilt
+  // from each stored row's raw text, re-parsing/re-deriving fresh rather
+  // than trusting any stored derived data (there is none — only rawText is
+  // persisted). Missing/unreadable/corrupt storage falls back to today's
+  // behavior: start empty.
+  (function init() {
+    const restored = restoreState();
+    pasteInputEl.value = restored.paste;
+    state.rows = restored.rows.map((rawText) => ({ id: nextId++, rawText, parsed: parseColor(rawText) }));
+    renderRows();
+    renderOutputs();
+
+    // Auto-show the Help modal once, on a genuinely fresh visit only.
+    // Marking it seen right away (rather than on close) keeps this a true
+    // "once" — even if the visitor navigates away without explicitly closing
+    // it, it won't auto-show again next time.
+    if (!hasSeenHelp()) {
+      markHelpSeen();
+      openHelp();
+    }
+  })();
+
+  // =====================================================================
+  // 12. Test hook
+  // =====================================================================
+  // Inert namespace for Playwright-driven tests: pure formatters, action
+  // functions, live (non-cloned) state, and derived-output getters.
+  window.__colorConverter = {
+    parseColor,
+    rgbaString,
+    hexString,
+    addRow,
+    bulkConvert,
+    removeRow,
+    removeAllRows,
+    state,
+    rgbaOutput,
+    hexOutput,
+  };
+
+</script>
+</body>
+</html>

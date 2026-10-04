@@ -1,0 +1,2589 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cron Builder</title>
+<meta property="og:title"       content="Cron Builder">
+<meta property="og:description" content="Build, parse, and understand a cron expression — field pickers &amp; raw edit in sync, a plain-English explainer, and the next runs preview, all local in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-alt: #f0f0f4;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --focus: #2f6fed;
+    --radius: 8px;
+    /* shared confirm component accents (unused today — no destructive confirms — but set so
+       the shared component reads correctly if ever adopted). */
+    --ctc-accent: #2f6fed;
+    --ctc-accent-contrast: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-alt: #2a2a30;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --focus: #6d9bff;
+      --ctc-accent: #6d9bff;
+      --ctc-accent-contrast: #0b1220;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  /* ===== Begin ct-base ===== */
+/* Shared single-file-tool base styles — inlined by the build
+   near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
+   This is the single source of truth: edit here, run `npm run build`. See
+   the html-single-file conventions (web-craft.md).
+   It sits near the TOP of the <style> block (after any reset) so a tool's own
+   later rules can still layer colors on top; for <select>, keep the tool's fill as
+   `background-color` (not the `background` shorthand, which would wipe the chevron). */
+html { touch-action: manipulation; } /* double-tap won't zoom the page; pinch-zoom + scroll still work. Gesture canvases keep their own touch-action:none. */
+[hidden] { display: none !important; } /* an author `display:` rule must never defeat the hidden attribute */
+.visually-hidden { /* screen-reader-only (kept in the a11y tree, unlike display:none) */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* iOS/Safari sizes a native <select> from font-size and ignores height/min-height
+   (renders ~half as tall as inputs). Opt out of the native control so the box model
+   applies, and supply our own chevron (appearance:none removes the native one). */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  font-size: 16px; /* >=16px also stops iOS zoom-on-focus */
+  padding-right: 2rem; /* room for the chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.6 6 6.4l5-4.8' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.72rem;
+}
+/* ===== end ct-base ===== */
+/* ===== Begin ct-controls ===== */
+/* Shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the jbc:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See web-craft.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use CtClipboardUtil copy/flash for behavior
+   (components/CtClipboardUtil.mjs). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 { font-size: 1.35rem; margin: 0 0 0.3rem; }
+  h2 { margin: 0; font-size: 1.15rem; }
+  h3 { margin: 0; }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  input[type="text"],
+  input[type="number"] {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.55rem 0.7rem;
+    width: 100%;
+  }
+
+  /* Keep base.css's chevron: fill with background-COLOR (never the shorthand),
+     and set padding with LONGHANDS so the shorthand doesn't clobber the
+     chevron's reserved padding-right (see conventions § select padding trap). */
+  select {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding-block: 0.55rem;
+    padding-left: 0.7rem;
+    padding-right: 2rem;
+    width: 100%;
+  }
+
+  input:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+
+  button:hover:not(:disabled):not(.ctc-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  output:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header { display: flex; flex-direction: column; gap: 0.2rem; }
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .header-titles { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; line-height: 1;
+  }
+
+  /* ---------- Card panels ---------- */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.15rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .card-head { display: flex; flex-direction: column; gap: 0.25rem; }
+  .card-blurb { margin: 0; color: var(--text-muted); font-size: 0.85rem; }
+
+  .hint { margin: 0; color: var(--text-muted); font-size: 0.8rem; line-height: 1.45; }
+
+  .field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .field.grow { flex: 1 1 auto; min-width: 0; }
+
+  .controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem 1.25rem;
+  }
+  .preset-field { min-width: 14rem; }
+  .flavor-field { min-width: 14rem; }
+
+  .checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .checkbox input { width: auto; min-height: 0; }
+
+  .expr-row { display: flex; }
+  .input-copy { display: flex; gap: 0.4rem; align-items: stretch; width: 100%; }
+  .input-copy input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+  }
+
+  .field-legend {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.01em;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .error {
+    margin: 0;
+    padding: 0.55rem 0.75rem;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Copy buttons ---------- */
+  .copy-btn {
+    flex: 0 0 auto;
+    line-height: 1;
+    padding: 0.45rem 0.6rem;
+    min-width: 44px;
+  }
+
+  /* ---------- Field editors ---------- */
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.85rem;
+  }
+  .field-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 0.8rem;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .field-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .field-card-title { font-weight: 700; font-size: 0.92rem; }
+  .field-card-range { color: var(--text-muted); font-size: 0.72rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .field-body { display: flex; flex-direction: column; gap: 0.45rem; }
+  .field-body.row { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .field-body .inline-label { font-weight: 500; font-size: 0.82rem; color: var(--text-muted); }
+  .field-body input[type="number"] { max-width: 6rem; }
+  .field-body .num-narrow { max-width: 8rem; }
+
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(4.2rem, 1fr));
+    gap: 0.3rem 0.5rem;
+  }
+  .checkbox-grid label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-weight: 500;
+    font-size: 0.82rem;
+    cursor: pointer;
+    padding: 0.15rem 0;
+  }
+  .checkbox-grid input { width: auto; min-height: 0; }
+
+  .field-hint { color: var(--text-muted); font-size: 0.72rem; }
+
+  /* ---------- Explainer ---------- */
+  .explain-text {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    font-weight: 600;
+  }
+  .or-note { border-top: 1px solid var(--border); padding-top: 0.6rem; }
+
+  /* ---------- Next runs ---------- */
+  .runs-list {
+    margin: 0;
+    padding-left: 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .runs-list li { line-height: 1.4; }
+  .run-time {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    user-select: text;
+  }
+  .run-rel { color: var(--text-muted); font-size: 0.8rem; margin-left: 0.4rem; }
+  .runs-empty { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+  .runs-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  /* ---------- Help modal ---------- */
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .help-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 34rem;
+    max-height: min(85vh, 720px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    padding: 1.25rem 3rem 1.1rem 1.4rem;
+  }
+
+  .modal-close-x {
+    position: absolute;
+    top: .5rem; right: .5rem;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; border: 0; border-radius: 8px;
+    background: transparent; color: inherit;
+    font-size: 1.6rem; line-height: 1; cursor: pointer;
+  }
+  .modal-close-x:hover:not(:disabled):not(.ctc-btn) { background: rgba(127, 127, 127, .18); }
+  .modal-close-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .help-dialog h2 { margin: 0 0 0.6rem; font-size: 1.2rem; }
+  .help-dialog p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .help-dialog ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .help-dialog li { margin-bottom: 0.4rem; }
+  .help-dialog code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: var(--panel-alt);
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+  }
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .help-overlay { animation: help-fade 150ms ease; }
+    @keyframes help-fade { from { opacity: 0; } to { opacity: 1; } }
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 640px) {
+    .field-grid { grid-template-columns: 1fr; }
+    .preset-field, .flavor-field { min-width: 0; width: 100%; flex: 1 1 100%; }
+    .controls-row { gap: 0.75rem; }
+    .copy-btn { min-height: 44px; }
+    #runs-copy-all { min-height: 44px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Cron Builder</h1>
+        <p class="subtitle">Build and understand a cron schedule — pickers and raw expression in sync, plain-English explainer, and the next runs, all local in your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <!-- ==================== Expression card ==================== -->
+  <section class="card" data-testid="card-expression" aria-labelledby="expr-heading">
+    <div class="card-head">
+      <h2 id="expr-heading">Cron expression</h2>
+      <p class="card-blurb">Edit the raw expression or the field pickers below — the other side updates to match.</p>
+    </div>
+
+    <div class="controls-row">
+      <div class="field flavor-field">
+        <label for="flavor-select">Flavor</label>
+        <select id="flavor-select" data-testid="flavor-select" aria-label="Cron flavor"></select>
+      </div>
+
+      <div class="field preset-field">
+        <label for="preset-select">Presets</label>
+        <select id="preset-select" data-testid="preset-select">
+          <option value="">Choose a preset…</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="expr-row">
+      <div class="field grow">
+        <label for="cron-input">Expression</label>
+        <div class="input-copy">
+          <input type="text" id="cron-input" data-testid="cron-input" autocomplete="off" spellcheck="false" autocapitalize="off">
+          <button type="button" class="copy-btn" data-copy-target="cron-input" data-testid="cron-copy" aria-label="Copy expression" title="Copy expression">📋</button>
+        </div>
+      </div>
+    </div>
+    <p class="field-legend" data-testid="field-legend" aria-hidden="true"></p>
+
+    <p class="error" data-testid="cron-error" role="alert" aria-live="polite" hidden></p>
+  </section>
+
+  <!-- ==================== Field editors ==================== -->
+  <section class="card" data-testid="card-fields" aria-labelledby="fields-heading">
+    <div class="card-head">
+      <h2 id="fields-heading">Field editors</h2>
+      <p class="card-blurb">Pick a mode per field. Changes rebuild the expression above.</p>
+    </div>
+    <div class="field-grid" data-testid="field-grid"></div>
+  </section>
+
+  <!-- ==================== Explainer ==================== -->
+  <section class="card" data-testid="card-explain" aria-labelledby="explain-heading">
+    <div class="card-head">
+      <h2 id="explain-heading">In plain English</h2>
+    </div>
+    <p class="explain-text" data-testid="cron-description" aria-live="polite"></p>
+    <p class="hint or-note" data-testid="dom-dow-note" hidden>
+      Note: day-of-month <em>and</em> day-of-week are both set, so this runs when <strong>either</strong> matches (an OR), following standard cron behavior.
+    </p>
+  </section>
+
+  <!-- ==================== Next runs ==================== -->
+  <section class="card" data-testid="card-runs" aria-labelledby="runs-heading">
+    <div class="card-head">
+      <h2 id="runs-heading">Next 5 runs</h2>
+      <p class="card-blurb">Upcoming fire times, computed offline from your device's clock.</p>
+    </div>
+    <ol class="runs-list" data-testid="next-runs"></ol>
+    <p class="runs-empty" data-testid="runs-empty" hidden>No matching times in the next 5 years.</p>
+    <div class="runs-foot">
+      <span class="hint" data-testid="tz-note"></span>
+      <button type="button" id="runs-copy-all" data-testid="runs-copy-all" title="Copy all runs" aria-label="Copy all runs">Copy all</button>
+    </div>
+  </section>
+</div>
+
+<div class="help-overlay" data-testid="help-overlay" hidden>
+  <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" data-testid="help-modal">
+    <button type="button" class="modal-close-x" data-testid="modal-close-x" aria-label="Close">&times;</button>
+    <h2 id="help-title">Cron Builder</h2>
+    <p>Build, read, and preview a <strong>cron schedule</strong> without leaving the page. Everything runs locally in your browser — nothing you type is ever sent anywhere.</p>
+    <ul>
+      <li><strong>Two-way editing.</strong> Type a raw expression, or use the per-field <strong>pickers</strong> (Every / Every N / Range / Specific / Custom). Each side updates the other.</li>
+      <li><strong>Pick a flavor.</strong> The <strong>Flavor</strong> menu sets the field layout, allowed special characters, and day-of-week numbering:
+        <ul>
+          <li><strong>Standard / Unix</strong> (default) — 5 fields <code>minute hour day-of-month month day-of-week</code>. Day-of-week <code>0–7</code> (0 and 7 = Sunday). Macros like <code>@daily</code> work.</li>
+          <li><strong>Unix with seconds</strong> — 6 fields, a leading <code>seconds</code> column.</li>
+          <li><strong>Quartz (Java)</strong> — 6 or 7 fields <code>sec min hour dom month dow [year]</code>. Day-of-week <code>1–7</code> (1 = Sunday). Supports <code>?</code> <code>L</code> <code>W</code> <code>#</code>; exactly one of dom/dow must be <code>?</code>.</li>
+          <li><strong>Spring @Scheduled</strong> — 6 fields <code>sec min hour dom month dow</code>. Day-of-week <code>0–7</code>. Supports <code>?</code> <code>L</code> <code>#</code> (no <code>W</code>).</li>
+          <li><strong>AWS EventBridge</strong> — 6 fields <code>min hour dom month dow year</code>. Day-of-week <code>1–7</code>; one of dom/dow must be <code>?</code>. Supports <code>L</code> <code>W</code> <code>#</code>.</li>
+        </ul>
+      </li>
+      <li><strong>Syntax.</strong> <code>*</code> (every), <code>a</code>, <code>a-b</code> (range), <code>*/n</code> (step), <code>a-b/n</code>, <code>a/n</code>, and lists like <code>0,15,30</code>. Month names <code>JAN–DEC</code> and day names <code>SUN–SAT</code> work. Where the flavor allows: <code>?</code> ("no specific value"), <code>L</code> (last), <code>W</code> (nearest weekday), and <code>#</code> (nth weekday, e.g. <code>6#3</code>).</li>
+      <li><strong>Day-of-month vs day-of-week.</strong> When <em>both</em> are set, cron fires when <strong>either</strong> matches (an OR) — the explainer flags this.</li>
+      <li><strong>Plain English + next runs.</strong> A live description and the next 5 fire times (in your local time zone) update as you edit.</li>
+      <li><strong>Presets &amp; copy.</strong> Start from a common schedule, and copy the expression or the run list with the copy buttons.</li>
+    </ul>
+    <p class="help-note">Your expression and the chosen flavor are remembered on this device, so reopening the tool picks up where you left off. Times are shown in your local time zone; around daylight-saving changes the preview follows your system clock.</p>
+  </div>
+</div>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<!---- end footer -->
+
+
+<script type="module">
+/* ct:module components/CtClipboardUtil.mjs */
+const __ct_components_CtClipboardUtil = (() => {
+// ===== Begin CtClipboardUtil (ES module) =====
+/*
+ * CtClipboardUtil — copy-to-clipboard + button-flash helpers (ES module; was copy.js)
+ * ---------------------------------------------------------------------------
+ * import { copy, flash } from '<rel>/jbc-include/components/CtClipboardUtil.mjs';
+ * (or `CtClipboardUtil.copy` / `CtClipboardUtil.flash` via the aggregator class
+ * at the bottom — statics REFERENCE the named bindings, single implementation.)
+ *
+ * Formerly the pasteable IIFE copy.js exposing the jbcCopy / jbcFlash window globals;
+ * those globals are GONE. `copy` = ex-jbcCopy, `flash` = ex-jbcFlash — bodies
+ * unchanged. The `.ctc-flash` CSS still self-injects on the first `flash()` call
+ * (ensureStyles) and the `window.ctCopyStyles = false` opt-out is still honored.
+ *
+ * copy(text) -> Promise<boolean>
+ * flash(el, opts?) -> void
+ *
+ *     btn.addEventListener('click', async () => {
+ *       if (!text) return;
+ *       const ok = await copy(text);
+ *       if (!ok) return;
+ *       flash(btn, { label: '✅', revertTo: '📋' });
+ *     });
+ *
+ * copy(text):
+ * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
+ *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
+ *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
+ *   Clipboard API is unavailable or denied.
+ * - Always RESOLVES — never rejects/throws. Resolves `true` on success,
+ *   `false` if every copy path failed (denied permission, unsupported
+ *   browser, etc.) — callers check the boolean rather than try/catch.
+ *
+ * flash(el, opts?):
+ * - Transient "copied" feedback on a button: swaps `el.textContent` to
+ *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
+ *   reverts and clears the timer.
+ * - Revert target: `opts.revertTo` if given (for icon-only buttons that
+ *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
+ *   current text — captured once and reused if `flash` is called again on
+ *   the same element before the previous flash reverted (rapid re-clicks
+ *   don't lose the true original label).
+ * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
+ *   decorative scale pulse (see STYLING below) — no functional behavior
+ *   depends on it.
+ *
+ * STYLING:
+ * - The only visual injected is the optional `.ctc-flash` pulse animation,
+ *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
+ *   text swap + revert timing are unaffected either way).
+ * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
+ *   `flash` call and no styles are injected.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtClipboardUtil.mjs
+ */
+
+
+function copy(text) {
+  text = String(text == null ? '' : text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      function () { return true; },
+      function () { return fallbackCopy(text); }
+    );
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+var STYLE_ID = 'ctc-copy-style';
+function ensureStyles() {
+  if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = [
+    '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+    '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+    '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+    '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+var flashTimeouts = new WeakMap();
+function flash(el, opts) {
+  opts = opts || {};
+  var ms = opts.ms != null ? opts.ms : 1000;
+  var label = opts.label != null ? opts.label : '✅';
+
+  ensureStyles();
+  clearTimeout(flashTimeouts.get(el));
+
+  var original;
+  if (opts.revertTo != null) {
+    original = opts.revertTo;
+  } else if (el.dataset.ctcFlashOriginal != null) {
+    original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+  } else {
+    original = el.textContent;
+  }
+  el.dataset.ctcFlashOriginal = original;
+
+  el.textContent = label;
+  el.classList.remove('ctc-flash');
+  void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+  el.classList.add('ctc-flash');
+
+  var t = setTimeout(function () {
+    el.textContent = original;
+    el.classList.remove('ctc-flash');
+    delete el.dataset.ctcFlashOriginal;
+    flashTimeouts.delete(el);
+  }, ms);
+  flashTimeouts.set(el, t);
+}
+
+/** Aggregator (decision #3): statics REFERENCE the named exports above. */
+class CtClipboardUtil {
+  static copy = copy;
+  static flash = flash;
+}
+// ===== end CtClipboardUtil =====
+return { copy, flash, CtClipboardUtil };
+})();
+const { copy, flash, CtClipboardUtil } = __ct_components_CtClipboardUtil;
+
+/* ct:module components/CtLicense.mjs */
+const __ct_components_CtLicense = (() => {
+/* CtLicense — shared License modal (components/CtLicense.mjs).
+   An ES module with a SIDE-EFFECT: importing it wires a global click listener
+   (once) that opens the modal on any [data-ct-license] trigger (the footer link in
+   components/footer.html). Every tool that carries the footer imports this module in its
+   app.mjs, so the footer link works for free; the footer no longer inlines a script.
+   Also callable as `openLicense()` / `CtLicense.open()` (there is no window global
+   any more). Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (e.g. a tool that bundles a wasm codec — a per-tool DATA config hook, read at
+   open time). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. Module-private names carry a "License"
+   qualifier so the build's import-flattening cannot collide with app.mjs top-levels. */
+var LICENSE_REPO = 'https://github.com/codercowboy/claude-tools';
+var LICENSE_REPO_LABEL = LICENSE_REPO.replace(/^https?:\/\//, '');
+var LICENSE_MIT_TEXT = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Jason and Claude (Anthropic)',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+
+var licenseOverlay, licenseDialog, licensePrevFocus, licenseStyleEl;
+
+function escapeLicenseHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function injectLicenseStyles() {
+  if (licenseStyleEl) return;
+  licenseStyleEl = document.createElement('style');
+  licenseStyleEl.textContent =
+    '.jbcl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+    '.jbcl-overlay[hidden]{display:none!important;}' +
+    '@media (prefers-reduced-motion:no-preference){.jbcl-overlay{animation:jbcl-fade .15s ease;}@keyframes jbcl-fade{from{opacity:0}to{opacity:1}}}' +
+    '.jbcl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+    '.jbcl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+    '.jbcl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+    '.jbcl-dialog a{color:LinkText;}' +
+    '.jbcl-lead{margin:0 0 .8rem;}' +
+    '.jbcl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+    '.jbcl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.jbcl-tp li{margin-bottom:.3rem;}' +
+    '.jbcl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+    '.jbcl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+    '.jbcl-close:hover{background:rgba(127,127,127,.18);}' +
+    '.jbcl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+  (document.head || document.documentElement).appendChild(licenseStyleEl);
+}
+
+function buildLicenseDialog() {
+  injectLicenseStyles();
+  licenseOverlay = document.createElement('div');
+  licenseOverlay.className = 'jbcl-overlay';
+  licenseOverlay.hidden = true;
+  licenseOverlay.setAttribute('data-testid', 'license-overlay');
+  licenseOverlay.innerHTML =
+    '<div class="jbcl-dialog" role="dialog" aria-modal="true" aria-labelledby="jbcl-title" data-testid="license-modal">' +
+      '<button type="button" class="jbcl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+      '<h2 id="jbcl-title">License</h2>' +
+      '<div class="jbcl-body"></div>' +
+    '</div>';
+  document.body.appendChild(licenseOverlay);
+  licenseDialog = licenseOverlay.querySelector('.jbcl-dialog');
+  licenseOverlay.querySelector('.jbcl-close').addEventListener('click', closeLicense);
+  licenseOverlay.addEventListener('mousedown', function (e) {
+    if (e.target === licenseOverlay) { e.preventDefault(); closeLicense(); }
+  });
+}
+
+function renderLicenseBody() {
+  var html =
+    '<p class="jbcl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+    '<a href="' + LICENSE_REPO + '" target="_blank" rel="noopener noreferrer">' + LICENSE_REPO_LABEL + '</a></p>' +
+    '<pre class="jbcl-text">' + escapeLicenseHtml(LICENSE_MIT_TEXT) + '</pre>';
+  var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+  if (tp.length) {
+    html += '<h3>Bundled third-party libraries</h3><ul class="jbcl-tp">';
+    tp.forEach(function (d) {
+      var label = escapeLicenseHtml(d.name || '') + (d.version ? ' ' + escapeLicenseHtml(d.version) : '');
+      var lic = d.license ? ' &mdash; ' + escapeLicenseHtml(d.license) : '';
+      var link = d.url ? ' &middot; <a href="' + escapeLicenseHtml(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+      html += '<li>' + label + lic + link + '</li>';
+    });
+    html += '</ul><p class="jbcl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+  } else {
+    html += '<p class="jbcl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+  }
+  licenseOverlay.querySelector('.jbcl-body').innerHTML = html;
+}
+
+function licenseFocusables() {
+  return Array.prototype.slice
+    .call(licenseDialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+    .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+}
+
+function onLicenseKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeLicense(); return; }
+  if (e.key !== 'Tab') return;
+  var f = licenseFocusables();
+  if (!f.length) return;
+  e.preventDefault();
+  var i = f.indexOf(document.activeElement);
+  var n = e.shiftKey ? i - 1 : i + 1;
+  if (n < 0) n = f.length - 1;
+  if (n >= f.length) n = 0;
+  f[n].focus();
+}
+
+function openLicense() {
+  if (!licenseOverlay) buildLicenseDialog();
+  renderLicenseBody();
+  licensePrevFocus = document.activeElement;
+  // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+  var host = document.fullscreenElement || document.body;
+  if (licenseOverlay.parentNode !== host) host.appendChild(licenseOverlay);
+  licenseOverlay.hidden = false;
+  document.addEventListener('keydown', onLicenseKey, true);
+  licenseDialog.scrollTop = 0;
+  licenseOverlay.querySelector('.jbcl-close').focus({ preventScroll: true });
+}
+
+function closeLicense() {
+  if (!licenseOverlay || licenseOverlay.hidden) return;
+  licenseOverlay.hidden = true;
+  document.removeEventListener('keydown', onLicenseKey, true);
+  if (licenseOverlay.parentNode !== document.body) document.body.appendChild(licenseOverlay);
+  if (licensePrevFocus && typeof licensePrevFocus.focus === 'function') { try { licensePrevFocus.focus(); } catch (e) {} }
+  licensePrevFocus = null;
+}
+
+var licenseTriggerWired = false;
+function wireLicenseTrigger() {
+  if (licenseTriggerWired || typeof document === 'undefined') return; // idempotent
+  licenseTriggerWired = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); openLicense(); }
+  });
+}
+wireLicenseTrigger(); // self-wire on module evaluation
+
+class CtLicense {
+  static open = openLicense;
+}
+return { openLicense, CtLicense };
+})();
+const { openLicense, CtLicense } = __ct_components_CtLicense;
+
+
+  // =====================================================================
+  // Cron Builder — app (DOM wiring, render, persistence).
+  // The pure engine is inlined below; nothing here touches localStorage or
+  // the DOM inside logic.mjs.
+  // =====================================================================
+
+  // =====================================================================
+  // Cron Builder — pure logic (DOM-free, unit-tested)
+  //
+  // No document / window / localStorage in this file. app.mjs inlines it at
+  // build time; tests/unit/*.test.mjs import it directly.
+  //
+  // FLAVOR-AWARE. Each supported cron flavor (Standard/Unix, Unix-with-seconds,
+  // Quartz, Spring @Scheduled, AWS EventBridge) differs in field layout
+  // (5/6/7 fields, seconds-leading vs year-trailing), allowed special chars
+  // (`?` `L` `W` `#`, macros), and day-of-week numbering (unix 0–7 with 7=Sun,
+  // vs quartz/aws 1–7 with 1=Sun). See DESIGN.md § "Flavors".
+  //
+  // Internal normalization: every day-of-week value is normalized to the
+  // JavaScript convention (0=Sunday … 6=Saturday) inside `valueSet`, so
+  // `nextRuns` date math is correct regardless of flavor. Term objects keep the
+  // *literal* cron numbers (for serialization + editor round-trips).
+  //
+  // Model shape (from parseCron):
+  //   { flavor:string, seconds:boolean, hasYear:boolean, order:string[],
+  //     second?:Field, minute:Field, hour:Field, dom:Field, month:Field,
+  //     dow:Field, year?:Field }
+  //   Field = { raw, terms:Term[], wildcard:boolean, question:boolean,
+  //             special:boolean, values:number[], valueSet:Set }
+  //   Term  = { type:'every' }
+  //         | { type:'step', step }            // */n over the whole range
+  //         | { type:'stepFrom', from, step }  // a/n
+  //         | { type:'single', value }
+  //         | { type:'range', from, to }
+  //         | { type:'rangeStep', from, to, step }
+  //         | { type:'lastDom' }               // L (day-of-month = last day)
+  //         | { type:'lastDomOffset', offset } // L-n
+  //         | { type:'lastWeekday' }           // LW (last weekday of month)
+  //         | { type:'nearestWeekday', dom }   // 15W
+  //         | { type:'nthDow', dow, jsDow, nth }// 6#3
+  //         | { type:'lastDow', dow, jsDow }   // 5L (last given weekday)
+  // =====================================================================
+
+  // ===== BEGIN PURE-LOGIC =====
+
+  const MONTH_NAMES = [
+    '', 'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  const MONTH_ABBR = [
+    '', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+  ];
+  const MONTH_ALIASES = Object.fromEntries(
+    MONTH_ABBR.map((n, i) => [n, i]).filter(([n]) => n)
+  );
+
+  const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const DOW_ABBR = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']; // index = JS day (0=Sun)
+
+  // Two day-of-week alias tables, one per numbering convention.
+  //  unix:   SUN=0 … SAT=6   (and a literal 7 also = Sunday)
+  //  quartz: SUN=1 … SAT=7   (1 = Sunday)
+  const DOW_ALIASES_UNIX = Object.fromEntries(DOW_ABBR.map((n, i) => [n, i]));
+  const DOW_ALIASES_QUARTZ = Object.fromEntries(DOW_ABBR.map((n, i) => [n, i + 1]));
+
+  // Recognized name tokens (uppercase), used to tell a real name like JUL / WED
+  // apart from a special token that merely contains an L or W.
+  const NAME_TOKENS = new Set([...MONTH_ABBR.filter(Boolean), ...DOW_ABBR]);
+
+  // ---------------------------------------------------------------------
+  // Flavors
+  // ---------------------------------------------------------------------
+  //  dowNumbering: 'unix' (0–7, 7=Sun) | 'quartz' (1–7, 1=Sun)
+  //  requireQuestionRule: 'exactlyOne' — exactly one of dom/dow must be `?`.
+  const FLAVORS = {
+    standard: {
+      id: 'standard', label: 'Standard / Unix',
+      dowNumbering: 'unix',
+      allowQuestion: false, allowL: false, allowW: false, allowHash: false,
+      allowMacros: true, requireQuestionRule: null,
+    },
+    unixSeconds: {
+      id: 'unixSeconds', label: 'Unix with seconds',
+      dowNumbering: 'unix',
+      allowQuestion: false, allowL: false, allowW: false, allowHash: false,
+      allowMacros: false, requireQuestionRule: null,
+    },
+    quartz: {
+      id: 'quartz', label: 'Quartz (Java)',
+      dowNumbering: 'quartz',
+      allowQuestion: true, allowL: true, allowW: true, allowHash: true,
+      allowMacros: false, requireQuestionRule: 'exactlyOne',
+    },
+    spring: {
+      id: 'spring', label: 'Spring @Scheduled',
+      dowNumbering: 'unix',
+      allowQuestion: true, allowL: true, allowW: false, allowHash: true,
+      allowMacros: false, requireQuestionRule: null,
+    },
+    aws: {
+      id: 'aws', label: 'AWS EventBridge',
+      dowNumbering: 'quartz',
+      allowQuestion: true, allowL: true, allowW: true, allowHash: true,
+      allowMacros: false, requireQuestionRule: 'exactlyOne',
+    },
+  };
+
+  const FLAVOR_IDS = Object.keys(FLAVORS);
+
+  function getFlavor(id) {
+    return FLAVORS[id] || FLAVORS.standard;
+  }
+
+  // Resolve the flavor from parse options. Back-compat: `{ seconds:true }`
+  // (the pre-flavor API) maps to the Unix-with-seconds flavor.
+  function resolveFlavor(opts = {}) {
+    if (opts.flavor && FLAVORS[opts.flavor]) return FLAVORS[opts.flavor];
+    if (opts.seconds === true) return FLAVORS.unixSeconds;
+    return FLAVORS.standard;
+  }
+
+  // ---------------------------------------------------------------------
+  // Field specs (flavor-tuned dow + optional year)
+  // ---------------------------------------------------------------------
+  //  min/validMax — bounds for a literal value or range endpoint.
+  //  wildMax      — top of the range used to expand `*` / `*/n`.
+  //  dowOffset    — subtracted to map a literal dow to the JS day (0=Sun).
+  //  wrap7        — unix dow only: a literal 7 is an alias for Sunday (0).
+  function buildFieldSpecs(flavor) {
+    const dowUnix = flavor.dowNumbering === 'unix';
+    return {
+      second: { key: 'second', label: 'Seconds',      min: 0, validMax: 59, wildMax: 59 },
+      minute: { key: 'minute', label: 'Minutes',      min: 0, validMax: 59, wildMax: 59 },
+      hour:   { key: 'hour',   label: 'Hours',        min: 0, validMax: 23, wildMax: 23 },
+      dom:    { key: 'dom',    label: 'Day of month', min: 1, validMax: 31, wildMax: 31,
+                allowQuestion: flavor.allowQuestion, allowL: flavor.allowL, allowW: flavor.allowW, allowHash: false },
+      month:  { key: 'month',  label: 'Month',        min: 1, validMax: 12, wildMax: 12, aliases: MONTH_ALIASES },
+      dow:    { key: 'dow',    label: 'Day of week',
+                min: dowUnix ? 0 : 1, validMax: 7, wildMax: dowUnix ? 6 : 7,
+                aliases: dowUnix ? DOW_ALIASES_UNIX : DOW_ALIASES_QUARTZ,
+                dowOffset: dowUnix ? 0 : 1, wrap7: dowUnix,
+                allowQuestion: flavor.allowQuestion, allowL: flavor.allowL, allowW: false, allowHash: flavor.allowHash },
+      year:   { key: 'year',   label: 'Year',         min: 1970, validMax: 2199, wildMax: 2199 },
+    };
+  }
+
+  const SPECS_CACHE = {};
+  function specsForFlavor(id) {
+    if (!SPECS_CACHE[id]) SPECS_CACHE[id] = buildFieldSpecs(getFlavor(id));
+    return SPECS_CACHE[id];
+  }
+
+  // Backward-compatible static export (Standard / Unix numbering).
+  const FIELD_SPECS = specsForFlavor('standard');
+
+  // Field order in a standard 5-field expression (compat export/helper).
+  const BASE_FIELD_ORDER = ['minute', 'hour', 'dom', 'month', 'dow'];
+
+  // Compat: the old two-arg field order (false = 5-field, true = 6-field seconds).
+  function fieldOrder(seconds) {
+    return seconds ? ['second', ...BASE_FIELD_ORDER] : BASE_FIELD_ORDER;
+  }
+
+  // The field order for a flavor. Quartz is 6 or 7 fields (year optional).
+  function orderForFlavor(id, withYear = false) {
+    switch (id) {
+      case 'standard':    return ['minute', 'hour', 'dom', 'month', 'dow'];
+      case 'unixSeconds': return ['second', 'minute', 'hour', 'dom', 'month', 'dow'];
+      case 'quartz':      return withYear
+        ? ['second', 'minute', 'hour', 'dom', 'month', 'dow', 'year']
+        : ['second', 'minute', 'hour', 'dom', 'month', 'dow'];
+      case 'spring':      return ['second', 'minute', 'hour', 'dom', 'month', 'dow'];
+      case 'aws':         return ['minute', 'hour', 'dom', 'month', 'dow', 'year'];
+      default:            return ['minute', 'hour', 'dom', 'month', 'dow'];
+    }
+  }
+
+  // Resolve the order used to parse `n` whitespace-separated fields for a flavor,
+  // or throw a friendly field-count error.
+  function resolveOrder(flavor, n) {
+    const id = flavor.id;
+    if (id === 'quartz') {
+      if (n === 6) return orderForFlavor('quartz', false);
+      if (n === 7) return orderForFlavor('quartz', true);
+      throw new Error(
+        `${flavor.label}: expected 6 or 7 fields (seconds minutes hours day-of-month month day-of-week [year]) but found ${n}.`
+      );
+    }
+    const order = orderForFlavor(id);
+    if (n !== order.length) {
+      throw new Error(
+        `${flavor.label}: expected ${order.length} fields (${order.join(' ')}) but found ${n}.`
+      );
+    }
+    return order;
+  }
+
+  const MACROS = {
+    '@yearly':   '0 0 1 1 *',
+    '@annually': '0 0 1 1 *',
+    '@monthly':  '0 0 1 * *',
+    '@weekly':   '0 0 * * 0',
+    '@daily':    '0 0 * * *',
+    '@midnight': '0 0 * * *',
+    '@hourly':   '0 * * * *',
+  };
+
+  // ---------------------------------------------------------------------
+  // Token / term parsing
+  // ---------------------------------------------------------------------
+  function resolveToken(tok, spec) {
+    const t = String(tok == null ? '' : tok).trim();
+    if (t === '') throw new Error(`${spec.label}: empty value.`);
+    const upper = t.toUpperCase();
+    if (spec.aliases && Object.prototype.hasOwnProperty.call(spec.aliases, upper)) {
+      return spec.aliases[upper];
+    }
+    if (!/^\d+$/.test(t)) {
+      throw new Error(`${spec.label}: "${t}" is not a valid value.`);
+    }
+    const n = parseInt(t, 10);
+    if (n < spec.min || n > spec.validMax) {
+      throw new Error(`${spec.label}: ${n} is out of range (${spec.min}–${spec.validMax}).`);
+    }
+    return n;
+  }
+
+  function parseStep(str, spec) {
+    if (!/^\d+$/.test(str)) throw new Error(`${spec.label}: step "${str}" is not a number.`);
+    const n = parseInt(str, 10);
+    if (n < 1) throw new Error(`${spec.label}: step must be 1 or greater.`);
+    return n;
+  }
+
+  // Special tokens (L / W / #) — only in day-of-month / day-of-week. Returns a
+  // special Term, or null if `str` is not a special token. Throws if the token
+  // is special but disallowed by the field/flavor.
+  function parseSpecialTerm(str, spec, flavor) {
+    const U = str.toUpperCase();
+    let m;
+
+    // nth weekday: `6#3`, `FRI#3` (day-of-week only).
+    if ((m = U.match(/^(\d+|[A-Z]{3})#(\d+)$/))) {
+      if (spec.key !== 'dow') throw new Error(`${spec.label}: "#" is only valid in day-of-week.`);
+      if (!flavor.allowHash) throw new Error(`${flavor.label} does not support "#".`);
+      const lit = resolveToken(m[1], spec);
+      const nthN = parseInt(m[2], 10);
+      if (nthN < 1 || nthN > 5) throw new Error(`${spec.label}: "#n" must be between 1 and 5.`);
+      return { type: 'nthDow', dow: lit, jsDow: normalizeValue(lit, spec), nth: nthN };
+    }
+
+    if (spec.key === 'dom') {
+      if (U === 'LW') {
+        if (!flavor.allowL || !flavor.allowW) throw new Error(`${flavor.label} does not support "LW".`);
+        return { type: 'lastWeekday' };
+      }
+      if ((m = U.match(/^(\d+)W$/))) {
+        if (!flavor.allowW) throw new Error(`${flavor.label} does not support "W".`);
+        const dv = resolveToken(m[1], spec);
+        return { type: 'nearestWeekday', dom: dv };
+      }
+      if (U === 'L') {
+        if (!flavor.allowL) throw new Error(`${flavor.label} does not support "L".`);
+        return { type: 'lastDom' };
+      }
+      if ((m = U.match(/^L-(\d+)$/))) {
+        if (!flavor.allowL) throw new Error(`${flavor.label} does not support "L".`);
+        const off = parseInt(m[1], 10);
+        if (off < 0 || off > 30) throw new Error(`${spec.label}: "L-n" offset out of range.`);
+        return { type: 'lastDomOffset', offset: off };
+      }
+    }
+
+    if (spec.key === 'dow') {
+      if ((m = U.match(/^(\d+|[A-Z]{3})L$/))) {
+        if (!flavor.allowL) throw new Error(`${flavor.label} does not support "L".`);
+        const lit = resolveToken(m[1], spec);
+        return { type: 'lastDow', dow: lit, jsDow: normalizeValue(lit, spec) };
+      }
+      if (U === 'L') {
+        if (!flavor.allowL) throw new Error(`${flavor.label} does not support "L".`);
+        // Bare L in day-of-week = Saturday (the last day of the week).
+        const satLit = spec.dowOffset ? 7 : 6;
+        return { type: 'single', value: satLit };
+      }
+    }
+
+    return null;
+  }
+
+  function parseTerm(part, spec, flavor) {
+    const str = part.trim();
+    if (str === '') throw new Error(`${spec.label}: empty term.`);
+
+    if (spec.key === 'dom' || spec.key === 'dow') {
+      const sp = parseSpecialTerm(str, spec, flavor);
+      if (sp) return sp;
+    }
+
+    if (str.includes('/')) {
+      const bits = str.split('/');
+      if (bits.length !== 2) throw new Error(`${spec.label}: malformed step in "${str}".`);
+      const head = bits[0].trim();
+      const step = parseStep(bits[1].trim(), spec);
+      if (head === '*') return { type: 'step', step };
+      if (head.includes('-')) {
+        const [a, b] = splitRange(head, spec);
+        return { type: 'rangeStep', from: a, to: b, step };
+      }
+      return { type: 'stepFrom', from: resolveToken(head, spec), step };
+    }
+
+    if (str === '*') return { type: 'every' };
+
+    if (str.includes('-')) {
+      const [a, b] = splitRange(str, spec);
+      return { type: 'range', from: a, to: b };
+    }
+
+    return { type: 'single', value: resolveToken(str, spec) };
+  }
+
+  function splitRange(str, spec) {
+    const bits = str.split('-');
+    if (bits.length !== 2) throw new Error(`${spec.label}: malformed range "${str}".`);
+    const a = resolveToken(bits[0].trim(), spec);
+    const b = resolveToken(bits[1].trim(), spec);
+    if (a > b) throw new Error(`${spec.label}: range start ${a} is after end ${b}.`);
+    return [a, b];
+  }
+
+  // Map a literal cron value to the internal (JS-day for dow) value.
+  function normalizeValue(v, spec) {
+    if (spec && spec.key === 'dow') {
+      if (spec.wrap7 && v === 7) return 0;
+      return v - (spec.dowOffset || 0);
+    }
+    return v;
+  }
+
+  const SPECIAL_TYPES = new Set([
+    'lastDom', 'lastDomOffset', 'lastWeekday', 'nearestWeekday', 'nthDow', 'lastDow',
+  ]);
+
+  function expandTerm(term, spec) {
+    const out = [];
+    switch (term.type) {
+      case 'every':
+        for (let v = spec.min; v <= spec.wildMax; v++) out.push(normalizeValue(v, spec));
+        break;
+      case 'step':
+        for (let v = spec.min; v <= spec.wildMax; v += term.step) out.push(normalizeValue(v, spec));
+        break;
+      case 'stepFrom':
+        for (let v = term.from; v <= spec.wildMax; v += term.step) out.push(normalizeValue(v, spec));
+        break;
+      case 'single':
+        out.push(normalizeValue(term.value, spec));
+        break;
+      case 'range':
+        for (let v = term.from; v <= term.to; v++) out.push(normalizeValue(v, spec));
+        break;
+      case 'rangeStep':
+        for (let v = term.from; v <= term.to; v += term.step) out.push(normalizeValue(v, spec));
+        break;
+      default:
+        // Special terms contribute no static values (matched date-by-date).
+        break;
+    }
+    return out;
+  }
+
+  function parseField(text, spec, flavor = FLAVORS.standard) {
+    const raw = String(text == null ? '' : text).trim();
+    if (raw === '') throw new Error(`${spec.label}: empty field.`);
+
+    if (raw === '?') {
+      if (!spec.allowQuestion) {
+        if (!flavor.allowQuestion) throw new Error(`${flavor.label} does not support "?".`);
+        throw new Error(`${spec.label}: "?" is only allowed for day-of-month and day-of-week.`);
+      }
+      const values = [];
+      for (let v = spec.min; v <= spec.wildMax; v++) values.push(normalizeValue(v, spec));
+      return {
+        raw, terms: [{ type: 'every' }], wildcard: false, question: true,
+        special: false, values, valueSet: new Set(values),
+      };
+    }
+    if (raw.includes('?')) {
+      throw new Error(`${spec.label}: "?" must stand alone.`);
+    }
+
+    const parts = raw.split(',');
+    const terms = parts.map((p) => parseTerm(p, spec, flavor));
+    const valueSet = new Set();
+    for (const term of terms) {
+      for (const v of expandTerm(term, spec)) valueSet.add(v);
+    }
+    const values = Array.from(valueSet).sort((x, y) => x - y);
+    const wildcard = terms.length === 1 && terms[0].type === 'every';
+    const special = terms.some((t) => SPECIAL_TYPES.has(t.type));
+    return { raw, terms, wildcard, question: false, special, values, valueSet };
+  }
+
+  // ---------------------------------------------------------------------
+  // Serialize
+  // ---------------------------------------------------------------------
+  function serializeTerm(t) {
+    switch (t.type) {
+      case 'every':          return '*';
+      case 'step':           return `*/${t.step}`;
+      case 'stepFrom':       return `${t.from}/${t.step}`;
+      case 'single':         return `${t.value}`;
+      case 'range':          return `${t.from}-${t.to}`;
+      case 'rangeStep':      return `${t.from}-${t.to}/${t.step}`;
+      case 'lastDom':        return 'L';
+      case 'lastDomOffset':  return `L-${t.offset}`;
+      case 'lastWeekday':    return 'LW';
+      case 'nearestWeekday': return `${t.dom}W`;
+      case 'nthDow':         return `${t.dow}#${t.nth}`;
+      case 'lastDow':        return `${t.dow}L`;
+      default:               return '*';
+    }
+  }
+
+  function buildField(field) {
+    if (field.question) return '?';
+    return field.terms.map(serializeTerm).join(',');
+  }
+
+  // ---------------------------------------------------------------------
+  // parseCron / buildCron
+  // ---------------------------------------------------------------------
+  function checkSpecialChars(text, flavor) {
+    const bad = [];
+    const upper = text.toUpperCase();
+    const toks = upper.match(/[A-Z0-9]+/g) || [];
+    let hasL = false, hasW = false;
+    for (const tok of toks) {
+      if (/L/.test(tok) && !NAME_TOKENS.has(tok)) hasL = true;
+      if (/W/.test(tok) && !NAME_TOKENS.has(tok)) hasW = true;
+    }
+    if (hasL && !flavor.allowL) bad.push('L');
+    if (hasW && !flavor.allowW) bad.push('W');
+    if (text.includes('#') && !flavor.allowHash) bad.push('#');
+    if (bad.length) {
+      throw new Error(`${flavor.label} does not support ${bad.join(', ')} in a cron expression.`);
+    }
+  }
+
+  function parseCron(expr, opts = {}) {
+    const flavor = resolveFlavor(opts);
+    const specs = specsForFlavor(flavor.id);
+    let text = String(expr == null ? '' : expr).trim();
+    if (text === '') throw new Error('Enter a cron expression.');
+
+    // Macro shortcuts (@daily, …) — flavor must allow them; always 5-field.
+    const macroKey = text.toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(MACROS, macroKey)) {
+      if (!flavor.allowMacros) {
+        throw new Error(`${flavor.label} does not support the "${text}" macro.`);
+      }
+      text = MACROS[macroKey];
+    } else if (text[0] === '@') {
+      throw new Error(`Unknown macro "${text}".`);
+    }
+
+    // Reject special chars this flavor doesn't allow (guarding real names like
+    // JUL / WED that merely contain an L or W).
+    checkSpecialChars(text, flavor);
+
+    const parts = text.split(/\s+/);
+    const order = resolveOrder(flavor, parts.length);
+
+    const model = {
+      flavor: flavor.id,
+      seconds: order.includes('second'),
+      hasYear: order.includes('year'),
+      order,
+    };
+    order.forEach((key, i) => {
+      model[key] = parseField(parts[i], specs[key], flavor);
+    });
+
+    // Quartz / AWS: exactly one of day-of-month / day-of-week must be `?`.
+    if (flavor.requireQuestionRule === 'exactlyOne') {
+      const cnt = (model.dom.question ? 1 : 0) + (model.dow.question ? 1 : 0);
+      if (cnt !== 1) {
+        throw new Error(
+          `${flavor.label}: exactly one of day-of-month and day-of-week must be "?" (the other a specific value or *).`
+        );
+      }
+    }
+
+    return model;
+  }
+
+  function buildCron(model) {
+    const order = model.order || orderForFlavor(model.flavor || (model.seconds ? 'unixSeconds' : 'standard'), model.hasYear);
+    return order.map((key) => buildField(model[key])).join(' ');
+  }
+
+  // ---------------------------------------------------------------------
+  // Matching / next runs
+  // ---------------------------------------------------------------------
+  function isRestricted(field) {
+    return !field.wildcard && !field.question;
+  }
+
+  function lastDayOfMonth(y, m) {
+    return new Date(y, m + 1, 0).getDate();
+  }
+
+  // The day-of-month a `W` (nearest weekday) resolves to for `dom` in date's
+  // month — never crossing into an adjacent month.
+  function nearestWeekdayDom(y, m, dom) {
+    const dim = lastDayOfMonth(y, m);
+    let day = Math.min(dom, dim);
+    const wd = new Date(y, m, day).getDay();
+    if (wd === 6) {            // Saturday
+      day = (day === 1) ? day + 2 : day - 1;
+    } else if (wd === 0) {     // Sunday
+      day = (day === dim) ? day - 2 : day + 1;
+    }
+    return day;
+  }
+
+  function lastWeekdayOfMonth(y, m) {
+    let day = lastDayOfMonth(y, m);
+    const wd = new Date(y, m, day).getDay();
+    if (wd === 6) day -= 1;
+    else if (wd === 0) day -= 2;
+    return day;
+  }
+
+  function domSpecialMatch(t, date) {
+    const y = date.getFullYear(), m = date.getMonth(), d = date.getDate();
+    switch (t.type) {
+      case 'lastDom':        return d === lastDayOfMonth(y, m);
+      case 'lastDomOffset':  return d === lastDayOfMonth(y, m) - t.offset;
+      case 'lastWeekday':    return d === lastWeekdayOfMonth(y, m);
+      case 'nearestWeekday': return d === nearestWeekdayDom(y, m, t.dom);
+      default:               return false;
+    }
+  }
+
+  function dowSpecialMatch(t, date) {
+    switch (t.type) {
+      case 'nthDow': {
+        if (date.getDay() !== t.jsDow) return false;
+        const occ = Math.floor((date.getDate() - 1) / 7) + 1;
+        return occ === t.nth;
+      }
+      case 'lastDow': {
+        if (date.getDay() !== t.jsDow) return false;
+        return date.getDate() + 7 > lastDayOfMonth(date.getFullYear(), date.getMonth());
+      }
+      default: return false;
+    }
+  }
+
+  function domOk(field, date) {
+    if (field.valueSet.has(date.getDate())) return true;
+    if (field.special) {
+      for (const t of field.terms) if (domSpecialMatch(t, date)) return true;
+    }
+    return false;
+  }
+
+  function dowOk(field, date) {
+    if (field.valueSet.has(date.getDay())) return true;
+    if (field.special) {
+      for (const t of field.terms) if (dowSpecialMatch(t, date)) return true;
+    }
+    return false;
+  }
+
+  // Vixie-cron dom/dow rule: if both restricted -> OR; else the restricted one
+  // (if any) constrains, otherwise every day matches. `?` is not restricted.
+  function dayMatches(model, date) {
+    const domR = isRestricted(model.dom);
+    const dowR = isRestricted(model.dow);
+    const dOk = domOk(model.dom, date);
+    const wOk = dowOk(model.dow, date);
+    if (domR && dowR) return dOk || wOk;
+    if (domR) return dOk;
+    if (dowR) return wOk;
+    return true;
+  }
+
+  function nextRuns(model, from, count = 5) {
+    const results = [];
+    if (!(from instanceof Date) || Number.isNaN(from.getTime())) return results;
+    const useSeconds = model.seconds;
+    const yearField = model.hasYear ? model.year : null;
+    const yearRestricted = yearField && isRestricted(yearField);
+    const maxYear = yearRestricted ? yearField.values[yearField.values.length - 1] : Infinity;
+
+    const d = new Date(from.getTime());
+    d.setMilliseconds(0);
+    if (useSeconds) {
+      d.setSeconds(d.getSeconds() + 1);
+    } else {
+      d.setSeconds(0);
+      d.setMinutes(d.getMinutes() + 1);
+    }
+
+    const horizon = new Date(from.getTime());
+    horizon.setFullYear(horizon.getFullYear() + 5);
+
+    let guard = 0;
+    while (results.length < count && d.getTime() <= horizon.getTime()) {
+      if (++guard > 4000000) break;
+
+      if (yearRestricted && !yearField.valueSet.has(d.getFullYear())) {
+        if (d.getFullYear() > maxYear) break;
+        d.setFullYear(d.getFullYear() + 1, 0, 1);
+        d.setHours(0, 0, 0, 0);
+        continue;
+      }
+      if (!model.month.valueSet.has(d.getMonth() + 1)) {
+        d.setMonth(d.getMonth() + 1, 1);
+        d.setHours(0, 0, 0, 0);
+        continue;
+      }
+      if (!dayMatches(model, d)) {
+        d.setDate(d.getDate() + 1);
+        d.setHours(0, 0, 0, 0);
+        continue;
+      }
+      if (!model.hour.valueSet.has(d.getHours())) {
+        d.setHours(d.getHours() + 1, 0, 0, 0);
+        continue;
+      }
+      if (!model.minute.valueSet.has(d.getMinutes())) {
+        d.setMinutes(d.getMinutes() + 1, 0, 0);
+        continue;
+      }
+      if (useSeconds && !model.second.valueSet.has(d.getSeconds())) {
+        d.setSeconds(d.getSeconds() + 1, 0);
+        continue;
+      }
+
+      results.push(new Date(d.getTime()));
+      if (useSeconds) d.setSeconds(d.getSeconds() + 1, 0);
+      else d.setMinutes(d.getMinutes() + 1, 0, 0);
+    }
+    return results;
+  }
+
+  // ---------------------------------------------------------------------
+  // Describe (plain English)
+  // ---------------------------------------------------------------------
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function capitalize(s) { return s.length ? s[0].toUpperCase() + s.slice(1) : s; }
+
+  function joinList(arr) {
+    if (arr.length === 0) return '';
+    if (arr.length === 1) return arr[0];
+    if (arr.length === 2) return `${arr[0]} and ${arr[1]}`;
+    return `${arr.slice(0, -1).join(', ')} and ${arr[arr.length - 1]}`;
+  }
+
+  function asSingle(field) {
+    if (field.question) return null;
+    if (field.terms.length === 1 && field.terms[0].type === 'single') return field.terms[0].value;
+    return null;
+  }
+  function asStep(field) {
+    if (field.terms.length === 1 && field.terms[0].type === 'step') return field.terms[0].step;
+    return null;
+  }
+  function asSingleTerm(field) {
+    return field.terms.length === 1 ? field.terms[0] : null;
+  }
+  function stepPhrase(field, unit, fmt = String) {
+    const t = asSingleTerm(field);
+    if (!t) return null;
+    if (t.type === 'rangeStep') return `every ${nth(t.step)} ${unit} from ${fmt(t.from)} through ${fmt(t.to)}`;
+    if (t.type === 'stepFrom') return `every ${nth(t.step)} ${unit} from ${fmt(t.from)} on`;
+    return null;
+  }
+
+  function termText(t, fmt) {
+    switch (t.type) {
+      case 'single':    return fmt(t.value);
+      case 'range':     return `${fmt(t.from)} through ${fmt(t.to)}`;
+      case 'rangeStep': return `every ${nth(t.step)} value from ${fmt(t.from)} through ${fmt(t.to)}`;
+      case 'stepFrom':  return `every ${nth(t.step)} value from ${fmt(t.from)} on`;
+      case 'step':      return `every ${nth(t.step)} value`;
+      case 'every':     return 'every value';
+      default:          return '';
+    }
+  }
+
+  function nth(n) {
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+
+  function fieldListText(field, fmt) {
+    return joinList(field.terms.map((t) => termText(t, fmt)));
+  }
+
+  function describeTimeClause(model) {
+    const useSec = model.seconds;
+    const min = model.minute;
+    const hr = model.hour;
+    const sec = useSec ? model.second : null;
+
+    const minS = asSingle(min);
+    const hrS = asSingle(hr);
+    const secS = useSec ? asSingle(sec) : 0;
+
+    if (minS != null && hrS != null && (!useSec || secS != null)) {
+      const ss = useSec ? `:${pad(secS)}` : '';
+      return `At ${pad(hrS)}:${pad(minS)}${ss}`;
+    }
+
+    const segments = [];
+
+    if (useSec) {
+      if (sec.wildcard) segments.push('every second');
+      else {
+        const st = asStep(sec);
+        const sp = stepPhrase(sec, 'second');
+        if (st != null) segments.push(`every ${nth(st)} second`);
+        else if (sp) segments.push(sp);
+        else segments.push(`at second ${fieldListText(sec, String)}`);
+      }
+    }
+
+    if (min.wildcard) {
+      if (!useSec) segments.push('every minute');
+    } else {
+      const st = asStep(min);
+      const sp = stepPhrase(min, 'minute');
+      if (st != null) segments.push(`every ${nth(st)} minute`);
+      else if (minS != null) segments.push(`at minute ${minS}`);
+      else if (sp) segments.push(sp);
+      else segments.push(`at minute ${fieldListText(min, String)}`);
+    }
+
+    if (!hr.wildcard) {
+      const st = asStep(hr);
+      const sp = stepPhrase(hr, 'hour');
+      if (st != null) segments.push(`every ${nth(st)} hour`);
+      else if (hrS != null) segments.push(`past hour ${hrS}`);
+      else if (sp) segments.push(sp);
+      else segments.push(`past hour ${fieldListText(hr, String)}`);
+    }
+
+    if (segments.length === 0) return 'Every minute';
+    return capitalize(segments.join(', '));
+  }
+
+  // Text for a special day-of-month term.
+  function domSpecialText(t) {
+    switch (t.type) {
+      case 'lastDom':        return 'the last day of the month';
+      case 'lastDomOffset':  return t.offset === 0 ? 'the last day of the month' : `${nth(t.offset)}-to-last day of the month`;
+      case 'lastWeekday':    return 'the last weekday of the month';
+      case 'nearestWeekday': return `the nearest weekday to day ${t.dom}`;
+      default:               return '';
+    }
+  }
+
+  function dowSpecialText(t) {
+    switch (t.type) {
+      case 'nthDow':  return `the ${nth(t.nth)} ${DOW_NAMES[t.jsDow]} of the month`;
+      case 'lastDow': return `the last ${DOW_NAMES[t.jsDow]} of the month`;
+      default:        return '';
+    }
+  }
+
+  function describeDomClause(field) {
+    if (!isRestricted(field)) return '';
+    if (field.special) {
+      const parts = field.terms.map((t) =>
+        SPECIAL_TYPES.has(t.type) ? domSpecialText(t) : `day ${termText(t, String)}`);
+      return `on ${joinList(parts)}`;
+    }
+    const st = asStep(field);
+    if (st != null) return `on every ${nth(st)} day of the month`;
+    return `on day ${fieldListText(field, String)} of the month`;
+  }
+
+  function describeDowClause(field, dowSpec) {
+    if (!isRestricted(field)) return '';
+    const fmt = (v) => DOW_NAMES[normalizeValue(v, dowSpec)];
+    if (field.special) {
+      const parts = field.terms.map((t) =>
+        SPECIAL_TYPES.has(t.type) ? dowSpecialText(t) : termText(t, fmt));
+      return `on ${joinList(parts)}`;
+    }
+    const st = asStep(field);
+    if (st != null) return `on every ${nth(st)} day of the week`;
+    return `on ${fieldListText(field, fmt)}`;
+  }
+
+  function describeMonthClause(field) {
+    if (!isRestricted(field)) return '';
+    const st = asStep(field);
+    const fmt = (v) => MONTH_NAMES[v];
+    if (st != null) return `in every ${nth(st)} month`;
+    return `in ${fieldListText(field, fmt)}`;
+  }
+
+  function describeYearClause(field) {
+    if (!field || !isRestricted(field)) return '';
+    const st = asStep(field);
+    if (st != null) return `in every ${nth(st)} year`;
+    return `in ${fieldListText(field, String)}`;
+  }
+
+  function describeCron(model) {
+    const specs = specsForFlavor(model.flavor || (model.seconds ? 'unixSeconds' : 'standard'));
+    const time = describeTimeClause(model);
+    const domClause = describeDomClause(model.dom);
+    const dowClause = describeDowClause(model.dow, specs.dow);
+    const monthClause = describeMonthClause(model.month);
+    const yearClause = model.hasYear ? describeYearClause(model.year) : '';
+
+    const bothRestricted = isRestricted(model.dom) && isRestricted(model.dow);
+
+    let out = time;
+    const dayParts = [];
+    if (domClause) dayParts.push(domClause);
+    if (dowClause) dayParts.push(dowClause);
+    if (dayParts.length) {
+      out += ', ' + dayParts.join(bothRestricted ? ' or ' : ' and ');
+    }
+    if (monthClause) out += ', ' + monthClause;
+    if (yearClause) out += ', ' + yearClause;
+    return out;
+  }
+
+  // ---------------------------------------------------------------------
+  // Editor mode (drives the app's per-field pickers)
+  // ---------------------------------------------------------------------
+  function fieldEditorMode(field) {
+    // '?' and '*' both read as "Every" in the editor (semantically identical).
+    if (field.question || field.wildcard) return { mode: 'every' };
+    // Special tokens (L/W/#) round-trip through the raw Custom editor.
+    if (field.special) return { mode: 'custom', text: buildField(field) };
+    if (field.terms.length === 1) {
+      const t = field.terms[0];
+      if (t.type === 'step') return { mode: 'step', step: t.step };
+      if (t.type === 'range') return { mode: 'range', from: t.from, to: t.to };
+    }
+    if (field.terms.every((t) => t.type === 'single')) {
+      return { mode: 'specific', values: field.terms.map((t) => t.value) };
+    }
+    return { mode: 'custom', text: buildField(field) };
+  }
+
+  // ---------------------------------------------------------------------
+  // Flavor conversion (for switching flavors in the app; pure + testable)
+  // ---------------------------------------------------------------------
+  const DEFAULTS = {
+    standard:    '0 9 * * 1-5',
+    unixSeconds: '0 0 9 * * 1-5',
+    quartz:      '0 0 9 ? * 2-6',   // Mon–Fri in Quartz numbering (2–6), dom = ?
+    spring:      '0 0 9 * * 1-5',
+    aws:         '0 9 ? * 2-6 *',   // min hour dom month dow year; Mon–Fri, dom = ?
+  };
+
+  function sameDowNumbering(a, b) {
+    return (a.dowOffset || 0) === (b.dowOffset || 0) && !!a.wrap7 === !!b.wrap7;
+  }
+
+  function domTextForTarget(field, toFlavor) {
+    if (field.question) return toFlavor.allowQuestion ? '?' : '*';
+    if (field.wildcard) return '*';
+    if (field.special) {
+      const bad = field.terms.some((t) =>
+        (t.type === 'nearestWeekday' && !toFlavor.allowW) ||
+        (t.type === 'lastWeekday' && (!toFlavor.allowL || !toFlavor.allowW)) ||
+        ((t.type === 'lastDom' || t.type === 'lastDomOffset') && !toFlavor.allowL));
+      if (bad) return '*';
+    }
+    return buildField(field);
+  }
+
+  function dowTextForTarget(field, fromDowSpec, toDowSpec, toFlavor) {
+    if (field.question) return toFlavor.allowQuestion ? '?' : '*';
+    if (field.wildcard) return '*';
+
+    const hasHash = field.terms.some((t) => t.type === 'nthDow');
+    const hasL = field.terms.some((t) => t.type === 'lastDow');
+    const specialsOk = (!hasHash || toFlavor.allowHash) && (!hasL || toFlavor.allowL);
+
+    if (sameDowNumbering(fromDowSpec, toDowSpec) && specialsOk) {
+      return buildField(field);
+    }
+
+    // Cross-numbering (or unsupported special): re-emit as a flat, always-valid
+    // list of the target's day numbers, degrading unsupported specials to the
+    // plain weekday.
+    const toOff = toDowSpec.dowOffset || 0;
+    const parts = [];
+    const plain = [...field.valueSet].sort((a, b) => a - b).map((js) => js + toOff);
+    if (plain.length) parts.push(...plain.map(String));
+    for (const t of field.terms) {
+      if (t.type === 'nthDow') {
+        parts.push(toFlavor.allowHash ? `${t.jsDow + toOff}#${t.nth}` : String(t.jsDow + toOff));
+      } else if (t.type === 'lastDow') {
+        parts.push(toFlavor.allowL ? `${t.jsDow + toOff}L` : String(t.jsDow + toOff));
+      }
+    }
+    const uniq = [...new Set(parts)];
+    return uniq.length ? uniq.join(',') : '*';
+  }
+
+  // Convert a cron expression from one flavor to another, keeping the schedule's
+  // meaning as far as each flavor allows. Always returns a string that parses in
+  // `toId` (falling back to that flavor's default if the input can't be parsed).
+  function convertExpr(expr, fromId, toId) {
+    if (fromId === toId) return expr;
+    if (!FLAVORS[toId]) return expr;
+    let model;
+    try { model = parseCron(expr, { flavor: fromId }); }
+    catch (e) { return DEFAULTS[toId]; }
+
+    const from = getFlavor(fromId), to = getFlavor(toId);
+    const fromSpecs = specsForFlavor(fromId), toSpecs = specsForFlavor(toId);
+
+    const txt = {};
+    txt.second = model.second ? buildField(model.second) : '0';
+    txt.minute = buildField(model.minute);
+    txt.hour = buildField(model.hour);
+    txt.month = buildField(model.month);
+    txt.dom = domTextForTarget(model.dom, to);
+    txt.dow = dowTextForTarget(model.dow, fromSpecs.dow, toSpecs.dow, to);
+    txt.year = model.year ? buildField(model.year) : '*';
+
+    // Quartz / AWS: exactly one of dom/dow must be `?`.
+    if (to.requireQuestionRule === 'exactlyOne') {
+      const domQ = txt.dom === '?', dowQ = txt.dow === '?';
+      const cnt = (domQ ? 1 : 0) + (dowQ ? 1 : 0);
+      if (cnt === 0) {
+        if (txt.dom === '*') txt.dom = '?';
+        else if (txt.dow === '*') txt.dow = '?';
+        else txt.dom = '?';                // both restricted: keep dow, blank dom
+      } else if (cnt === 2) {
+        txt.dow = '*';                     // keep dom = ?
+      }
+    }
+
+    const withYear = toId === 'quartz' && !!model.year;
+    const order = orderForFlavor(toId, withYear);
+    const out = order.map((k) => txt[k]).join(' ');
+
+    // Final safety net: if the conversion somehow didn't parse, use the default.
+    try { parseCron(out, { flavor: toId }); return out; }
+    catch (e) { return DEFAULTS[toId]; }
+  }
+
+  // ===== END PURE-LOGIC =====
+
+  export {
+    MONTH_NAMES,
+    MONTH_ABBR,
+    MONTH_ALIASES,
+    DOW_NAMES,
+    DOW_ABBR,
+    DOW_ALIASES_UNIX,
+    DOW_ALIASES_QUARTZ,
+    FIELD_SPECS,
+    BASE_FIELD_ORDER,
+    FLAVORS,
+    FLAVOR_IDS,
+    getFlavor,
+    resolveFlavor,
+    specsForFlavor,
+    orderForFlavor,
+    MACROS,
+    DEFAULTS,
+    resolveToken,
+    parseTerm,
+    parseSpecialTerm,
+    expandTerm,
+    parseField,
+    serializeTerm,
+    buildField,
+    fieldOrder,
+    parseCron,
+    buildCron,
+    convertExpr,
+    isRestricted,
+    dayMatches,
+    domOk,
+    dowOk,
+    nextRuns,
+    describeCron,
+    fieldEditorMode,
+    normalizeValue,
+    lastDayOfMonth,
+    nearestWeekdayDom,
+    lastWeekdayOfMonth,
+    nth,
+    pad,
+  };
+
+  // =====================================================================
+  // 1. Constants & UI field specs
+  // =====================================================================
+  const STORAGE_KEY = 'cron-builder:v1';
+  const HELP_SEEN_KEY = 'cron-builder:help-seen:v1';
+  const DEFAULT_FLAVOR = 'standard';
+
+  // Presets are standard 5-field expressions; picking one switches to the
+  // Standard / Unix flavor (like the pre-flavor seconds toggle behavior).
+  const PRESETS = [
+    { label: 'Every minute',            expr: '* * * * *' },
+    { label: 'Every 5 minutes',         expr: '*/5 * * * *' },
+    { label: 'Every 15 minutes',        expr: '*/15 * * * *' },
+    { label: 'Every hour (on the hour)',expr: '0 * * * *' },
+    { label: 'Every day at midnight',   expr: '0 0 * * *' },
+    { label: 'Weekdays at 9:00 AM',     expr: '0 9 * * 1-5' },
+    { label: 'Every Sunday at midnight',expr: '0 0 * * 0' },
+    { label: '1st of the month, midnight', expr: '0 0 1 * *' },
+    { label: 'Every New Year (Jan 1)',  expr: '0 0 1 1 *' },
+  ];
+
+  // Per-field UI metadata for the CURRENT flavor. `kind:'enum'` fields (month,
+  // dow) use named checkboxes/selects; `kind:'num'` fields use number/text
+  // inputs. Rebuilt on every flavor change (dow numbering + labels differ).
+  let UI_FIELDS = {};
+
+  function buildUiFields(flavorId) {
+    const specs = specsForFlavor(flavorId);
+    const dow = specs.dow;
+    const dowUnix = flavorId !== 'quartz' && flavorId !== 'aws';
+    // dow option value = the flavor's LITERAL cron number (SUN=0 unix, SUN=1 quartz).
+    const dowOptions = DOW_ABBR.map((abbr, jsDay) => ({
+      value: jsDay + (dow.dowOffset || 0),
+      label: abbr,
+    }));
+    return {
+      second: { key: 'second', label: 'Seconds',      min: 0, max: 59, kind: 'num' },
+      minute: { key: 'minute', label: 'Minutes',      min: 0, max: 59, kind: 'num' },
+      hour:   { key: 'hour',   label: 'Hours',        min: 0, max: 23, kind: 'num' },
+      dom:    { key: 'dom',    label: 'Day of month', min: 1, max: 31, kind: 'num' },
+      month:  { key: 'month',  label: 'Month',        min: 1, max: 12, kind: 'enum',
+                options: MONTH_ABBR.map((abbr, i) => ({ value: i, label: abbr })).filter((o) => o.value >= 1) },
+      dow:    { key: 'dow',    label: 'Day of week',  min: dow.min, max: dow.validMax, kind: 'enum',
+                dowWrap7: dowUnix, options: dowOptions },
+      year:   { key: 'year',   label: 'Year',         min: 1970, max: 2199, kind: 'num' },
+    };
+  }
+
+  const MODE_OPTIONS = [
+    { value: 'every',    label: 'Every' },
+    { value: 'step',     label: 'Every N (step)' },
+    { value: 'range',    label: 'Range' },
+    { value: 'specific', label: 'Specific' },
+    { value: 'custom',   label: 'Custom' },
+  ];
+
+  // =====================================================================
+  // 2. State & persistence
+  // =====================================================================
+  const state = { expr: DEFAULTS[DEFAULT_FLAVOR], flavor: DEFAULT_FLAVOR };
+
+  function hasSeenHelp() {
+    try { return localStorage.getItem(HELP_SEEN_KEY) === '1'; }
+    catch (err) { return true; }
+  }
+  function markHelpSeen() {
+    try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch (err) { /* best-effort */ }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        expr: state.expr,
+        flavor: state.flavor,
+      }));
+    } catch (err) { /* best-effort */ }
+  }
+
+  function loadState() {
+    const fallback = { expr: DEFAULTS[DEFAULT_FLAVOR], flavor: DEFAULT_FLAVOR };
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return fallback;
+      const p = JSON.parse(raw) || {};
+      // Flavor, with back-compat for the pre-flavor `{ seconds:true }` shape.
+      let flavor = (typeof p.flavor === 'string' && FLAVORS[p.flavor]) ? p.flavor
+        : (p.seconds === true ? 'unixSeconds' : DEFAULT_FLAVOR);
+      let expr = (typeof p.expr === 'string' && p.expr.trim()) ? p.expr.trim() : '';
+      if (!expr) expr = DEFAULTS[flavor];
+      return { expr, flavor };
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  // =====================================================================
+  // 3. DOM references
+  // =====================================================================
+  const helpButtonEl = document.getElementById('help-button');
+  const helpOverlayEl = document.querySelector('[data-testid="help-overlay"]');
+  const helpDialogEl = document.querySelector('[data-testid="help-modal"]');
+  const helpCloseXBtn = helpDialogEl.querySelector('[data-testid="modal-close-x"]');
+
+  const flavorSelect = document.getElementById('flavor-select');
+  const presetSelect = document.getElementById('preset-select');
+  const cronInput = document.getElementById('cron-input');
+  const fieldLegendEl = document.querySelector('[data-testid="field-legend"]');
+  const errorEl = document.querySelector('[data-testid="cron-error"]');
+  const fieldGridEl = document.querySelector('[data-testid="field-grid"]');
+  const descriptionEl = document.querySelector('[data-testid="cron-description"]');
+  const domDowNoteEl = document.querySelector('[data-testid="dom-dow-note"]');
+  const runsListEl = document.querySelector('[data-testid="next-runs"]');
+  const runsEmptyEl = document.querySelector('[data-testid="runs-empty"]');
+  const tzNoteEl = document.querySelector('[data-testid="tz-note"]');
+  const runsCopyAllBtn = document.getElementById('runs-copy-all');
+
+  // fieldReaders[key]() -> current field text from that editor card.
+  const fieldReaders = {};
+  let lastModel = null;
+
+  // =====================================================================
+  // 4. Error display
+  // =====================================================================
+  function showError(msg) { errorEl.textContent = msg; errorEl.hidden = false; }
+  function hideError() { errorEl.hidden = true; errorEl.textContent = ''; }
+
+  // =====================================================================
+  // 5. Render pipeline
+  //    Source of truth = the raw expression string. Everything else is
+  //    derived: parse -> model -> editors / explainer / next-runs.
+  // =====================================================================
+  // The field order for the current view: the last successfully-parsed model's
+  // order when available (Quartz may be 6 or 7 fields), else the flavor default.
+  function currentOrder() {
+    if (lastModel && lastModel.flavor === state.flavor && Array.isArray(lastModel.order)) {
+      return lastModel.order;
+    }
+    return orderForFlavor(state.flavor);
+  }
+
+  function updateLegend() {
+    // A monospace legend that lines up field names under the expression.
+    fieldLegendEl.textContent = currentOrder().join('  ');
+  }
+
+  function renderFromRaw({ rerenderEditors = true } = {}) {
+    let model;
+    try {
+      model = parseCron(cronInput.value.trim(), { flavor: state.flavor });
+    } catch (err) {
+      showError(err.message);
+      return;
+    }
+    hideError();
+    lastModel = model;
+    updateLegend();
+    if (rerenderEditors) renderEditors(model);
+    renderExplainer(model);
+    renderNextRuns(model);
+  }
+
+  // Set a new canonical expression (from preset / seconds toggle / editors).
+  function applyExpr(expr, { rerenderEditors = true } = {}) {
+    cronInput.value = expr;
+    state.expr = expr;
+    renderFromRaw({ rerenderEditors });
+    saveState();
+  }
+
+  // =====================================================================
+  // 6. Field editors
+  // =====================================================================
+  function makeSelect(options, value, testid) {
+    const sel = document.createElement('select');
+    if (testid) sel.setAttribute('data-testid', testid);
+    for (const o of options) {
+      const opt = document.createElement('option');
+      opt.value = String(o.value);
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    }
+    if (value != null) sel.value = String(value);
+    return sel;
+  }
+
+  function renderEditors(model) {
+    UI_FIELDS = buildUiFields(state.flavor);
+    fieldGridEl.innerHTML = '';
+    for (const key in fieldReaders) delete fieldReaders[key];
+    for (const key of (model.order || currentOrder())) {
+      const card = createFieldEditor(UI_FIELDS[key], model[key]);
+      fieldGridEl.appendChild(card);
+    }
+  }
+
+  function createFieldEditor(ui, field) {
+    const card = document.createElement('div');
+    card.className = 'field-card';
+    card.setAttribute('data-testid', `fieldcard-${ui.key}`);
+
+    const head = document.createElement('div');
+    head.className = 'field-card-head';
+    const title = document.createElement('span');
+    title.className = 'field-card-title';
+    title.textContent = ui.label;
+    const range = document.createElement('span');
+    range.className = 'field-card-range';
+    range.textContent = `${ui.min}–${ui.max}`;
+    head.append(title, range);
+
+    const modeSel = makeSelect(MODE_OPTIONS, null, `mode-${ui.key}`);
+    modeSel.setAttribute('aria-label', `${ui.label} mode`);
+
+    const body = document.createElement('div');
+    body.className = 'field-body';
+
+    let em = fieldEditorMode(field);
+    // The enum range picker can only offer values that exist as options — and
+    // day-of-week's options are SUN–SAT (0–6), with no entry for 7 (the Sunday
+    // alias). A range endpoint outside the option set (e.g. dow `5-7` or `7-7`,
+    // both valid per the spec) therefore can't be shown as a range without
+    // silently blanking the <select> and corrupting the assembled expression.
+    // Fall such a field back to the Custom editor, which round-trips the raw
+    // field text verbatim.
+    if (em.mode === 'range' && ui.kind === 'enum') {
+      const optVals = new Set(ui.options.map((o) => o.value));
+      if (!optVals.has(em.from) || !optVals.has(em.to)) {
+        em = { mode: 'custom', text: buildField(field) };
+      }
+    }
+    modeSel.value = em.mode;
+
+    // buildBody renders inputs for the current mode and wires their change ->
+    // onEditorChange. It also (re)registers fieldReaders[ui.key].
+    function buildBody(mode, params) {
+      body.innerHTML = '';
+      body.classList.remove('row');
+      if (mode === 'every') {
+        const p = document.createElement('span');
+        p.className = 'field-hint';
+        p.textContent = `Every value (${ui.key === 'dom' || ui.key === 'dow' ? '* — no restriction' : '*'})`;
+        body.appendChild(p);
+        fieldReaders[ui.key] = () => '*';
+      } else if (mode === 'step') {
+        body.classList.add('row');
+        const lbl = document.createElement('span');
+        lbl.className = 'inline-label';
+        lbl.textContent = 'Every';
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.min = '1';
+        inp.max = String(ui.max);
+        inp.value = String(params && params.step != null ? params.step : 1);
+        inp.setAttribute('data-testid', `step-${ui.key}`);
+        inp.setAttribute('aria-label', `${ui.label} step`);
+        inp.addEventListener('input', onEditorChange);
+        const suffix = document.createElement('span');
+        suffix.className = 'inline-label';
+        suffix.textContent = unitPlural(ui.key);
+        body.append(lbl, inp, suffix);
+        fieldReaders[ui.key] = () => {
+          const n = parseInt(inp.value, 10);
+          return `*/${Number.isFinite(n) && n >= 1 ? n : 1}`;
+        };
+      } else if (mode === 'range') {
+        body.classList.add('row');
+        const fromSel = makeRangeControl(ui, (params && params.from != null) ? params.from : ui.min, `range-from-${ui.key}`, `${ui.label} range from`);
+        const dash = document.createElement('span');
+        dash.className = 'inline-label';
+        dash.textContent = 'to';
+        const toSel = makeRangeControl(ui, (params && params.to != null) ? params.to : ui.max, `range-to-${ui.key}`, `${ui.label} range to`);
+        body.append(fromSel.el, dash, toSel.el);
+        fieldReaders[ui.key] = () => `${fromSel.read()}-${toSel.read()}`;
+      } else if (mode === 'specific') {
+        if (ui.kind === 'enum') {
+          const grid = buildCheckboxGrid(ui, (params && params.values) || []);
+          body.appendChild(grid.el);
+          fieldReaders[ui.key] = () => {
+            const vals = grid.read();
+            return vals.length ? vals.join(',') : '*';
+          };
+        } else {
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.autocomplete = 'off';
+          inp.spellcheck = false;
+          inp.placeholder = 'e.g. 0,15,30';
+          inp.value = (params && params.values) ? params.values.join(',') : '';
+          inp.setAttribute('data-testid', `specific-${ui.key}`);
+          inp.setAttribute('aria-label', `${ui.label} specific values`);
+          inp.addEventListener('input', onEditorChange);
+          body.appendChild(inp);
+          const hint = document.createElement('span');
+          hint.className = 'field-hint';
+          hint.textContent = 'Comma-separated values.';
+          body.appendChild(hint);
+          fieldReaders[ui.key] = () => {
+            const v = inp.value.trim();
+            return v === '' ? '*' : v.replace(/\s+/g, '');
+          };
+        }
+      } else { // custom
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.autocomplete = 'off';
+        inp.spellcheck = false;
+        inp.placeholder = 'raw field, e.g. 1-5/2';
+        inp.value = params && params.text != null ? params.text : '*';
+        inp.setAttribute('data-testid', `custom-${ui.key}`);
+        inp.setAttribute('aria-label', `${ui.label} custom expression`);
+        inp.addEventListener('input', onEditorChange);
+        body.appendChild(inp);
+        fieldReaders[ui.key] = () => {
+          const v = inp.value.trim();
+          return v === '' ? '*' : v.replace(/\s+/g, '');
+        };
+      }
+    }
+
+    modeSel.addEventListener('change', () => {
+      buildBody(modeSel.value, null);
+      onEditorChange();
+    });
+
+    buildBody(em.mode, em);
+
+    card.append(head, modeSel, body);
+    return card;
+  }
+
+  function unitPlural(key) {
+    return ({ second: 'seconds', minute: 'minutes', hour: 'hours', dom: 'days', month: 'months', dow: 'days', year: 'years' })[key] || 'values';
+  }
+
+  // A range endpoint control: enum fields use a named <select>, numeric fields
+  // a number input.
+  function makeRangeControl(ui, value, testid, ariaLabel) {
+    if (ui.kind === 'enum') {
+      const sel = makeSelect(ui.options, value, testid);
+      sel.setAttribute('aria-label', ariaLabel);
+      sel.addEventListener('change', onEditorChange);
+      return { el: sel, read: () => sel.value };
+    }
+    const inp = document.createElement('input');
+    inp.type = 'number';
+    inp.min = String(ui.min);
+    inp.max = String(ui.max);
+    inp.className = 'num-narrow';
+    inp.value = String(value);
+    inp.setAttribute('data-testid', testid);
+    inp.setAttribute('aria-label', ariaLabel);
+    inp.addEventListener('input', onEditorChange);
+    return { el: inp, read: () => inp.value.trim() };
+  }
+
+  function buildCheckboxGrid(ui, selected) {
+    const grid = document.createElement('div');
+    grid.className = 'checkbox-grid';
+    grid.setAttribute('data-testid', `specific-grid-${ui.key}`);
+    const selSet = new Set(selected.map((v) => (ui.dowWrap7 && v === 7 ? 0 : v)));
+    const boxes = [];
+    for (const o of ui.options) {
+      const label = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = String(o.value);
+      cb.checked = selSet.has(o.value);
+      cb.setAttribute('data-testid', `spec-${ui.key}-${o.value}`);
+      cb.addEventListener('change', onEditorChange);
+      const span = document.createElement('span');
+      span.textContent = o.label;
+      label.append(cb, span);
+      grid.appendChild(label);
+      boxes.push(cb);
+    }
+    return {
+      el: grid,
+      read: () => boxes.filter((b) => b.checked).map((b) => parseInt(b.value, 10)),
+    };
+  }
+
+  function assembleExprFromEditors() {
+    return currentOrder().map((key) => fieldReaders[key] ? fieldReaders[key]() : '*').join(' ');
+  }
+
+  // Editor input -> new expression. Don't rebuild the editors (keep focus),
+  // just re-derive the raw box + explainer + next-runs.
+  function onEditorChange() {
+    const expr = assembleExprFromEditors();
+    cronInput.value = expr;
+    state.expr = expr;
+    renderFromRaw({ rerenderEditors: false });
+    saveState();
+  }
+
+  // =====================================================================
+  // 7. Explainer
+  // =====================================================================
+  function renderExplainer(model) {
+    descriptionEl.textContent = describeCron(model);
+    const both = isRestricted(model.dom) && isRestricted(model.dow);
+    domDowNoteEl.hidden = !both;
+  }
+
+  // =====================================================================
+  // 8. Next runs
+  // =====================================================================
+  function relativeText(date, now) {
+    const diff = date.getTime() - now.getTime();
+    const sec = Math.round(Math.abs(diff) / 1000);
+    if (sec < 45) return 'in under a minute';
+    const units = [
+      ['year', 31536000], ['month', 2592000], ['day', 86400],
+      ['hour', 3600], ['minute', 60],
+    ];
+    for (const [name, s] of units) {
+      if (sec >= s) {
+        const v = Math.floor(sec / s);
+        return `in ${v} ${name}${v === 1 ? '' : 's'}`;
+      }
+    }
+    return 'soon';
+  }
+
+  function renderNextRuns(model) {
+    const now = new Date();
+    const runs = nextRuns(model, now, 5);
+    runsListEl.innerHTML = '';
+    if (runs.length === 0) {
+      runsEmptyEl.hidden = false;
+    } else {
+      runsEmptyEl.hidden = true;
+      runs.forEach((r, i) => {
+        const li = document.createElement('li');
+        li.setAttribute('data-testid', `next-run-${i}`);
+        const t = document.createElement('span');
+        t.className = 'run-time';
+        t.textContent = formatRunTime(r, model.seconds);
+        const rel = document.createElement('span');
+        rel.className = 'run-rel';
+        rel.textContent = relativeText(r, now);
+        li.append(t, rel);
+        runsListEl.appendChild(li);
+      });
+    }
+    let tz = 'local time';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz; } catch (e) { /* ignore */ }
+    tzNoteEl.textContent = `Times shown in your local time zone (${tz}).`;
+  }
+
+  function formatRunTime(date, withSeconds) {
+    const opts = {
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    };
+    if (withSeconds) opts.second = '2-digit';
+    try { return date.toLocaleString(undefined, opts); }
+    catch (e) { return date.toString(); }
+  }
+
+  // =====================================================================
+  // 9. Controls: seconds toggle, presets, raw input
+  // =====================================================================
+  flavorSelect.addEventListener('change', () => {
+    const from = state.flavor;
+    const to = FLAVORS[flavorSelect.value] ? flavorSelect.value : DEFAULT_FLAVOR;
+    if (to === from) return;
+    // Convert the current expression to the new flavor (field count, dow
+    // numbering, `?`-rule) — pure + tested. Reset lastModel so currentOrder()
+    // uses the new flavor's default order until the reparse sets a real one.
+    const converted = convertExpr(cronInput.value.trim(), from, to);
+    state.flavor = to;
+    lastModel = null;
+    updateLegend();
+    applyExpr(converted, { rerenderEditors: true });
+  });
+
+  presetSelect.addEventListener('change', () => {
+    const val = presetSelect.value;
+    if (!val) return;
+    // Presets are standard 5-field; switch to the Standard / Unix flavor to
+    // apply them cleanly.
+    if (state.flavor !== 'standard') {
+      state.flavor = 'standard';
+      flavorSelect.value = 'standard';
+      lastModel = null;
+      updateLegend();
+    }
+    applyExpr(val, { rerenderEditors: true });
+    presetSelect.value = '';
+  });
+
+  cronInput.addEventListener('input', () => {
+    state.expr = cronInput.value;
+    renderFromRaw({ rerenderEditors: true });
+    saveState();
+  });
+
+  runsCopyAllBtn.addEventListener('click', async () => {
+    const lines = [];
+    for (const li of runsListEl.querySelectorAll('li')) {
+      const t = li.querySelector('.run-time')?.textContent.trim();
+      if (t) lines.push(t);
+    }
+    if (lines.length === 0) return;
+    const ok = await copy(lines.join('\n'));
+    if (!ok) return;
+    flash(runsCopyAllBtn, { label: 'Copied!', revertTo: 'Copy all' });
+  });
+
+  // Delegated copy for the expression copy button (and any future ones).
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.copy-btn');
+    if (!btn) return;
+    const targetId = btn.getAttribute('data-copy-target');
+    const el = document.querySelector(`[data-testid="${targetId}"]`);
+    if (!el) return;
+    const text = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') ? el.value : el.textContent;
+    if (!text) return;
+    const ok = await copy(text);
+    if (!ok) return;
+    flash(btn, { label: '✅', revertTo: '📋' });
+  });
+
+  // =====================================================================
+  // 10. Presets menu population
+  // =====================================================================
+  function populatePresets() {
+    for (const p of PRESETS) {
+      const opt = document.createElement('option');
+      opt.value = p.expr;
+      opt.textContent = `${p.label}  (${p.expr})`;
+      presetSelect.appendChild(opt);
+    }
+  }
+
+  // Flavor <select> options (Standard / Unix is the default first entry).
+  const FLAVOR_LABELS = {
+    standard:    'Standard / Unix (5-field)',
+    unixSeconds: 'Unix with seconds (6-field)',
+    quartz:      'Quartz / Java (6–7-field)',
+    spring:      'Spring @Scheduled (6-field)',
+    aws:         'AWS EventBridge (6-field, year)',
+  };
+
+  function populateFlavors() {
+    flavorSelect.innerHTML = '';
+    for (const id of FLAVOR_IDS) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = FLAVOR_LABELS[id] || id;
+      flavorSelect.appendChild(opt);
+    }
+  }
+
+  // =====================================================================
+  // 11. Help modal (mirrors dev-converter pattern)
+  // =====================================================================
+  let helpPreviouslyFocused = null;
+
+  function getHelpFocusable() {
+    return Array.from(
+      helpDialogEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter((el) => !el.disabled && el.getClientRects().length > 0);
+  }
+
+  function onHelpKeydown(e) {
+    if (e.key === 'Escape') { e.preventDefault(); closeHelp(); return; }
+    if (e.key !== 'Tab') return;
+    const focusable = getHelpFocusable();
+    if (focusable.length === 0) return;
+    e.preventDefault();
+    const idx = focusable.indexOf(document.activeElement);
+    let next = e.shiftKey ? idx - 1 : idx + 1;
+    if (next < 0) next = focusable.length - 1;
+    if (next >= focusable.length) next = 0;
+    focusable[next].focus();
+  }
+
+  function openHelp() {
+    helpPreviouslyFocused = document.activeElement;
+    helpOverlayEl.hidden = false;
+    document.addEventListener('keydown', onHelpKeydown, true);
+    helpDialogEl.scrollTop = 0;
+    helpCloseXBtn.focus({ preventScroll: true });
+  }
+
+  function closeHelp() {
+    if (helpOverlayEl.hidden) return;
+    helpOverlayEl.hidden = true;
+    document.removeEventListener('keydown', onHelpKeydown, true);
+    if (helpPreviouslyFocused && typeof helpPreviouslyFocused.focus === 'function') {
+      try { helpPreviouslyFocused.focus(); } catch (e) { /* ignore */ }
+    }
+    helpPreviouslyFocused = null;
+  }
+
+  helpButtonEl.addEventListener('click', () => openHelp());
+  helpCloseXBtn.addEventListener('click', () => closeHelp());
+  helpOverlayEl.addEventListener('mousedown', (e) => {
+    if (e.target !== helpOverlayEl) return;
+    e.preventDefault();
+    closeHelp();
+  });
+
+  // =====================================================================
+  // 12. Init
+  // =====================================================================
+  (function init() {
+    populateFlavors();
+    populatePresets();
+    const loaded = loadState();
+    state.flavor = loaded.flavor;
+    state.expr = loaded.expr;
+    flavorSelect.value = state.flavor;
+    updateLegend();
+
+    cronInput.value = state.expr;
+    // If stored state won't parse (shouldn't normally happen), fall back.
+    try {
+      parseCron(state.expr, { flavor: state.flavor });
+    } catch (err) {
+      state.expr = DEFAULTS[state.flavor] || DEFAULTS[DEFAULT_FLAVOR];
+      cronInput.value = state.expr;
+    }
+    renderFromRaw({ rerenderEditors: true });
+    saveState();
+
+    if (!hasSeenHelp()) {
+      markHelpSeen();
+      openHelp();
+    }
+  })();
+
+  // =====================================================================
+  // 13. Test hook — inert namespace for tests
+  // =====================================================================
+  window.__cronBuilder = {
+    // pure
+    parseCron, buildCron, describeCron, nextRuns, convertExpr,
+    parseField, buildField, fieldEditorMode, isRestricted, dayMatches,
+    FIELD_SPECS, MONTH_NAMES, DOW_NAMES, fieldOrder, orderForFlavor,
+    specsForFlavor, FLAVORS, FLAVOR_IDS, DEFAULTS,
+    // entry points
+    applyExpr, renderFromRaw, assembleExprFromEditors, openHelp, closeHelp,
+    // live state
+    state,
+  };
+</script>
+</body>
+</html>
