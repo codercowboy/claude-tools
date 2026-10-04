@@ -25,7 +25,12 @@ import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runBuild } from './build-tool.mjs';
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// Default to THIS engine's own repo; a consuming project targets its own tools
+// via $JC_REPO_ROOT (see build-tool.mjs). runBuild reads the same env, so the two
+// stay consistent without threading params.
+const REPO_ROOT = process.env.JC_REPO_ROOT
+  ? resolve(process.env.JC_REPO_ROOT)
+  : resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ROOTS = (process.env.JC_BUILD_ROOTS || 'src/tools')
   .split(/[,:]/).map((s) => s.trim()).filter(Boolean);
 // The landing gallery is its own buildable section (src/gallery/source -> src/gallery/index.html).

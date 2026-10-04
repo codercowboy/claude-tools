@@ -21,11 +21,15 @@
  */
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// SCRIPTS = where the engine lives (always on-disk next to this file). REPO = the
+// project being operated on: this engine's own repo by default, or a consuming
+// project via $JC_REPO_ROOT (serve/run target it; build/test forward the env to
+// the child scripts, which resolve it themselves).
 const SCRIPTS = dirname(fileURLToPath(import.meta.url));
-const REPO = dirname(SCRIPTS);
+const REPO = process.env.JC_REPO_ROOT ? resolve(process.env.JC_REPO_ROOT) : dirname(SCRIPTS);
 const GALLERY = join(REPO, 'src', 'gallery', 'index.html');
 
 const [verb, ...rest] = process.argv.slice(2);
