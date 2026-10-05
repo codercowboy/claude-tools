@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Social Card / OG-image Maker</title>
+<meta property="og:title"       content="Social Card / OG-image Maker">
+<meta property="og:description" content="Compose a social share image (Open Graph / Twitter card) on a canvas — title, subtitle, logo, gradient or image background — and copy the matching og:image meta tags. All local, nothing uploaded.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-2: #f0f0f3;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #6d4bd8;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --warning: #8a6300;
+    --warning-bg: #fff6e0;
+    --focus: #6d4bd8;
+    --radius: 8px;
+    --checker: #e6e6ea;
+
+    /* jbcModal (Help dialog) theming — reuse this tool's tokens (they redefine
+       per theme, so this one block covers light + dark). */
+    --jbcm-bg: var(--panel);
+    --jbcm-fg: var(--text);
+    --jbcm-border: var(--border);
+    --jbcm-radius: var(--radius);
+    --jbcm-focus: var(--focus);
+    --jbcm-max-width: 34rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-2: #26262b;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #a78bfa;
+      --accent-contrast: #150b2e;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --warning: #ffce6b;
+      --warning-bg: #3a2c0d;
+      --focus: #a78bfa;
+      --checker: #303036;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:lib components/styles/widgets.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Social Card / OG-image Maker</h1>
+        <p class="subtitle">Compose a share image — title, subtitle, logo, gradient or photo background — export PNG / JPEG / WebP and copy the matching <code>og:image</code> meta tags. All local, nothing uploaded.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <p class="error" data-testid="error" role="alert" hidden></p>
+
+  <div class="work">
+    <div class="controls" data-testid="controls">
+
+      <!-- ---------- Content ---------- -->
+      <fieldset class="field-group">
+        <legend>Content</legend>
+        <div class="field">
+          <label for="eyebrowInput">Eyebrow / badge <span class="muted">(optional)</span></label>
+          <input type="text" id="eyebrowInput" data-testid="eyebrow-input" placeholder="e.g. ANNOUNCEMENT" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="titleInput">Title</label>
+          <textarea id="titleInput" data-testid="title-input" rows="2" placeholder="Your headline goes here"></textarea>
+        </div>
+        <div class="field">
+          <label for="subtitleInput">Subtitle <span class="muted">(optional)</span></label>
+          <textarea id="subtitleInput" data-testid="subtitle-input" rows="2" placeholder="A supporting line of context"></textarea>
+        </div>
+      </fieldset>
+
+      <!-- ---------- Background ---------- -->
+      <fieldset class="field-group">
+        <legend>Background</legend>
+        <div class="field">
+          <label for="bgModeSelect">Type</label>
+          <select id="bgModeSelect" data-testid="bg-mode-select">
+            <option value="solid">Solid color</option>
+            <option value="gradient">Linear gradient</option>
+            <option value="image">Image + scrim</option>
+          </select>
+        </div>
+
+        <div class="field bg-solid" data-testid="bg-solid">
+          <label for="bgColorInput">Color</label>
+          <div class="color-row">
+            <input type="color" id="bgColorInput" data-testid="bg-color" value="#6d4bd8">
+            <input type="text" id="bgColorText" data-testid="bg-color-text" class="hex-text" value="#6d4bd8" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="bg-gradient" data-testid="bg-gradient" hidden>
+          <div class="field">
+            <label for="grad1Input">Stop 1</label>
+            <div class="color-row">
+              <input type="color" id="grad1Input" data-testid="grad1-color" value="#6d4bd8">
+              <input type="text" id="grad1Text" data-testid="grad1-color-text" class="hex-text" value="#6d4bd8" spellcheck="false" autocomplete="off">
+            </div>
+          </div>
+          <div class="field">
+            <label for="grad2Input">Stop 2</label>
+            <div class="color-row">
+              <input type="color" id="grad2Input" data-testid="grad2-color" value="#2f9ee0">
+              <input type="text" id="grad2Text" data-testid="grad2-color-text" class="hex-text" value="#2f9ee0" spellcheck="false" autocomplete="off">
+            </div>
+          </div>
+          <div class="field">
+            <label for="gradAngleRange">Angle: <span data-testid="grad-angle-value">135</span>°</label>
+            <input type="range" id="gradAngleRange" data-testid="grad-angle" min="0" max="360" step="5" value="135">
+          </div>
+        </div>
+
+        <div class="bg-image" data-testid="bg-image" hidden>
+          <label class="dropzone" for="bgFileInput" data-testid="bg-dropzone">
+            <input type="file" id="bgFileInput" data-testid="bg-file-input" accept="image/*" class="visually-hidden">
+            <span data-testid="bg-drop-label">Drop a background image, or click to choose</span>
+            <span class="dropzone-hint">Drawn cover (center-cropped) to fill the card</span>
+          </label>
+          <button type="button" class="remove-img" data-testid="bg-remove-btn" hidden>Remove background image</button>
+          <div class="field">
+            <label for="scrimColorInput">Scrim tint</label>
+            <div class="color-row">
+              <input type="color" id="scrimColorInput" data-testid="scrim-color" value="#000000">
+              <input type="text" id="scrimColorText" data-testid="scrim-color-text" class="hex-text" value="#000000" spellcheck="false" autocomplete="off">
+            </div>
+          </div>
+          <div class="field">
+            <label for="scrimRange">Scrim opacity: <span data-testid="scrim-value">35</span>%</label>
+            <input type="range" id="scrimRange" data-testid="scrim-range" min="0" max="100" step="1" value="35">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ---------- Logo ---------- -->
+      <fieldset class="field-group">
+        <legend>Logo <span class="muted">(optional)</span></legend>
+        <label class="dropzone" for="logoFileInput" data-testid="logo-dropzone">
+          <input type="file" id="logoFileInput" data-testid="logo-file-input" accept="image/*" class="visually-hidden">
+          <span data-testid="logo-drop-label">Drop a logo image, or click to choose</span>
+          <span class="dropzone-hint">Placed above the text, following its alignment</span>
+        </label>
+        <button type="button" class="remove-img" data-testid="logo-remove-btn" hidden>Remove logo</button>
+        <div class="field">
+          <label for="logoSizeRange">Logo height: <span data-testid="logo-size-value">14</span>% of short side</label>
+          <input type="range" id="logoSizeRange" data-testid="logo-size-range" min="4" max="40" step="1" value="14">
+        </div>
+      </fieldset>
+
+      <!-- ---------- Text style ---------- -->
+      <fieldset class="field-group">
+        <legend>Text style</legend>
+        <div class="field">
+          <label for="fontSelect">Font family</label>
+          <select id="fontSelect" data-testid="font-select"></select>
+        </div>
+        <div class="field">
+          <label for="customFontInput">Custom family <span class="muted">(optional, overrides)</span></label>
+          <input type="text" id="customFontInput" data-testid="custom-font-input" placeholder="e.g. Futura" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <span class="group-label">Horizontal align</span>
+            <div class="seg" role="group" aria-label="Horizontal alignment" data-testid="halign-group">
+              <button type="button" data-halign="left" data-value="left" data-testid="halign-left" aria-pressed="false">Left</button>
+              <button type="button" data-halign="center" data-value="center" data-testid="halign-center" aria-pressed="true">Center</button>
+              <button type="button" data-halign="right" data-value="right" data-testid="halign-right" aria-pressed="false">Right</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="group-label">Vertical align</span>
+            <div class="seg" role="group" aria-label="Vertical alignment" data-testid="valign-group">
+              <button type="button" data-valign="top" data-value="top" data-testid="valign-top" aria-pressed="false">Top</button>
+              <button type="button" data-valign="middle" data-value="middle" data-testid="valign-middle" aria-pressed="true">Middle</button>
+              <button type="button" data-valign="bottom" data-value="bottom" data-testid="valign-bottom" aria-pressed="false">Bottom</button>
+            </div>
+          </div>
+        </div>
+
+        <details class="tune">
+          <summary>Eyebrow</summary>
+          <div class="grid-2">
+            <div class="field">
+              <label for="eyebrowSize">Size (px)</label>
+              <input type="number" id="eyebrowSize" data-testid="eyebrow-size" min="8" max="200" step="1" value="28" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label for="eyebrowColor">Color</label>
+              <div class="color-row">
+                <input type="color" id="eyebrowColor" data-testid="eyebrow-color" value="#ffffff">
+                <input type="text" id="eyebrowColorText" data-testid="eyebrow-color-text" class="hex-text" value="#ffffff" spellcheck="false" autocomplete="off">
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details class="tune" open>
+          <summary>Title</summary>
+          <div class="grid-2">
+            <div class="field">
+              <label for="titleSize">Size (px)</label>
+              <input type="number" id="titleSize" data-testid="title-size" min="8" max="400" step="1" value="72" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label for="titleWeight">Weight</label>
+              <select id="titleWeight" data-testid="title-weight">
+                <option value="400">Regular (400)</option>
+                <option value="500">Medium (500)</option>
+                <option value="600">Semibold (600)</option>
+                <option value="700" selected>Bold (700)</option>
+                <option value="800">Extrabold (800)</option>
+                <option value="900">Black (900)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="titleColor">Color</label>
+              <div class="color-row">
+                <input type="color" id="titleColor" data-testid="title-color" value="#ffffff">
+                <input type="text" id="titleColorText" data-testid="title-color-text" class="hex-text" value="#ffffff" spellcheck="false" autocomplete="off">
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details class="tune">
+          <summary>Subtitle</summary>
+          <div class="grid-2">
+            <div class="field">
+              <label for="subtitleSize">Size (px)</label>
+              <input type="number" id="subtitleSize" data-testid="subtitle-size" min="8" max="300" step="1" value="36" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label for="subtitleWeight">Weight</label>
+              <select id="subtitleWeight" data-testid="subtitle-weight">
+                <option value="400" selected>Regular (400)</option>
+                <option value="500">Medium (500)</option>
+                <option value="600">Semibold (600)</option>
+                <option value="700">Bold (700)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="subtitleColor">Color</label>
+              <div class="color-row">
+                <input type="color" id="subtitleColor" data-testid="subtitle-color" value="#e8e6f5">
+                <input type="text" id="subtitleColorText" data-testid="subtitle-color-text" class="hex-text" value="#e8e6f5" spellcheck="false" autocomplete="off">
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div class="field">
+          <label for="paddingRange">Edge padding: <span data-testid="padding-value">72</span>px</label>
+          <input type="range" id="paddingRange" data-testid="padding-range" min="0" max="240" step="4" value="72">
+        </div>
+      </fieldset>
+
+      <!-- ---------- Size ---------- -->
+      <fieldset class="field-group">
+        <legend>Output size</legend>
+        <div class="field">
+          <label for="sizeSelect">Preset</label>
+          <select id="sizeSelect" data-testid="size-select"></select>
+        </div>
+        <div class="custom-size" data-testid="custom-size" hidden>
+          <div class="dim-inputs">
+            <div class="dim">
+              <label for="customW">Width (px)</label>
+              <input type="number" id="customW" data-testid="custom-w" min="64" max="4096" step="1" value="1200" inputmode="numeric">
+            </div>
+            <span class="dim-x" aria-hidden="true">×</span>
+            <div class="dim">
+              <label for="customH">Height (px)</label>
+              <input type="number" id="customH" data-testid="custom-h" min="64" max="4096" step="1" value="630" inputmode="numeric">
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ---------- Export ---------- -->
+      <fieldset class="field-group">
+        <legend>Export</legend>
+        <div class="field">
+          <label for="formatSelect">Format</label>
+          <select id="formatSelect" data-testid="format-select">
+            <option value="png">PNG (lossless)</option>
+            <option value="jpeg">JPEG (lossy)</option>
+            <option value="webp">WebP (lossy)</option>
+          </select>
+        </div>
+        <div class="field quality-field" data-testid="quality-field" hidden>
+          <label for="qualityRange">Quality: <span data-testid="quality-value">92</span>%</label>
+          <input type="range" id="qualityRange" data-testid="quality-range" min="1" max="100" value="92">
+        </div>
+        <div class="output-info" data-testid="output-info" aria-live="polite">
+          <span class="output-info-label">Output:</span>
+          <span data-testid="output-dims">—</span>
+          <span aria-hidden="true">&middot;</span>
+          <span data-testid="output-size">—</span>
+          <span aria-hidden="true">&middot;</span>
+          <span data-testid="output-type">—</span>
+        </div>
+        <div class="actions-row">
+          <button type="button" id="downloadBtn" data-testid="download-btn" class="primary" disabled>Download</button>
+          <button type="button" id="resetBtn" data-testid="reset-btn">Reset</button>
+        </div>
+      </fieldset>
+
+      <!-- ---------- Meta snippet ---------- -->
+      <fieldset class="field-group">
+        <legend>Meta tags</legend>
+        <p class="hint">Paste into your page <code>&lt;head&gt;</code>. Set the image URL to where <code>preview.png</code> will actually live on your host.</p>
+        <div class="field">
+          <label for="metaUrlInput">Image URL</label>
+          <input type="text" id="metaUrlInput" data-testid="meta-url-input" value="preview.png" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="ct-field ct-field--multiline">
+          <textarea id="metaOutput" data-testid="meta-output" rows="8" readonly aria-label="Generated meta tags"></textarea>
+          <button type="button" class="ct-copy-btn" data-testid="meta-copy-btn" title="Copy meta tags" aria-label="Copy meta tags">
+            <span aria-hidden="true">⧉</span>
+          </button>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="preview" data-testid="preview">
+      <div class="canvas-wrap ct-checkerboard" data-testid="canvas-wrap">
+        <canvas data-testid="preview-canvas" aria-label="Social card preview"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Help modal built at runtime by the shared jbcModal primitive
+     (shared lib components/CtModal.mjs) from this hidden template. The <h2> title comes
+     from jbcModal's `title` option, so it is not repeated here. -->
+<template id="help-body">
+    <p>Compose a social share image entirely in your browser — images you drop never leave your device. The card is drawn with the browser's own <code>&lt;canvas&gt;</code> engine and exported as a real PNG / JPEG / WebP.</p>
+    <ul>
+      <li><strong>Content.</strong> Add an optional <strong>eyebrow/badge</strong>, a <strong>title</strong>, and an optional <strong>subtitle</strong>. Text wraps to the padded content box; press Enter for a hard line break.</li>
+      <li><strong>Background.</strong> Pick a <strong>solid color</strong>, a <strong>linear gradient</strong> (two stops + angle), or an <strong>uploaded image</strong> with a tint <strong>scrim</strong> for legibility.</li>
+      <li><strong>Logo.</strong> Drop an optional logo — it sits above the text and follows its alignment; size it as a percent of the card's short side.</li>
+      <li><strong>Text style.</strong> Choose a <strong>system font</strong> (or type a custom family), set per-line size / weight / color, horizontal + vertical alignment, and edge padding. <em>Only system fonts are used — none are bundled.</em></li>
+      <li><strong>Size.</strong> <strong>1200×630</strong> (OG landscape), <strong>1200×1200</strong> (square), <strong>1080×1920</strong> (story), or a custom width × height.</li>
+      <li><strong>Export &amp; meta tags.</strong> Download the image, and copy the generated <code>og:*</code> / <code>twitter:*</code> meta tags to paste into your page <code>&lt;head&gt;</code>.</li>
+    </ul>
+    <p class="help-note"><strong>Notes.</strong> Everything runs locally; nothing is uploaded. Your text and style preferences are remembered on this device — never the images themselves. AVIF export isn't offered (browser canvases can't encode it).</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

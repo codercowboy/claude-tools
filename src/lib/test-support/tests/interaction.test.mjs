@@ -74,14 +74,14 @@ test('assertConfirmDialog: confirm / cancel / none / bad action', async () => {
   const log = [];
   const dlgAttrs = { attrs: { 'aria-modal': 'true' }, text: 'Clear everything?' };
   const page = {
-    locator: (sel) => fakeLoc(log, sel, sel.includes('.jbcc-dialog') ? dlgAttrs : { count: 0 }),
+    locator: (sel) => fakeLoc(log, sel, sel.includes('.ctc-dialog') ? dlgAttrs : { count: 0 }),
     keyboard: { press: async (k) => log.push(`press ${k}`) },
   };
   await assertConfirmDialog(page, { text: 'Clear', action: 'confirm' });
-  assert.ok(log.some((l) => l.includes('.jbcc-btn--yes')));
+  assert.ok(log.some((l) => l.includes('.ctc-btn--yes')));
   log.length = 0;
   await assertConfirmDialog(page, { action: 'cancel' });
-  assert.ok(log.some((l) => l.includes('.jbcc-btn--cancel')));
+  assert.ok(log.some((l) => l.includes('.ctc-btn--cancel')));
   log.length = 0;
   await assertConfirmDialog(page, { action: 'escape' });
   assert.ok(log.includes('press Escape'));

@@ -1,0 +1,373 @@
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+    margin: 0 0 0.3rem;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  textarea,
+  input[type="text"],
+  input[type="number"],
+  select {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.55rem 0.7rem;
+  }
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    overflow: auto;
+    min-height: 220px;
+  }
+
+  input[type="text"],
+  input[type="number"] {
+    width: 100%;
+  }
+
+  input:disabled,
+  select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+
+  /* Excludes .ctc-btn so confirmDialog's accent "Yes" keeps its fill on hover
+     (docs/conventions.md hover-specificity trap). Also excludes .ct-copy-btn so
+     the in-field copy button keeps its own subtle hover from controls.css. */
+  button:hover:not(:disabled):not(.ctc-btn):not(.ct-copy-btn) {
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+
+  .app-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* ---------- Format bar ---------- */
+
+  .format-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .format-bar .field {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+
+  .swap-btn {
+    flex: 0 0 auto;
+    height: 44px;
+    min-width: 44px;
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .detect-status {
+    margin: 0.35rem 0 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    min-height: 1.1em;
+  }
+
+  .detect-status strong { color: var(--accent); }
+
+  /* ---------- Fields / sections ---------- */
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .io-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .io-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+  }
+
+  .io-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .io-head h2 {
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  .io-actions {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .io-actions button {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Setup card (formats + options merged) ---------- */
+
+  .setup-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--panel);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .options-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .options-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .options-groups {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
+  }
+
+  .opt-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1rem;
+  }
+
+  .opt-group .field {
+    gap: 0.25rem;
+  }
+
+  .opt-group .field label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .opt-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+
+  .opt-inline input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+  }
+
+  .opt-narrow {
+    width: 5.5rem;
+    flex: 0 0 auto;
+  }
+
+  /* A <select> must be wide enough for its longest option AND keep base.css's
+     2rem right padding clear of the chevron — a fixed narrow width made a long
+     option (e.g. "Minified") sit on top of the caret. width:auto sizes to the
+     content box (which reserves the chevron padding); min-width is the floor. */
+  .opt-select {
+    width: auto;
+    min-width: 8.5rem;
+    flex: 0 0 auto;
+    /* Restore chevron room: the tool's `select { padding: … 0.7rem }` shorthand
+       (later in the cascade, equal specificity) otherwise clobbers base.css's
+       padding-right:2rem, leaving the selected text under the caret. */
+    padding-right: 2.2rem;
+  }
+
+  /* From/To selects fill their flex field (>=200px), so they clear the chevron;
+     the extra right padding just guarantees a gap after the longest option. */
+  .format-select {
+    padding-right: 2.2rem;
+  }
+
+  .opt-empty {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Error region ---------- */
+
+  .error {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Help modal ----------
+     The Help dialog is the shared jbcModal primitive (lib/modal.js),
+     which injects its own structural CSS. These --jbcm-* tokens theme it to
+     format-converter; only the Help body's own typography is styled below. */
+  :root {
+    --jbcm-bg: var(--panel);
+    --jbcm-fg: var(--text);
+    --jbcm-border: var(--border);
+    --jbcm-radius: var(--radius);
+    --jbcm-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    --jbcm-backdrop: rgba(0, 0, 0, 0.5);
+    --jbcm-focus: var(--focus);
+    --jbcm-max-width: 34rem;
+  }
+
+  .jbcm-body h3 { margin: 1rem 0 0.4rem; font-size: 0.98rem; }
+  .jbcm-body p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .jbcm-body ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .jbcm-body li { margin-bottom: 0.4rem; }
+  .jbcm-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: color-mix(in srgb, var(--text) 8%, var(--panel));
+    padding: 0.1em 0.3em;
+    border-radius: 4px;
+  }
+
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .jbcm-body code {
+      background: color-mix(in srgb, var(--text) 14%, var(--panel));
+    }
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 720px) {
+    .io-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .format-bar .field { flex: 1 1 100%; }
+    .swap-btn { width: 100%; }
+    .io-actions button,
+    .help-button,
+    .swap-btn {
+      min-height: 44px;
+    }
+  }

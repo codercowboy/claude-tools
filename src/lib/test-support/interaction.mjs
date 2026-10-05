@@ -342,8 +342,8 @@ export async function assertHelpAutoShows(browser, url, {
 }
 
 // assertConfirmDialog(page, { open, text, action }) — drive the shared inlined
-// confirmDialog dialog (.jbcc-overlay > .jbcc-dialog[role=dialog], buttons
-// .jbcc-btn--yes / .jbcc-btn--cancel). `open` is an optional async fn that
+// confirmDialog dialog (.ctc-overlay > .ctc-dialog[role=dialog], buttons
+// .ctc-btn--yes / .ctc-btn--cancel). `open` is an optional async fn that
 // triggers it (omit if the caller already did). `text`, if given, must appear
 // in the dialog. `action`:
 //   'confirm'  click Yes                'cancel'  click Cancel
@@ -351,8 +351,8 @@ export async function assertHelpAutoShows(browser, url, {
 //   'none'     assert NO dialog appears after `open` (e.g. empty-input Clear)
 // For every dismiss action the dialog must be gone afterwards.
 export async function assertConfirmDialog(page, { open, text, action = 'confirm' } = {}) {
-  const overlay = page.locator('.jbcc-overlay');
-  const dialog = page.locator('.jbcc-overlay .jbcc-dialog[role="dialog"]');
+  const overlay = page.locator('.ctc-overlay');
+  const dialog = page.locator('.ctc-overlay .ctc-dialog[role="dialog"]');
   if (open) await open();
 
   if (action === 'none') {
@@ -367,8 +367,8 @@ export async function assertConfirmDialog(page, { open, text, action = 'confirm'
     if (!body.includes(text)) fail(`confirm dialog does not contain ${JSON.stringify(text)}`);
   }
 
-  if (action === 'confirm') await dialog.locator('.jbcc-btn--yes').click();
-  else if (action === 'cancel') await dialog.locator('.jbcc-btn--cancel').click();
+  if (action === 'confirm') await dialog.locator('.ctc-btn--yes').click();
+  else if (action === 'cancel') await dialog.locator('.ctc-btn--cancel').click();
   else if (action === 'escape') await page.keyboard.press('Escape');
   else if (action === 'backdrop') await overlay.click({ position: { x: 5, y: 5 } });
   else fail(`assertConfirmDialog: unknown action ${JSON.stringify(action)}`);

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTTP Header Explainer</title>
+
+<meta property="og:title" content="HTTP Header Explainer, Linter & Builder">
+<meta property="og:description" content="Paste raw HTTP request or response headers and get each one explained, linted, and checked against a security checklist - or build a recommended set. Offline, no network.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="claude-tools">
+<meta property="og:image" content="preview.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<style>
+  :root {
+    --bg: #f8fafc;
+    --panel-bg: #ffffff;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --border: #d1d5db;
+    --accent: #2563eb;
+    --accent-text: #ffffff;
+    --focus-ring: #2563eb;
+    --code-bg: #f3f4f6;
+    --note-bg: #fef9c3;
+    --note-border: #fde047;
+    --note-text: #713f12;
+    --ctc-accent: #2563eb;
+    --ok: #15803d; --ok-bg: #dcfce7;
+    --warn: #a16207; --warn-bg: #fef9c3;
+    --fail: #b91c1c; --fail-bg: #fee2e2;
+    --info: #1d4ed8; --info-bg: #dbeafe;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1420;
+      --panel-bg: #171e2b;
+      --text: #e5e7eb;
+      --text-muted: #9ca3af;
+      --border: #374151;
+      --accent: #3b82f6;
+      --accent-text: #ffffff;
+      --focus-ring: #60a5fa;
+      --code-bg: #1f2733;
+      --note-bg: #3f2d10;
+      --note-border: #a16207;
+      --note-text: #fde68a;
+      --ctc-accent: #3b82f6;
+      --ok: #4ade80; --ok-bg: #14532d;
+      --warn: #fde68a; --warn-bg: #422006;
+      --fail: #fca5a5; --fail-bg: #450a0a;
+      --info: #93c5fd; --info-bg: #172554;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+<<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="header-titles">
+        <h1>HTTP Header Explainer</h1>
+        <p class="tagline">Paste raw request or response headers to see each one explained, linted, and checked against a security checklist &mdash; or build a recommended set. Works offline and never sends a request.</p>
+      </div>
+      <button id="help-button" type="button" class="help-button" data-testid="help-button" title="How it works" aria-label="How it works">?</button>
+    </header>
+
+    <div class="mode-tabs" role="tablist" aria-label="Sections" data-testid="tabs">
+      <button type="button" role="tab" id="tab-input" class="mode-tab" data-mode="input" data-testid="tab-input" aria-controls="panel-input" aria-selected="true">Input</button>
+      <button type="button" role="tab" id="tab-explain" class="mode-tab" data-mode="explain" data-testid="tab-explain" aria-controls="panel-explain" aria-selected="false" tabindex="-1">Explain</button>
+      <button type="button" role="tab" id="tab-checklist" class="mode-tab" data-mode="checklist" data-testid="tab-checklist" aria-controls="panel-checklist" aria-selected="false" tabindex="-1">Checklist</button>
+      <button type="button" role="tab" id="tab-build" class="mode-tab" data-mode="build" data-testid="tab-build" aria-controls="panel-build" aria-selected="false" tabindex="-1">Build</button>
+    </div>
+
+    <!-- ============ INPUT ============ -->
+    <section id="panel-input" class="panel" role="tabpanel" aria-labelledby="tab-input" data-testid="panel-input">
+      <h2>Paste headers</h2>
+      <label for="raw-input" class="sr-only">Raw HTTP header block</label>
+      <textarea id="raw-input" class="raw-input" data-testid="raw-input" spellcheck="false" autocomplete="off" placeholder="HTTP/1.1 200 OK&#10;Content-Type: text/html&#10;Cache-Control: max-age=60&#10;&#10;...or a request, a curl -i / -v paste, or HTTP/2 lowercase headers."></textarea>
+      <div class="toolbar">
+        <button type="button" data-testid="load-sample-response">Load sample response</button>
+        <button type="button" data-testid="load-sample-request">Load sample request</button>
+        <button type="button" data-testid="clear-input">Clear</button>
+      </div>
+      <div class="toolbar">
+        <span class="toolbar-label" id="kind-label">Treat as</span>
+        <div class="segmented" role="group" aria-labelledby="kind-label" data-testid="kind-group">
+          <button type="button" data-value="auto" data-testid="kind-auto" aria-pressed="true">Auto</button>
+          <button type="button" data-value="request" data-testid="kind-request" aria-pressed="false">Request</button>
+          <button type="button" data-value="response" data-testid="kind-response" aria-pressed="false">Response</button>
+        </div>
+        <div class="field-inline" data-testid="block-wrap" hidden>
+          <label for="block-select">Message</label>
+          <select id="block-select" data-testid="block-select"></select>
+        </div>
+      </div>
+      <p class="parse-summary" data-testid="parse-summary" aria-live="polite"></p>
+      <div class="ct-warning banner" data-testid="parse-banner" role="status" hidden></div>
+      <ul class="notes" data-testid="parse-issues"></ul>
+      <p class="panel-note">Your pasted text is saved on this device so it is here when you return &mdash; but the values of <code>Authorization</code>, <code>Cookie</code>, <code>Set-Cookie</code>, and <code>Proxy-Authorization</code> are replaced with <code>[redacted]</code> before saving.</p>
+    </section>
+
+    <!-- ============ EXPLAIN ============ -->
+    <section id="panel-explain" class="panel" role="tabpanel" aria-labelledby="tab-explain" data-testid="panel-explain" hidden>
+      <div class="panel-head">
+        <h2>Header explainer</h2>
+        <div class="segmented" role="group" aria-label="Show" data-testid="filter-group">
+          <button type="button" data-value="all" data-testid="filter-all" aria-pressed="true">All</button>
+          <button type="button" data-value="issues" data-testid="filter-issues" aria-pressed="false">With issues</button>
+        </div>
+      </div>
+      <p class="empty" data-testid="explain-empty" hidden>Nothing to explain yet &mdash; paste some headers on the Input tab.</p>
+      <div class="cards" data-testid="cards"></div>
+    </section>
+
+    <!-- ============ CHECKLIST ============ -->
+    <section id="panel-checklist" class="panel" role="tabpanel" aria-labelledby="tab-checklist" data-testid="panel-checklist" hidden>
+      <h2>Security checklist</h2>
+      <p class="checklist-summary" data-testid="checklist-summary" aria-live="polite"></p>
+      <p class="empty" data-testid="checklist-empty" hidden></p>
+      <ul class="checklist" data-testid="checklist-list"></ul>
+      <h3>Other findings</h3>
+      <ul class="notes" data-testid="lint-list"></ul>
+      <p class="panel-note">Mildly opinionated, based on the OWASP Secure Headers Project and MDN Observatory-style checks. There is deliberately no letter grade. Headers alone cannot show whether a page was served over HTTPS.</p>
+    </section>
+
+    <!-- ============ BUILD ============ -->
+    <section id="panel-build" class="panel" role="tabpanel" aria-labelledby="tab-build" data-testid="panel-build" hidden>
+      <h2>Build a header set</h2>
+      <div class="toolbar">
+        <span class="toolbar-label">Preset</span>
+        <button type="button" data-testid="preset-static">Static site</button>
+        <button type="button" data-testid="preset-api">API / JSON</button>
+        <button type="button" data-testid="preset-spa">SPA</button>
+        <button type="button" data-testid="preset-download">Download</button>
+        <button type="button" data-testid="preset-clear">Clear</button>
+      </div>
+      <div class="build-form" data-testid="build-form"></div>
+      <div class="subgroup">
+        <h3>Custom headers</h3>
+        <div class="kv-list" data-testid="custom-list"></div>
+        <button type="button" class="add-row" data-testid="add-custom">+ Add header</button>
+      </div>
+      <div class="out-block">
+        <div class="out-head">
+          <h3>Output</h3>
+          <div class="segmented" role="group" aria-label="Output format" data-testid="fmt-group">
+            <button type="button" data-value="raw" data-testid="fmt-raw" aria-pressed="true">Raw</button>
+            <button type="button" data-value="nginx" data-testid="fmt-nginx" aria-pressed="false">nginx</button>
+            <button type="button" data-value="apache" data-testid="fmt-apache" aria-pressed="false">Apache</button>
+            <button type="button" data-value="express" data-testid="fmt-express" aria-pressed="false">Express</button>
+          </div>
+        </div>
+        <div class="ct-field ct-field--multiline">
+          <pre class="code-out" data-testid="build-out"></pre>
+          <button type="button" class="ct-copy-btn" data-copy-target="build-out" data-testid="copy-build" title="Copy header block" aria-label="Copy header block">&#128203;</button>
+        </div>
+        <div class="toolbar">
+          <button type="button" data-testid="build-download">Download .txt</button>
+          <button type="button" data-testid="build-analyze">Analyze this set</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <template id="help-body">
+      <p>Paste the headers from curl, devtools, or a log and get a plain-English read-out. Everything runs in this page &mdash; nothing is sent anywhere and there is no network lookup.</p>
+      <h3>Tabs</h3>
+      <ul>
+        <li><strong>Input</strong> &mdash; paste a request, a response, <code>curl -i</code> / <code>-v</code> output (<code>&lt; </code> / <code>&gt; </code> prefixes), or HTTP/2 lowercase headers. For redirect chains the last response is analysed; pick another from the Message menu.</li>
+        <li><strong>Explain</strong> &mdash; a card per header: what it does, an example, common pitfalls, and the spec reference, plus warnings for deprecated, duplicated, or malformed values.</li>
+        <li><strong>Checklist</strong> &mdash; pass / warn / fail / info for the security headers, cookie flags, CORS sanity, and information disclosure, each with a ready-to-paste fix.</li>
+        <li><strong>Build</strong> &mdash; pick a preset or tick headers to generate a block, or nginx / Apache / Express snippets.</li>
+      </ul>
+      <p class="help-note">Your pasted text is remembered on this device, with the values of Authorization, Cookie, Set-Cookie, and Proxy-Authorization replaced by [redacted] before it is saved.</p>
+  </template>
+
+<<ct:lib components/footer.html>>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

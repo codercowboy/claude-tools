@@ -1,0 +1,302 @@
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  /* Textarea-heavy tool: the inputs and the two side-by-side diff panes must
+     widen with the viewport rather than sit in a fixed narrow column (see
+     docs/conventions.md § "Responsive & mobile" — scale UP on large screens).
+     A very generous cap keeps ultra-wide lines from getting silly while still
+     letting the panes fill the width on any normal desktop window. */
+  .app {
+    max-width: 2200px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  h1 { font-size: 1.35rem; margin: 0 0 0.3rem; }
+
+  .subtitle { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+
+  label { font-size: 0.9rem; font-weight: 600; }
+
+  textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.7rem;
+    width: 100%;
+    resize: vertical;
+    min-height: 120px;
+    overflow: auto;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+
+  /* :not(.ctc-btn) — hover-specificity trap (docs/conventions.md): keep the
+     confirm dialog's Yes/Cancel fills intact on hover. :not(.ct-copy-btn) so
+     the in-field copy button keeps its own subtle controls.css hover (this
+     generic rule out-specifies .ct-copy-btn:hover otherwise). */
+  button:hover:not(:disabled):not(.ctc-btn):not(.ct-copy-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header { display: flex; flex-direction: column; gap: 0.2rem; }
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .header-titles { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px; height: 44px; padding: 0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; line-height: 1;
+  }
+
+  /* ---------- Inputs ---------- */
+  .inputs {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  .field { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+  .field-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .link-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    border-color: var(--border);
+    color: var(--text-muted);
+  }
+  .swap-wrap { display: flex; align-items: center; justify-content: center; }
+  .swap-btn {
+    width: 44px; height: 44px; padding: 0;
+    border-radius: 50%;
+    font-size: 1.2rem; line-height: 1;
+    align-self: center;
+  }
+
+  /* ---------- Controls ---------- */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+  }
+  .options { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; }
+  .opt {
+    display: flex; align-items: center; gap: 0.4rem;
+    font-weight: 500; font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .opt input { width: 18px; height: 18px; cursor: pointer; }
+  .opt.disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .controls-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+
+  .view-toggle { display: flex; }
+  .view-toggle button {
+    padding: 0.5rem 0.85rem;
+    font-weight: 600;
+    border-radius: 0;
+  }
+  .view-toggle button:first-child {
+    border-top-left-radius: var(--radius);
+    border-bottom-left-radius: var(--radius);
+  }
+  .view-toggle button:last-child {
+    border-top-right-radius: var(--radius);
+    border-bottom-right-radius: var(--radius);
+    border-left: 0;
+  }
+  .view-toggle button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+  .view-toggle button[aria-pressed="true"]:hover { background: var(--accent); }
+
+  /* ---------- Stats / warning ---------- */
+  .stats {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    min-height: 1.2em;
+  }
+  .stats .s-add { color: var(--add-text); }
+  .stats .s-del { color: var(--del-text); }
+  .stats .s-chg { color: color-mix(in srgb, var(--text) 70%, var(--accent)); }
+  .warning {
+    margin: 0;
+    padding: 0.5rem 0.7rem;
+    background: var(--chg-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Legend ---------- */
+  /* Explains the line-highlight colors. Accessible, not color-only: every item
+     pairs a color swatch with a text label (the label even names the color). The
+     swatch backgrounds reuse the exact --add/--del/--chg line-highlight tokens,
+     which already carry light + dark values, so the legend tracks the diff. */
+  .diff-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 1.1rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+  .lg-item { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .lg-swatch {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex: 0 0 auto;
+    border-radius: 3px;
+    border: 1px solid var(--border-strong);
+  }
+  .lg-swatch--add { background: var(--add-bg); border-color: var(--add-gutter); }
+  .lg-swatch--del { background: var(--del-bg); border-color: var(--del-gutter); }
+  .lg-swatch--chg { background: var(--chg-bg); }
+
+  /* ---------- Diff output (shared) ---------- */
+  .diff-output {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .diff-empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .diff-row {
+    display: grid;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+  .gutter {
+    padding: 0 0.5rem;
+    text-align: right;
+    color: var(--gutter-text);
+    background: var(--gutter-bg);
+    user-select: none;
+    white-space: nowrap;
+    border-right: 1px solid var(--border);
+  }
+  .code {
+    padding: 0 0.6rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .cell-empty { background: var(--gutter-bg); opacity: 0.4; }
+
+  /* line-type backgrounds */
+  .r-add .code { background: var(--add-bg); }
+  .r-add .gutter { background: var(--add-gutter); color: var(--add-text); }
+  .r-del .code { background: var(--del-bg); }
+  .r-del .gutter { background: var(--del-gutter); color: var(--del-text); }
+  .r-chg .code { background: var(--chg-bg); }
+
+  /* intra-line word highlights */
+  .wd-del { background: var(--wd-del-bg); border-radius: 2px; }
+  .wd-ins { background: var(--wd-add-bg); border-radius: 2px; }
+
+  /* ---------- Side-by-side ---------- */
+  /* scrolls horizontally inside its own container on narrow screens; the page
+     body never scrolls sideways. */
+  .diff-split { overflow-x: auto; }
+  .diff-split .diff-row {
+    grid-template-columns: 3.2em minmax(0, 1fr) 3.2em minmax(0, 1fr);
+  }
+  .diff-split .code { border-right: 1px solid var(--border); }
+  .diff-split .diff-row { min-width: max-content; }
+
+  /* ---------- Inline / unified ---------- */
+  .diff-inline { overflow-x: auto; }
+  .diff-inline .diff-row {
+    grid-template-columns: 3.2em 3.2em 1.4em minmax(0, 1fr);
+  }
+  .diff-inline .sign {
+    padding: 0 0.3rem;
+    text-align: center;
+    user-select: none;
+    color: var(--text-muted);
+  }
+  .diff-inline .r-add .sign { color: var(--add-text); }
+  .diff-inline .r-del .sign { color: var(--del-text); }
+
+  /* legend chips inside Help */
+  .lg { padding: 0 0.35em; border-radius: 3px; font-weight: 600; }
+  .lg-add { background: var(--add-bg); color: var(--add-text); }
+  .lg-del { background: var(--del-bg); color: var(--del-text); }
+  .lg-chg { background: var(--chg-bg); color: var(--text); }
+
+  /* ---------- Help modal content ----------
+     The dialog chrome (overlay, surface, ✕, fade, focus-trap) is the shared
+     jbcModal primitive (lib/modal.js), themed via the --jbcm-* tokens
+     in :root. Only the Help body's own typography is styled here. */
+  .jbcm-body p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .jbcm-body ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .jbcm-body li { margin-bottom: 0.4rem; }
+  .help-note {
+    margin-top: 0.8rem; padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted); font-size: 0.85rem;
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 720px) {
+    .inputs { grid-template-columns: 1fr; }
+    .swap-wrap { order: 0; }
+    .swap-btn { transform: rotate(90deg); }
+    .controls { flex-direction: column; align-items: stretch; }
+    .controls-right { justify-content: space-between; }
+    .view-toggle { flex: 1 1 auto; }
+    .view-toggle button { flex: 1 1 0; }
+    .help-button, .swap-btn { min-height: 44px; }
+  }

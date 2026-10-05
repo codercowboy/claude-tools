@@ -1,0 +1,4247 @@
+<!doctype html>
+<!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pretty-Printer &amp; Minifier</title>
+<meta property="og:title"       content="Pretty-Printer & Minifier">
+<meta property="og:description" content="Pretty-print and minify JSON, YAML, HTML, CSS, SQL, and JavaScript — hand-rolled, dependency-free, entirely in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --focus: #2f6fed;
+    --radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* confirmDialog theming — reuse this tool's tokens (docs/conventions.md) */
+    --ctc-accent: var(--accent);
+    --ctc-accent-fg: var(--accent-contrast);
+    --ctc-bg: var(--panel);
+    --ctc-fg: var(--text);
+    --ctc-radius: var(--radius);
+    --ctc-btn-radius: var(--radius);
+    --ctc-focus: var(--focus);
+    --ctc-cancel-border: var(--border-strong);
+
+    /* jbcModal (Help dialog) theming — reuse this tool's tokens (they redefine
+       per theme, so this one block covers light + dark). */
+    --jbcm-bg: var(--panel);
+    --jbcm-fg: var(--text);
+    --jbcm-border: var(--border);
+    --jbcm-radius: var(--radius);
+    --jbcm-focus: var(--focus);
+    --jbcm-max-width: 34rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --focus: #6d9bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  /* ===== Begin ct-base ===== */
+/* Shared single-file-tool base styles — inlined by the build
+   near the TOP of each tool's <style>. UNIVERSAL, palette-agnostic fixes only.
+   This is the single source of truth: edit here, run `npm run build`. See
+   the html-single-file conventions (web-craft.md).
+   It sits near the TOP of the <style> block (after any reset) so a tool's own
+   later rules can still layer colors on top; for <select>, keep the tool's fill as
+   `background-color` (not the `background` shorthand, which would wipe the chevron). */
+html { touch-action: manipulation; } /* double-tap won't zoom the page; pinch-zoom + scroll still work. Gesture canvases keep their own touch-action:none. */
+[hidden] { display: none !important; } /* an author `display:` rule must never defeat the hidden attribute */
+.visually-hidden { /* screen-reader-only (kept in the a11y tree, unlike display:none) */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* iOS/Safari sizes a native <select> from font-size and ignores height/min-height
+   (renders ~half as tall as inputs). Opt out of the native control so the box model
+   applies, and supply our own chevron (appearance:none removes the native one). */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  font-size: 16px; /* >=16px also stops iOS zoom-on-focus */
+  padding-right: 2rem; /* room for the chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.6 6 6.4l5-4.8' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.72rem;
+}
+/* ===== end ct-base ===== */
+/* ===== Begin ct-controls ===== */
+/* Shared control conventions — inlined by the build into each
+   UTILITY tool's <style> via the jbc:include controls.css token, placed AFTER
+   ct-base and BEFORE the tool's own color rules. Single source of truth: edit
+   here, run `npm run build`. See web-craft.md § "Standard control height"
+   and § "In-field copy button". Opt-in: only utility tools include it.
+
+   Palette-agnostic: sizing + structure only; colors come from the tool via
+   currentColor / its own later rules. */
+
+:root { --control-h: 44px; } /* standard height for single-line controls */
+
+/* Standard height for single-line interactive controls (NOT textareas, and not
+   the toggle/range/file/color inputs, which have their own intrinsic sizing).
+   box-sizing so a tool's padding doesn't inflate the box past the standard. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select,
+button {
+  min-height: var(--control-h, 44px);
+  box-sizing: border-box;
+}
+
+/* ---- In-field copy button ----
+   Wrap a value field in `.ct-field` (position:relative). The field reserves
+   right padding so its text never runs under the icon; the copy <button> is
+   `.ct-copy-btn` and sits inside at the right. Use CtClipboardUtil copy/flash for behavior
+   (components/CtClipboardUtil.mjs). Outputs show it always; editable inputs reveal it only when
+   non-empty — the tool toggles the button's [hidden] on input (CSS can't read a
+   value). Skip secret fields (e.g. an HMAC key). */
+.ct-field { position: relative; display: block; }
+.ct-field > input,
+.ct-field > textarea { width: 100%; }
+.ct-field > input { padding-right: 2.6rem; }
+.ct-field > textarea { padding-right: 2.6rem; }
+
+.ct-copy-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;                 /* override the single-line control min-height above */
+  height: var(--control-h, 44px);
+  width: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 1;
+}
+.ct-copy-btn:hover:not(:disabled) { opacity: 1; background: rgba(127, 127, 127, 0.16); }
+.ct-copy-btn:focus-visible { outline: 2px solid var(--focus, #7dd3fc); outline-offset: 2px; opacity: 1; }
+
+/* Multi-line fields: pin the copy button to the TOP-right (not vertically
+   centered over the textarea). Add `ct-field--multiline` to the wrapper. */
+.ct-field--multiline .ct-copy-btn { top: 0.4rem; right: 0.4rem; height: 2rem; width: 2.2rem; }
+/* ===== end ct-controls ===== */
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+    margin: 0 0 0.3rem;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  textarea {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.7rem;
+    width: 100%;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    overflow: auto;
+    min-height: 200px;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  /* Stacked layout: the input keeps roughly its current height; the output is
+     much taller since it now sits below (not beside) the input. */
+  #pp-input { min-height: 180px; }
+  #pp-output { min-height: 440px; }
+
+  select {
+    font: inherit;
+    color: var(--text);
+    /* base.css supplies the chevron via background-image — keep the fill as
+       background-color (never the `background` shorthand, which wipes it). */
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.4rem 2rem 0.4rem 0.6rem;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+
+  /* Exclude confirmDialog's own buttons (.ctc-btn) so its accent "Yes" keeps its
+     fill on hover — docs/conventions.md's hover-specificity trap. */
+  button:hover:not(:disabled):not(.ctc-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="tab"]:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+
+  .app-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* ---------- Tabs (WAI-ARIA tablist) ---------- */
+
+  .tablist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+  }
+
+  [role="tab"] {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: var(--radius);
+    padding: 0.45rem 0.85rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  [role="tab"]:hover:not([aria-selected="true"]) {
+    background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+    color: var(--text);
+  }
+
+  [role="tab"][aria-selected="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  /* ---------- Controls row ---------- */
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .mode-toggle {
+    display: inline-flex;
+    gap: 0.35rem;
+  }
+
+  .mode-toggle button {
+    font-weight: 600;
+  }
+
+  .mode-toggle button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .mode-toggle button[aria-pressed="true"]:hover:not(:disabled):not(.ctc-btn) {
+    background: var(--accent);
+  }
+
+  .control-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .control-field label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .controls-spacer {
+    flex: 1 1 auto;
+  }
+
+  /* ---------- Editor panels ---------- */
+
+  /* Stacked vertically: Input on top, Output below (on every viewport). */
+  .editor {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 32px;
+  }
+
+  .panel-header .meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  /* Stats sit in the OUTPUT label row (the stacked layout would otherwise bury
+     them at the very bottom of the page). */
+  .stats {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    min-height: 1.1em;
+    text-align: right;
+  }
+
+  .stats .saved {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .error {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+  }
+
+  /* ---------- Help modal content ----------
+     The dialog chrome (overlay, surface, ✕, fade, focus-trap) is the shared
+     jbcModal primitive (CtModal in the shared lib), themed via the --jbcm-* tokens
+     in :root. Only the Help body's own typography is styled here. */
+  .jbcm-body h3 { margin: 0.9rem 0 0.3rem; font-size: 0.98rem; }
+  .jbcm-body p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .jbcm-body ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .jbcm-body li { margin-bottom: 0.35rem; }
+  .jbcm-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: color-mix(in srgb, var(--text) 8%, var(--panel));
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+  }
+
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Responsive ---------- */
+
+  @media (max-width: 720px) {
+    .controls-spacer {
+      flex-basis: 100%;
+      height: 0;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Pretty-Printer &amp; Minifier</h1>
+        <p class="subtitle">Format or minify JSON, YAML, HTML, CSS, SQL, and JavaScript — all hand-rolled, all local, nothing leaves your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <div class="tablist" role="tablist" aria-label="Language" data-testid="tablist">
+    <button type="button" role="tab" id="tab-json" data-testid="tab-json" data-lang="json" data-value="json" aria-selected="true"  aria-controls="panel-editor" tabindex="0">JSON</button>
+    <button type="button" role="tab" id="tab-yaml" data-testid="tab-yaml" data-lang="yaml" data-value="yaml" aria-selected="false" aria-controls="panel-editor" tabindex="-1">YAML</button>
+    <button type="button" role="tab" id="tab-html" data-testid="tab-html" data-lang="html" data-value="html" aria-selected="false" aria-controls="panel-editor" tabindex="-1">HTML</button>
+    <button type="button" role="tab" id="tab-css"  data-testid="tab-css"  data-lang="css"  data-value="css"  aria-selected="false" aria-controls="panel-editor" tabindex="-1">CSS</button>
+    <button type="button" role="tab" id="tab-sql"  data-testid="tab-sql"  data-lang="sql"  data-value="sql"  aria-selected="false" aria-controls="panel-editor" tabindex="-1">SQL</button>
+    <button type="button" role="tab" id="tab-js"   data-testid="tab-js"   data-lang="js"   data-value="js"   aria-selected="false" aria-controls="panel-editor" tabindex="-1">JavaScript</button>
+  </div>
+
+  <div class="controls" role="group" aria-label="Options">
+    <div class="mode-toggle" role="group" aria-label="Mode">
+      <button type="button" id="mode-format" data-testid="mode-format" data-value="format" aria-pressed="true">Format</button>
+      <button type="button" id="mode-minify" data-testid="mode-minify" data-value="minify" aria-pressed="false">Minify</button>
+    </div>
+
+    <div class="control-field" data-testid="indent-field">
+      <label for="indent-select">Indent</label>
+      <select id="indent-select" data-testid="indent-select" aria-label="Indent size">
+        <option value="2" selected>2 spaces</option>
+        <option value="4">4 spaces</option>
+        <option value="tab">Tab</option>
+      </select>
+    </div>
+
+    <div class="control-field" data-testid="sql-case-field" hidden>
+      <label for="sql-keyword-case">Keywords</label>
+      <select id="sql-keyword-case" data-testid="sql-keyword-case" aria-label="SQL keyword case">
+        <option value="unchanged" selected>Unchanged</option>
+        <option value="upper">UPPERCASE</option>
+        <option value="lower">lowercase</option>
+      </select>
+    </div>
+
+    <div class="controls-spacer"></div>
+
+    <button type="button" id="load-sample" data-testid="load-sample">Load sample</button>
+    <button type="button" id="clear-input" data-testid="clear-input">Clear</button>
+  </div>
+
+  <div class="editor" id="panel-editor" role="tabpanel" aria-labelledby="tab-json" data-testid="editor">
+    <section class="panel">
+      <div class="panel-header">
+        <label for="pp-input" id="input-label">Input</label>
+        <span class="meta" data-testid="input-bytes" aria-live="off"></span>
+      </div>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="pp-input" data-testid="pp-input" spellcheck="false" autocomplete="off" autocapitalize="off"
+          placeholder="Paste or type code, then pick Format or Minify…" aria-labelledby="input-label"></textarea>
+        <button type="button" id="copy-input" class="ct-copy-btn" data-testid="copy-input" aria-label="Copy input" title="Copy input" hidden>📋</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <label for="pp-output">Output</label>
+        <p class="stats" data-testid="pp-stats" aria-live="polite"></p>
+      </div>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="pp-output" data-testid="pp-output" readonly spellcheck="false" aria-label="Output"></textarea>
+        <button type="button" id="copy-output" class="ct-copy-btn" data-testid="copy-output" aria-label="Copy output" title="Copy output">📋</button>
+      </div>
+    </section>
+  </div>
+
+  <p class="error" data-testid="pp-error" role="alert" aria-live="polite" hidden></p>
+</div>
+
+<!-- Help modal is built at runtime by the shared jbcModal primitive
+     (CtModal in the shared lib) from this hidden template. The <h2> title is
+     supplied via jbcModal's `title` option, so it is not repeated here. -->
+<template id="help-body">
+    <p>Pick a language tab, paste your code into the <strong>Input</strong> box up top, and choose <strong>Format</strong> (pretty-print) or <strong>Minify</strong>. The <strong>Output</strong> updates live in the taller box below. Everything runs locally — nothing you paste is ever sent anywhere.</p>
+
+    <h3>Six languages</h3>
+    <ul>
+      <li><strong>JSON</strong> — full pretty-print and minify (via a strict parse + re-serialize).</li>
+      <li><strong>YAML</strong> — a practical common subset (block mappings/sequences, scalars, flow collections, comments). Anchors, aliases, tags, complex keys, block scalars and multi-document streams are rejected with a clear message rather than mis-parsed. Comments are dropped.</li>
+      <li><strong>HTML</strong> — re-indent the element tree; <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code>, <code>&lt;pre&gt;</code> and <code>&lt;textarea&gt;</code> contents are kept verbatim. Minify is conservative because HTML whitespace can be significant.</li>
+      <li><strong>CSS</strong> — full pretty-print and minify, aware of strings, comments and <code>url()</code>.</li>
+      <li><strong>SQL</strong> — reliable pretty-print (with keyword casing) plus a <em>safe</em> minify (strip comments, collapse whitespace). Token-based, string/identifier/comment aware.</li>
+      <li><strong>JavaScript</strong> — reliable pretty-print plus a <em>safe</em> minify. Fully aware of strings, template literals (incl. nested <code>${…}</code>), regex-vs-division, and comments. No renaming, no dead-code removal.</li>
+    </ul>
+
+    <h3>Safe by design</h3>
+    <p>For JS and SQL the tool only strips comments and insignificant whitespace — it never renames identifiers or rewrites your code, and it stays conservative around automatic semicolon insertion. The overriding rule everywhere: the output is always semantically equivalent to the input.</p>
+
+    <p class="help-note">Your active tab, mode, indent, SQL keyword case, and the text for each language are remembered on this device. Output is always recomputed, never stored.</p>
+</template>
+
+<!------ Begin Footer ---->
+<style>
+  .ct-footer { margin: 3rem auto 0; padding: 1rem 1rem 1.5rem; max-width: 960px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.72; text-align: center; }
+  .ct-footer__repo { display: inline-flex; align-items: center; gap: 0.45rem; color: inherit; text-decoration: none; font-weight: 600; }
+  .ct-footer__repo:hover { text-decoration: underline; }
+  .ct-footer__icon { flex: none; }
+  .ct-footer__credits { margin: 0; }
+  .ct-footer__license { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ct-footer__license:hover { opacity: 0.85; }
+  .ct-footer__license:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 3px; }
+</style>
+<footer class="ct-footer">
+  <a class="ct-footer__repo" href="https://github.com/codercowboy/claude-tools" target="_blank" rel="noopener noreferrer" aria-label="claude-tools repository on GitHub">
+    <svg class="ct-footer__icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>github.com/codercowboy/claude-tools</span>
+  </a>
+  <p class="ct-footer__credits">Code by Claude &middot; Ideas by Jason, the ideas guy &middot; <button type="button" class="ct-footer__license" data-ct-license data-testid="footer-license-link" aria-haspopup="dialog">MIT License</button></p>
+</footer>
+<!---- end footer -->
+
+
+
+
+
+<script type="module">// ===== Begin CtClipboardUtil (ES module) =====
+/*
+ * CtClipboardUtil — copy-to-clipboard + button-flash helpers (ES module; was copy.js)
+ * ---------------------------------------------------------------------------
+ * import { copy, flash } from '<rel>/jbc-include/components/CtClipboardUtil.mjs';
+ * (or `CtClipboardUtil.copy` / `CtClipboardUtil.flash` via the aggregator class
+ * at the bottom — statics REFERENCE the named bindings, single implementation.)
+ *
+ * Formerly the pasteable IIFE copy.js exposing the jbcCopy / jbcFlash window globals;
+ * those globals are GONE. `copy` = ex-jbcCopy, `flash` = ex-jbcFlash — bodies
+ * unchanged. The `.ctc-flash` CSS still self-injects on the first `flash()` call
+ * (ensureStyles) and the `window.ctCopyStyles = false` opt-out is still honored.
+ *
+ * copy(text) -> Promise<boolean>
+ * flash(el, opts?) -> void
+ *
+ *     btn.addEventListener('click', async () => {
+ *       if (!text) return;
+ *       const ok = await copy(text);
+ *       if (!ok) return;
+ *       flash(btn, { label: '✅', revertTo: '📋' });
+ *     });
+ *
+ * copy(text):
+ * - Tries `navigator.clipboard.writeText` first; falls back to a hidden,
+ *   off-screen `<textarea>` + `document.execCommand('copy')` for restricted
+ *   or insecure contexts (e.g. `file://`, LAN HTTP) where the async
+ *   Clipboard API is unavailable or denied.
+ * - Always RESOLVES — never rejects/throws. Resolves `true` on success,
+ *   `false` if every copy path failed (denied permission, unsupported
+ *   browser, etc.) — callers check the boolean rather than try/catch.
+ *
+ * flash(el, opts?):
+ * - Transient "copied" feedback on a button: swaps `el.textContent` to
+ *   `opts.label` (default `'✅'`) for `opts.ms` (default `1000`), then
+ *   reverts and clears the timer.
+ * - Revert target: `opts.revertTo` if given (for icon-only buttons that
+ *   always revert to a fixed glyph, e.g. `'📋'`); otherwise the element's
+ *   current text — captured once and reused if `flash` is called again on
+ *   the same element before the previous flash reverted (rapid re-clicks
+ *   don't lose the true original label).
+ * - Adds a `.ctc-flash` class for the duration, driving a brief, purely
+ *   decorative scale pulse (see STYLING below) — no functional behavior
+ *   depends on it.
+ *
+ * STYLING:
+ * - The only visual injected is the optional `.ctc-flash` pulse animation,
+ *   which is skipped entirely under `prefers-reduced-motion: reduce` (the
+ *   text swap + revert timing are unaffected either way).
+ * - Full opt-out: set `window.ctCopyStyles = false` BEFORE the first
+ *   `flash` call and no styles are injected.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtClipboardUtil.mjs
+ */
+
+
+function copy(text) {
+  text = String(text == null ? '' : text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(
+      function () { return true; },
+      function () { return fallbackCopy(text); }
+    );
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* unsupported */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+var STYLE_ID = 'ctc-copy-style';
+function ensureStyles() {
+  if (window.ctCopyStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = [
+    '@keyframes ctc-flash-pulse{0%{transform:scale(1);}',
+    '30%{transform:scale(1.12);}100%{transform:scale(1);}}',
+    '.ctc-flash{animation:ctc-flash-pulse 300ms ease;}',
+    '@media (prefers-reduced-motion: reduce){.ctc-flash{animation:none;}}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+var flashTimeouts = new WeakMap();
+function flash(el, opts) {
+  opts = opts || {};
+  var ms = opts.ms != null ? opts.ms : 1000;
+  var label = opts.label != null ? opts.label : '✅';
+
+  ensureStyles();
+  clearTimeout(flashTimeouts.get(el));
+
+  var original;
+  if (opts.revertTo != null) {
+    original = opts.revertTo;
+  } else if (el.dataset.ctcFlashOriginal != null) {
+    original = el.dataset.ctcFlashOriginal; // already mid-flash; keep true original
+  } else {
+    original = el.textContent;
+  }
+  el.dataset.ctcFlashOriginal = original;
+
+  el.textContent = label;
+  el.classList.remove('ctc-flash');
+  void el.offsetWidth; // restart the CSS animation even on rapid re-clicks
+  el.classList.add('ctc-flash');
+
+  var t = setTimeout(function () {
+    el.textContent = original;
+    el.classList.remove('ctc-flash');
+    delete el.dataset.ctcFlashOriginal;
+    flashTimeouts.delete(el);
+  }, ms);
+  flashTimeouts.set(el, t);
+}
+
+/** Aggregator (decision #3): statics REFERENCE the named exports above. */
+class CtClipboardUtil {
+  static copy = copy;
+  static flash = flash;
+}
+// ===== end CtClipboardUtil =====
+// ===== Begin CtModal (ES module) =====
+/*
+ * createModal({ title?, body?, onClose? }) -> { open, close, root }   (ES module; was jbcModal / modal.js)
+ * ---------------------------------------------------------------------------
+ * The shared accessible content-modal primitive for single-file tools — the
+ * one place the Help / Options / About / License dialog contract is
+ * implemented.
+ *
+ *     import { createModal } from '<rel>/jbc-include/components/CtModal.mjs';
+ *     // (or `CtModal.create` via the aggregator class at the bottom — the
+ *     //  static REFERENCES the named binding, single implementation.)
+ *
+ *     var help = createModal({
+ *       title: 'How this works',
+ *       body: '<p>Paste some text and hit Convert…</p>'  // string OR a Node
+ *     });
+ *     helpButton.addEventListener('click', help.open);
+ *
+ * Each call BUILDS one modal and returns a small handle:
+ *   - open()   show it (records the trigger, moves focus inside)
+ *   - close()  hide it (restores focus to the trigger, runs onClose)
+ *   - root     the overlay element; `root.querySelector('.jbcm-body')` is the
+ *              content container if you want to swap `body` between opens.
+ *
+ * Options:
+ *   - title    heading text; renders an <h2> and wires `aria-labelledby`.
+ *              Omit it and the dialog is labelled `aria-label="Dialog"`.
+ *   - titleId  explicit id for that <h2> (and the `aria-labelledby` it wires).
+ *              Default: a random id. Pass a stable one when a test or another
+ *              element references it (e.g. `titleId: 'help-title'`).
+ *   - body     string (assigned as innerHTML) OR a DOM Node (appended). Omit
+ *              to start empty and fill `.jbcm-body` yourself.
+ *   - onClose  called (no args) after each close — handy for a "seen" flag.
+ *   - testid   `data-testid` prefix for stable test hooks: the overlay gets
+ *              `${testid}-overlay`, the dialog `${testid}-modal` (default:
+ *              `jbcm-overlay` / `jbcm-dialog`). The ✕ is always `modal-close-x`.
+ *   - autoOpen the FIRST-LOAD variant: a once-flag handle `{ seen(), mark() }`
+ *              (e.g. `CtUtil's onceFlag(KEY)`). On a genuinely fresh visit
+ *              (`seen()` false) the modal auto-opens and marks the flag, so it
+ *              shows exactly once and never again — the first-load Help popup.
+ *              Injected (not a hard CtUtil dependency) so this stays standalone.
+ *
+ * THE CONTRACT (implemented here once, for every tool):
+ *   - role="dialog", aria-modal="true", labelled by the title.
+ *   - A persistent close ✕ pinned to the dialog's top-right corner — always
+ *     reachable even when the content scrolls; it is the sole dedicated close
+ *     affordance (no redundant bottom "Close").
+ *   - Initial focus moves to the ✕; a focus trap cycles Tab / Shift+Tab over
+ *     the ✕ plus any content controls and wraps at both ends.
+ *   - Esc and backdrop-click close; focus returns to the triggering element.
+ *   - Scrolls to the top on open; reduced-motion aware (no fade when the
+ *     visitor asked for less motion).
+ *   - Fullscreen-safe: the browser only paints the fullscreen element's own
+ *     subtree, so on open the overlay is re-parented into
+ *     document.fullscreenElement (and restored to <body> on close) — the modal
+ *     shows and stays interactive over fullscreen content.
+ *
+ * STYLING — the component adapts to each tool's look:
+ * - It injects only structural CSS; every VISUAL choice reads from a CSS
+ *   variable with a theme-aware system-color fallback, so it looks right with
+ *   no theming AND matches your tool if you set a few variables anywhere in
+ *   scope (e.g. your :root / body theme block):
+ *     --jbcm-bg, --jbcm-fg              (dialog surface + text)
+ *     --jbcm-backdrop                  (overlay behind the dialog)
+ *     --jbcm-border, --jbcm-shadow      (dialog border + shadow)
+ *     --jbcm-radius                    (corner rounding)
+ *     --jbcm-font, --jbcm-max-width     (dialog font + width cap)
+ *     --jbcm-focus                     (focus ring)
+ * - Full opt-out: set `window.ctModalStyles = false` BEFORE the first call
+ *   and NO styles are injected — your tool then supplies all `.jbcm-*` CSS
+ *   (.jbcm-overlay/.jbcm-dialog/.jbcm-close/.jbcm-title/.jbcm-body).
+ *
+ * Formerly the pasteable IIFE modal.js exposing the old `jbcModal` window global;
+ * that global is GONE — `createModal` = ex-jbcModal, body unchanged. The CSS
+ * still self-injects on the first createModal() call (ensureModalStyles) and the
+ * `window.ctModalStyles = false` opt-out is still honored.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtModal.mjs
+ */
+
+var MODAL_STYLE_ID = 'jbcm-style';
+function ensureModalStyles() {
+  if (window.ctModalStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(MODAL_STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = MODAL_STYLE_ID;
+  style.textContent = [
+    '.jbcm-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;',
+    'align-items:center;justify-content:center;padding:1rem;color-scheme:light dark;',
+    'background:var(--jbcm-backdrop,rgba(0,0,0,0.5));}',
+    '.jbcm-overlay[hidden]{display:none!important;}',
+    '@media (prefers-reduced-motion:no-preference){',
+    '.jbcm-overlay{animation:jbcm-fade .15s ease;}',
+    '@keyframes jbcm-fade{from{opacity:0}to{opacity:1}}}',
+    '.jbcm-dialog{position:relative;box-sizing:border-box;width:100%;',
+    'max-width:var(--jbcm-max-width,40rem);max-height:min(85vh,680px);overflow-y:auto;',
+    'background:var(--jbcm-bg,Canvas);color:var(--jbcm-fg,CanvasText);',
+    'border:1px solid var(--jbcm-border,GrayText);',
+    'border-radius:var(--jbcm-radius,12px);',
+    'box-shadow:var(--jbcm-shadow,0 12px 32px rgba(0,0,0,0.35));',
+    'padding:1.25rem 3rem 1.25rem 1.4rem;',
+    'font-family:var(--jbcm-font,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);',
+    'font-size:.9rem;line-height:1.5;}',
+    '.jbcm-title{margin:0 0 .7rem;font-size:1.2rem;line-height:1.25;}',
+    '.jbcm-body{margin:0;}',
+    '.jbcm-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;',
+    'min-height:0;display:flex;align-items:center;justify-content:center;padding:0;',
+    'border:0;border-radius:8px;background:transparent;color:inherit;',
+    'font-size:1.6rem;line-height:1;cursor:pointer;}',
+    '.jbcm-close:hover{background:rgba(127,127,127,0.18);}',
+    '.jbcm-close:focus-visible{outline:2px solid var(--jbcm-focus,Highlight);',
+    'outline-offset:2px;}'
+  ].join('');
+  (document.head || document.documentElement).appendChild(style);
+}
+
+function createModal(opts) {
+  opts = opts || {};
+  ensureModalStyles();
+
+  var prevFocus = null;
+  var titleId = (opts.titleId != null && String(opts.titleId) !== '')
+    ? String(opts.titleId)
+    : 'jbcm-title-' + Math.random().toString(36).slice(2);
+  var tidPrefix = (opts.testid != null && String(opts.testid) !== '') ? String(opts.testid) : null;
+
+  var overlay = document.createElement('div');
+  overlay.className = 'jbcm-overlay';
+  overlay.hidden = true;
+  overlay.setAttribute('data-testid', tidPrefix ? tidPrefix + '-overlay' : 'jbcm-overlay');
+
+  var dialog = document.createElement('div');
+  dialog.className = 'jbcm-dialog';
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('data-testid', tidPrefix ? tidPrefix + '-modal' : 'jbcm-dialog');
+
+  var closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'jbcm-close';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.setAttribute('title', 'Close');
+  closeBtn.setAttribute('data-testid', 'modal-close-x');
+  closeBtn.innerHTML = '&times;';
+  dialog.appendChild(closeBtn);
+
+  if (opts.title != null && String(opts.title) !== '') {
+    var titleEl = document.createElement('h2');
+    titleEl.className = 'jbcm-title';
+    titleEl.id = titleId;
+    titleEl.textContent = String(opts.title);
+    dialog.appendChild(titleEl);
+    dialog.setAttribute('aria-labelledby', titleId);
+  } else {
+    dialog.setAttribute('aria-label', 'Dialog');
+  }
+
+  var bodyEl = document.createElement('div');
+  bodyEl.className = 'jbcm-body';
+  if (opts.body != null) {
+    if (typeof opts.body === 'string') bodyEl.innerHTML = opts.body;
+    else if (opts.body.nodeType) bodyEl.appendChild(opts.body);
+  }
+  dialog.appendChild(bodyEl);
+
+  overlay.appendChild(dialog);
+  // Present-but-hidden from construction (not lazily on first open): the
+  // overlay is queryable immediately and its `[hidden]` collapses it to
+  // display:none, matching the semantics of a statically-authored modal.
+  if (document.body) document.body.appendChild(overlay);
+
+  function focusables() {
+    return Array.prototype.slice
+      .call(dialog.querySelectorAll(
+        'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+      .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+  }
+
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    var f = focusables();
+    if (!f.length) return;
+    e.preventDefault();
+    var i = f.indexOf(document.activeElement);
+    var n = e.shiftKey ? i - 1 : i + 1;
+    if (n < 0) n = f.length - 1;
+    if (n >= f.length) n = 0;
+    f[n].focus();
+  }
+
+  function open() {
+    if (!overlay.parentNode) document.body.appendChild(overlay);
+    prevFocus = document.activeElement;
+    // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+    var host = document.fullscreenElement || document.body;
+    if (overlay.parentNode !== host) host.appendChild(overlay);
+    overlay.hidden = false;
+    document.addEventListener('keydown', onKey, true);
+    dialog.scrollTop = 0;
+    closeBtn.focus({ preventScroll: true });
+  }
+
+  function close() {
+    if (overlay.hidden) return;
+    overlay.hidden = true;
+    document.removeEventListener('keydown', onKey, true);
+    if (overlay.parentNode !== document.body) document.body.appendChild(overlay);
+    if (prevFocus && typeof prevFocus.focus === 'function') {
+      try { prevFocus.focus(); } catch (e) { /* ignore */ }
+    }
+    prevFocus = null;
+    if (typeof opts.onClose === 'function') opts.onClose();
+  }
+
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('mousedown', function (e) {
+    if (e.target === overlay) { e.preventDefault(); close(); }
+  });
+
+  // First-load variant: auto-open ONCE, gated by an injected once-flag handle
+  // (e.g. CtUtil's onceFlag(KEY)). Mark seen BEFORE opening so it stays a true
+  // "once" even if the visitor navigates away without closing — never again.
+  var once = opts.autoOpen;
+  if (once && typeof once.seen === 'function' && !once.seen()) {
+    if (typeof once.mark === 'function') once.mark();
+    open();
+  }
+
+  return { open: open, close: close, root: overlay };
+}
+
+/** Aggregator (decision #3): static REFERENCES the named export above. */
+class CtModal {
+  static create = createModal;
+}
+// ===== end CtModal =====
+// ===== Begin CtConfirm (ES module) =====
+/*
+ * confirmDialog(message?) -> Promise<boolean>   (ES module; was the jbcConfirm window global)
+ * ---------------------------------------------------------------------------
+ * A tiny, dependency-free confirm dialog for single-file tools.
+ *
+ *     import { confirmDialog } from '<rel>/jbc-include/components/CtConfirm.mjs';
+ *     // (or `CtConfirm.confirm` via the aggregator class at the bottom — the
+ *     //  static REFERENCES the named binding, single implementation. The named
+ *     //  export is `confirmDialog`, NOT `confirm`, so it never shadows window.confirm.)
+ *
+ *     if (await confirmDialog('Remove this color?')) { ...do it... }
+ *
+ * - Returns a Promise<boolean>: true = confirmed, false = cancelled.
+ * - message is optional; null/empty/whitespace becomes "Are you sure?".
+ * - "Yes" is the highlighted default: Enter confirms. Esc / "Cancel" /
+ *   backdrop-click cancel. Focus is trapped and returned to the caller's
+ *   element on close. role="dialog", aria-modal, labelled by the message.
+ *
+ * STYLING — the component adapts to each tool's look:
+ * - It injects only structural CSS; every VISUAL choice reads from a CSS
+ *   variable with a theme-aware system-color fallback, so it looks right with
+ *   no theming AND matches your tool if you set a few variables anywhere in
+ *   scope (e.g. your :root / body theme block):
+ *     --ctc-accent, --ctc-accent-fg   (the "Yes" button)
+ *     --ctc-bg, --ctc-fg              (dialog surface + text)
+ *     --ctc-backdrop                  (overlay behind the dialog)
+ *     --ctc-radius, --ctc-btn-radius  (corner rounding)
+ *     --ctc-shadow, --ctc-font        (dialog shadow + font)
+ *     --ctc-cancel-border, --ctc-focus, --ctc-max-width
+ * - Full opt-out: set `window.ctConfirmStyles = false` BEFORE the first call
+ *   and NO styles are injected — your tool then supplies all `.ctc-*` CSS
+ *   (.ctc-overlay/.ctc-dialog/.ctc-message/.ctc-buttons/.ctc-btn/
+ *   .ctc-btn--cancel/.ctc-btn--yes).
+ *
+ * Formerly a pasteable IIFE script exposing the old `jbcConfirm` window global
+ * (vendored copies called it `ctConfirm`); those globals are GONE — `confirmDialog` =
+ * ex-jbcConfirm, body unchanged. The CSS still self-injects on the first call
+ * (ensureConfirmStyles) and the `window.ctConfirmStyles = false` opt-out is still honored.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit here and run `npm run build` — every tool picks it up; there is no hash
+ * to recompute. Canonical source:
+ * html-single-file/assets/components/CtConfirm.mjs
+ */
+
+var CONFIRM_STYLE_ID = 'ctc-style';
+function ensureConfirmStyles() {
+  if (window.ctConfirmStyles === false) return; // tool supplies its own CSS
+  if (document.getElementById(CONFIRM_STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = CONFIRM_STYLE_ID;
+  style.textContent = [
+    '.ctc-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;',
+    'align-items:center;justify-content:center;padding:1rem;',
+    'color-scheme:light dark;background:var(--ctc-backdrop,rgba(0,0,0,0.5));}',
+    '.ctc-dialog{box-sizing:border-box;width:100%;',
+    'max-width:var(--ctc-max-width,22rem);padding:1.25rem 1.25rem 1rem;',
+    'background:var(--ctc-bg,Canvas);color:var(--ctc-fg,CanvasText);',
+    'border-radius:var(--ctc-radius,12px);',
+    'box-shadow:var(--ctc-shadow,0 10px 40px rgba(0,0,0,0.3));',
+    'font-family:var(--ctc-font,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);}',
+    '.ctc-message{margin:0 0 1.1rem;font-size:1rem;line-height:1.45;}',
+    '.ctc-buttons{display:flex;justify-content:flex-end;gap:0.6rem;}',
+    '.ctc-btn{box-sizing:border-box;min-height:44px;padding:0.5rem 1.1rem;',
+    'border-radius:var(--ctc-btn-radius,8px);font:inherit;font-weight:600;',
+    'cursor:pointer;border:1px solid transparent;}',
+    '.ctc-btn:focus-visible{outline:2px solid var(--ctc-focus,AccentColor);',
+    'outline-offset:2px;}',
+    '.ctc-btn--cancel{background:transparent;color:inherit;',
+    'border-color:var(--ctc-cancel-border,rgba(128,128,128,0.5));}',
+    '.ctc-btn--cancel:hover{background:rgba(128,128,128,0.15);}',
+    '.ctc-btn--yes{background:var(--ctc-accent,AccentColor);',
+    'color:var(--ctc-accent-fg,AccentColorText);}',
+    '.ctc-btn--yes:hover{filter:brightness(1.08);}'
+  ].join('');
+  document.head.appendChild(style);
+}
+
+function confirmDialog(message) {
+  ensureConfirmStyles();
+  var text = (message == null || String(message).trim() === '')
+    ? 'Are you sure?' : String(message);
+
+  return new Promise(function (resolve) {
+    var previouslyFocused = document.activeElement;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'ctc-overlay';
+
+    var dialog = document.createElement('div');
+    dialog.className = 'ctc-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+
+    var msgEl = document.createElement('p');
+    msgEl.className = 'ctc-message';
+    msgEl.textContent = text;
+    var msgId = 'ctc-msg-' + Math.random().toString(36).slice(2);
+    msgEl.id = msgId;
+    dialog.setAttribute('aria-labelledby', msgId);
+
+    var buttons = document.createElement('div');
+    buttons.className = 'ctc-buttons';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'ctc-btn ctc-btn--cancel';
+    cancelBtn.textContent = 'Cancel';
+
+    var yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'ctc-btn ctc-btn--yes';
+    yesBtn.textContent = 'Yes';
+
+    buttons.appendChild(cancelBtn);
+    buttons.appendChild(yesBtn);
+    dialog.appendChild(msgEl);
+    dialog.appendChild(buttons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    var done = false;
+    function close(result) {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKeydown, true);
+      overlay.remove();
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        try { previouslyFocused.focus(); } catch (e) { /* ignore */ }
+      }
+      resolve(result);
+    }
+
+    function onKeydown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        close(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        close(false);
+      } else if (e.key === 'Tab') {
+        // trap focus between the two buttons
+        e.preventDefault();
+        var order = [cancelBtn, yesBtn];
+        var idx = order.indexOf(document.activeElement);
+        var next = e.shiftKey ? idx - 1 : idx + 1;
+        if (next < 0) next = order.length - 1;
+        if (next >= order.length) next = 0;
+        order[next].focus();
+      }
+    }
+
+    document.addEventListener('keydown', onKeydown, true);
+    overlay.addEventListener('mousedown', function (e) {
+      if (e.target === overlay) close(false);
+    });
+    cancelBtn.addEventListener('click', function () { close(false); });
+    yesBtn.addEventListener('click', function () { close(true); });
+
+    yesBtn.focus(); // "Yes" is the default
+  });
+}
+
+/** Aggregator (decision #3): static REFERENCES the named export above. */
+class CtConfirm {
+  static confirm = confirmDialog;
+}
+// ===== end CtConfirm =====
+/* CtLicense — shared License modal (components/CtLicense.mjs).
+   An ES module with a SIDE-EFFECT: importing it wires a global click listener
+   (once) that opens the modal on any [data-ct-license] trigger (the footer link in
+   components/footer.html). Every tool that carries the footer imports this module in its
+   app.mjs, so the footer link works for free; the footer no longer inlines a script.
+   Also callable as `openLicense()` / `CtLicense.open()` (there is no window global
+   any more). Shows the project's MIT license, plus any bundled
+   third-party libraries a tool declares by setting
+   `window.ctThirdParty = [{ name, version, license, url }]` before the modal is
+   opened (e.g. a tool that bundles a wasm codec — a per-tool DATA config hook, read at
+   open time). Accessible modal (role=dialog,
+   aria-modal, focus trap, Esc/backdrop close, focus return), reduced-motion
+   aware, and fullscreen-safe (re-parents into document.fullscreenElement while
+   fullscreen so it shows over fullscreen content). Palette-agnostic via CSS system
+   colors so it tracks the page's light/dark. Module-private names carry a "License"
+   qualifier so the build's import-flattening cannot collide with app.mjs top-levels. */
+var LICENSE_REPO = 'https://github.com/codercowboy/claude-tools';
+var LICENSE_REPO_LABEL = LICENSE_REPO.replace(/^https?:\/\//, '');
+var LICENSE_MIT_TEXT = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Jason and Claude (Anthropic)',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+
+var licenseOverlay, licenseDialog, licensePrevFocus, licenseStyleEl;
+
+function escapeLicenseHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function injectLicenseStyles() {
+  if (licenseStyleEl) return;
+  licenseStyleEl = document.createElement('style');
+  licenseStyleEl.textContent =
+    '.jbcl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.5);}' +
+    '.jbcl-overlay[hidden]{display:none!important;}' +
+    '@media (prefers-reduced-motion:no-preference){.jbcl-overlay{animation:jbcl-fade .15s ease;}@keyframes jbcl-fade{from{opacity:0}to{opacity:1}}}' +
+    '.jbcl-dialog{position:relative;box-sizing:border-box;width:100%;max-width:40rem;max-height:min(85vh,680px);overflow-y:auto;background:Canvas;color:CanvasText;border:1px solid GrayText;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:1.25rem 3rem 1.25rem 1.4rem;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.9rem;line-height:1.5;color-scheme:light dark;}' +
+    '.jbcl-dialog h2{margin:0 0 .6rem;font-size:1.2rem;}' +
+    '.jbcl-dialog h3{margin:1rem 0 .4rem;font-size:1rem;}' +
+    '.jbcl-dialog a{color:LinkText;}' +
+    '.jbcl-lead{margin:0 0 .8rem;}' +
+    '.jbcl-text{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;line-height:1.45;background:color-mix(in srgb,CanvasText 6%,Canvas);border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:8px;padding:.7rem .8rem;overflow-x:auto;margin:0;}' +
+    '.jbcl-tp{margin:.2rem 0 .6rem;padding-left:1.2rem;}.jbcl-tp li{margin-bottom:.3rem;}' +
+    '.jbcl-note{margin:.6rem 0 0;opacity:.75;font-size:.82rem;}' +
+    '.jbcl-close{position:absolute;top:.5rem;right:.5rem;width:40px;height:40px;min-height:0;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:1.6rem;line-height:1;cursor:pointer;}' +
+    '.jbcl-close:hover{background:rgba(127,127,127,.18);}' +
+    '.jbcl-close:focus-visible{outline:2px solid Highlight;outline-offset:2px;}';
+  (document.head || document.documentElement).appendChild(licenseStyleEl);
+}
+
+function buildLicenseDialog() {
+  injectLicenseStyles();
+  licenseOverlay = document.createElement('div');
+  licenseOverlay.className = 'jbcl-overlay';
+  licenseOverlay.hidden = true;
+  licenseOverlay.setAttribute('data-testid', 'license-overlay');
+  licenseOverlay.innerHTML =
+    '<div class="jbcl-dialog" role="dialog" aria-modal="true" aria-labelledby="jbcl-title" data-testid="license-modal">' +
+      '<button type="button" class="jbcl-close" data-testid="license-close-x" aria-label="Close" title="Close">&times;</button>' +
+      '<h2 id="jbcl-title">License</h2>' +
+      '<div class="jbcl-body"></div>' +
+    '</div>';
+  document.body.appendChild(licenseOverlay);
+  licenseDialog = licenseOverlay.querySelector('.jbcl-dialog');
+  licenseOverlay.querySelector('.jbcl-close').addEventListener('click', closeLicense);
+  licenseOverlay.addEventListener('mousedown', function (e) {
+    if (e.target === licenseOverlay) { e.preventDefault(); closeLicense(); }
+  });
+}
+
+function renderLicenseBody() {
+  var html =
+    '<p class="jbcl-lead">This project (<strong>claude-tools</strong>) is released under the <strong>MIT License</strong>. ' +
+    '<a href="' + LICENSE_REPO + '" target="_blank" rel="noopener noreferrer">' + LICENSE_REPO_LABEL + '</a></p>' +
+    '<pre class="jbcl-text">' + escapeLicenseHtml(LICENSE_MIT_TEXT) + '</pre>';
+  var tp = Array.isArray(window.ctThirdParty) ? window.ctThirdParty : [];
+  if (tp.length) {
+    html += '<h3>Bundled third-party libraries</h3><ul class="jbcl-tp">';
+    tp.forEach(function (d) {
+      var label = escapeLicenseHtml(d.name || '') + (d.version ? ' ' + escapeLicenseHtml(d.version) : '');
+      var lic = d.license ? ' &mdash; ' + escapeLicenseHtml(d.license) : '';
+      var link = d.url ? ' &middot; <a href="' + escapeLicenseHtml(d.url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '';
+      html += '<li>' + label + lic + link + '</li>';
+    });
+    html += '</ul><p class="jbcl-note">Full third-party license texts are in the repository’s NOTICES file.</p>';
+  } else {
+    html += '<p class="jbcl-note">No third-party libraries — this tool is 100% vanilla, with no runtime dependencies.</p>';
+  }
+  licenseOverlay.querySelector('.jbcl-body').innerHTML = html;
+}
+
+function licenseFocusables() {
+  return Array.prototype.slice
+    .call(licenseDialog.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+    .filter(function (el) { return !el.disabled && el.getClientRects().length > 0; });
+}
+
+function onLicenseKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeLicense(); return; }
+  if (e.key !== 'Tab') return;
+  var f = licenseFocusables();
+  if (!f.length) return;
+  e.preventDefault();
+  var i = f.indexOf(document.activeElement);
+  var n = e.shiftKey ? i - 1 : i + 1;
+  if (n < 0) n = f.length - 1;
+  if (n >= f.length) n = 0;
+  f[n].focus();
+}
+
+function openLicense() {
+  if (!licenseOverlay) buildLicenseDialog();
+  renderLicenseBody();
+  licensePrevFocus = document.activeElement;
+  // Fullscreen-safe: the browser only renders the fullscreen element's subtree.
+  var host = document.fullscreenElement || document.body;
+  if (licenseOverlay.parentNode !== host) host.appendChild(licenseOverlay);
+  licenseOverlay.hidden = false;
+  document.addEventListener('keydown', onLicenseKey, true);
+  licenseDialog.scrollTop = 0;
+  licenseOverlay.querySelector('.jbcl-close').focus({ preventScroll: true });
+}
+
+function closeLicense() {
+  if (!licenseOverlay || licenseOverlay.hidden) return;
+  licenseOverlay.hidden = true;
+  document.removeEventListener('keydown', onLicenseKey, true);
+  if (licenseOverlay.parentNode !== document.body) document.body.appendChild(licenseOverlay);
+  if (licensePrevFocus && typeof licensePrevFocus.focus === 'function') { try { licensePrevFocus.focus(); } catch (e) {} }
+  licensePrevFocus = null;
+}
+
+var licenseTriggerWired = false;
+function wireLicenseTrigger() {
+  if (licenseTriggerWired || typeof document === 'undefined') return; // idempotent
+  licenseTriggerWired = true;
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-ct-license]');
+    if (t) { e.preventDefault(); openLicense(); }
+  });
+}
+wireLicenseTrigger(); // self-wire on module evaluation
+
+class CtLicense {
+  static open = openLicense;
+}
+
+// ===== Begin CtComponents (ES module) =====
+/*
+ * CtComponents — the shared UI-wiring helpers (ES module; was 8 helpers on the
+ * classic-script util.js global). Dependency-free, SELF-CONTAINED (no import
+ * of any other module; showBanner/hideBanner back the banner helpers).
+ *
+ *     import { wireTabs, wireDropzone, announce } from '<rel>/jbc-include/components/CtComponents.mjs';
+ *     // (or `CtComponents.wireTabs` etc. via the aggregator class at the bottom —
+ *     //  the statics REFERENCE the named bindings, single implementation.)
+ *
+ * Bodies are moved VERBATIM from util.js (behavior-preserving + a11y gate); only
+ * the access path changed (the old util.js global's X -> named import X).
+ *
+ * iconButton(label, title, onClick?, opts?):
+ * - A `<button type=button class="icon-btn">` with `label` text, `title` +
+ *   matching `aria-label`, and an optional click handler. `opts.className`
+ *   overrides the class.
+ *
+ * wireSegmented(group, onChange, opts?):
+ * - Turns a container of buttons into an accessible single-select segmented
+ *   control. Click or Arrow-key selects; the chosen button gets
+ *   aria-pressed="true" (roving tabindex), others "false", then
+ *   `onChange(value, button)` fires. A button's value is its `data-value`, else
+ *   `.value`, else trimmed text. `opts.attr` ("aria-checked"), `opts.selector`.
+ *   Returns `{ select(value), buttons }`; call `select(initial)` once to set the
+ *   starting state.
+ *
+ * wireTabs(tablist, onChange, opts?):
+ * - Turns a role="tablist" container of role="tab" buttons into an accessible
+ *   tabs widget — the tablist analogue of wireSegmented (aria-selected +
+ *   role=tabpanel show/hide, not aria-pressed). Click or Arrow/Home/End selects:
+ *   the chosen tab gets aria-selected="true" + roving tabindex="0" (others
+ *   "false"/"-1"), the panel named by its `aria-controls` is shown and the
+ *   siblings' panels hidden, then `onChange(value, tab)` fires. A tab's value is
+ *   its `data-mode`, else `data-value`, else `id`, else trimmed text. Tabs that
+ *   all point one `aria-controls` at a SINGLE panel (e.g. a language switcher over
+ *   one editor) keep that shared panel shown; a tab with no `aria-controls`
+ *   toggles no panel (a panel-less selector styled as tabs). `opts.selector`
+ *   (default '[role="tab"]'), `opts.attr` (default "aria-selected"),
+ *   `opts.vertical` (ArrowUp/Down instead of ArrowLeft/Right). Returns
+ *   `{ select(value), tabs }`; call `select(initial)` once to set the starting
+ *   state.
+ *
+ * wireDropzone(zone, onFiles, opts?):
+ * - Wires drag-and-drop file input: toggles `opts.dragClass` (default
+ *   "ct-drag-over") during a drag and calls `onFiles(dataTransfer.files)` on
+ *   drop. Pairs with the `.ct-dropzone` CSS in widgets.css.
+ *
+ * showError(el, msg?) / showWarning(el, msg?):   (impl: showBanner)
+ * - Banner toggle: set `el.textContent` (when `msg` given) and reveal by
+ *   clearing `[hidden]`. show/hideWarning are the same operation on a separate
+ *   element. Pairs with the `.ct-error` / `.ct-warning` CSS in widgets.css.
+ *
+ * hideError(el) / hideWarning(el):   (impl: hideBanner)
+ * - Hide a banner: sets `el.hidden = true` (no-op for a falsy `el`).
+ *
+ * showBanner(el, msg?) / hideBanner(el): the shared implementations behind the four above.
+ * (Moved here from util.js in R12 — the banner trio is no longer on the util.js global.)
+ *
+ * announce(msg, opts?):
+ * - Writes `msg` to a lazily-created, visually-hidden aria-live region (one per
+ *   page) so screen readers announce dynamic results. `opts.assertive` uses
+ *   aria-live="assertive". Re-announces even identical consecutive messages.
+ *
+ * wireCopyButtons(root?, opts?):
+ * - Delegated copy wiring on top of the injected `opts.copy` / `opts.flash`
+ *   (CtClipboardUtil's `copy`/`flash` — callers pass them in:
+ *   `wireCopyButtons(document, { copy, flash })`). One listener on
+ *   `root` (default document) handles clicks on `opts.selector` (default
+ *   ".ct-copy-btn") that carry `opts.targetAttr` (default "data-copy-target"),
+ *   resolving the target by `[data-testid]` then `id`, copying its value/text,
+ *   and flashing the button. No-ops if `opts.copy` is absent.
+ *   `opts.skipWhen(text, target, btn)`: an optional predicate consulted AFTER the
+ *   target's text is read and BEFORE the truly-empty (`!text`) guard; when it
+ *   returns truthy the click is ignored (no copy, no flash). This lets a tool
+ *   route an "empty sentinel" through the shared wiring: escaper shows a "—" in
+ *   an `<output>` that means "nothing to copy" (`skipWhen: t => t === '—'`), and
+ *   jwt-decoder carries a `data-empty` flag while the value is non-empty
+ *   (`skipWhen: (t, el) => el.getAttribute('data-empty') === 'true'`). Absent (the
+ *   default) the behavior is unchanged. `opts.flashLabel` (default "✅") and
+ *   `opts.revertTo` set the flash.
+ *
+ * wireEditableCopy(input, btn):
+ * - Reveals an in-field copy `btn` only while `input` has a value (CSS can't
+ *   read a value); toggles `btn.hidden` on input and once immediately.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit the canonical copy, re-vendor, run `npm run build`. Canonical source:
+ * html-single-file/assets/components/CtComponents.mjs
+ */
+
+// ---- iconButton / wireSegmented / wireTabs / wireDropzone ----
+function iconButton(label, title, onClick, opts) {
+  opts = opts || {};
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = opts.className || 'icon-btn';
+  if (label != null) b.textContent = label;
+  if (title != null) { b.title = title; b.setAttribute('aria-label', title); }
+  if (typeof onClick === 'function') b.addEventListener('click', onClick);
+  return b;
+}
+
+function wireSegmented(group, onChange, opts) {
+  opts = opts || {};
+  var attr = opts.attr || 'aria-pressed';
+  var buttons = Array.prototype.slice.call(group.querySelectorAll(opts.selector || 'button'));
+  function valueOf(btn) {
+    var dv = btn.getAttribute('data-value');
+    if (dv != null) return dv;
+    if (btn.value != null && btn.value !== '') return btn.value;
+    return (btn.textContent || '').trim();
+  }
+  function select(value, fire) {
+    var chosen = null;
+    for (var i = 0; i < buttons.length; i++) {
+      var on = valueOf(buttons[i]) === value;
+      buttons[i].setAttribute(attr, on ? 'true' : 'false');
+      buttons[i].tabIndex = on ? 0 : -1;
+      if (on) chosen = buttons[i];
+    }
+    if (fire !== false && typeof onChange === 'function') onChange(value, chosen);
+  }
+  buttons.forEach(function (btn, idx) {
+    btn.addEventListener('click', function () { select(valueOf(btn)); });
+    btn.addEventListener('keydown', function (e) {
+      var dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1
+        : ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 0);
+      if (!dir) return;
+      e.preventDefault();
+      var next = buttons[(idx + dir + buttons.length) % buttons.length];
+      next.focus();
+      select(valueOf(next));
+    });
+  });
+  return { select: function (v) { select(v); }, buttons: buttons };
+}
+
+function wireTabs(tablist, onChange, opts) {
+  opts = opts || {};
+  var selAttr = opts.attr || 'aria-selected';
+  var vertical = !!opts.vertical;
+  var tabs = Array.prototype.slice.call(tablist.querySelectorAll(opts.selector || '[role="tab"]'));
+  function valueOf(tab) {
+    var dm = tab.getAttribute('data-mode');
+    if (dm != null) return dm;
+    var dv = tab.getAttribute('data-value');
+    if (dv != null) return dv;
+    if (tab.id) return tab.id;
+    return (tab.textContent || '').trim();
+  }
+  function panelFor(tab) {
+    var id = tab.getAttribute('aria-controls');
+    return id ? document.getElementById(id) : null;
+  }
+  function applyPanels(chosen) {
+    var chosenPanel = chosen ? panelFor(chosen) : null;
+    // Hide every panel a non-chosen tab controls, EXCEPT the chosen panel — so a
+    // tablist whose tabs all drive one shared panel never hides it, and a tab
+    // with no aria-controls simply toggles nothing.
+    for (var i = 0; i < tabs.length; i++) {
+      if (tabs[i] === chosen) continue;
+      var p = panelFor(tabs[i]);
+      if (p && p !== chosenPanel) p.hidden = true;
+    }
+    if (chosenPanel) chosenPanel.hidden = false;
+  }
+  function select(value, fire) {
+    var chosen = null;
+    for (var i = 0; i < tabs.length; i++) {
+      var on = valueOf(tabs[i]) === value;
+      tabs[i].setAttribute(selAttr, on ? 'true' : 'false');
+      tabs[i].tabIndex = on ? 0 : -1;
+      if (on) chosen = tabs[i];
+    }
+    applyPanels(chosen);
+    if (fire !== false && typeof onChange === 'function') onChange(value, chosen);
+  }
+  tabs.forEach(function (tab, idx) {
+    tab.addEventListener('click', function () { select(valueOf(tab)); });
+    tab.addEventListener('keydown', function (e) {
+      var fwd = vertical ? 'ArrowDown' : 'ArrowRight';
+      var back = vertical ? 'ArrowUp' : 'ArrowLeft';
+      var next = -1;
+      if (e.key === fwd) next = (idx + 1) % tabs.length;
+      else if (e.key === back) next = (idx - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = tabs.length - 1;
+      else return;
+      e.preventDefault();
+      var nt = tabs[next];
+      nt.focus();
+      select(valueOf(nt));
+    });
+  });
+  return { select: function (v) { select(v); }, tabs: tabs };
+}
+
+function wireDropzone(zone, onFiles, opts) {
+  opts = opts || {};
+  var dragClass = opts.dragClass || 'ct-drag-over';
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add(dragClass); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.remove(dragClass); });
+  });
+  zone.addEventListener('drop', function (e) {
+    var dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length && typeof onFiles === 'function') onFiles(dt.files);
+  });
+}
+
+// ---- banners: showError / showWarning / hideError / hideWarning (+ showBanner / hideBanner) ----
+function showBanner(elm, msg) {
+  if (!elm) return;
+  if (msg != null) elm.textContent = msg;
+  elm.hidden = false;
+}
+function hideBanner(elm) { if (elm) elm.hidden = true; }
+const showError = showBanner;
+const showWarning = showBanner;
+const hideError = hideBanner;
+const hideWarning = hideBanner;
+
+// ---- announce (aria-live) ----
+var liveRegion = null;
+function announce(msg, opts) {
+  opts = opts || {};
+  if (!liveRegion) {
+    liveRegion = document.createElement('div');
+    liveRegion.setAttribute('role', 'status');
+    liveRegion.setAttribute('aria-live', opts.assertive ? 'assertive' : 'polite');
+    liveRegion.setAttribute('aria-atomic', 'true');
+    var s = liveRegion.style;
+    s.position = 'absolute'; s.width = '1px'; s.height = '1px'; s.margin = '-1px';
+    s.padding = '0'; s.border = '0'; s.overflow = 'hidden';
+    s.clip = 'rect(0 0 0 0)'; s.clipPath = 'inset(50%)'; s.whiteSpace = 'nowrap';
+    document.body.appendChild(liveRegion);
+  }
+  liveRegion.textContent = '';
+  var r = liveRegion;
+  setTimeout(function () { r.textContent = String(msg == null ? '' : msg); }, 30);
+}
+
+// ---- wireCopyButtons / wireEditableCopy ----
+function wireCopyButtons(root, opts) {
+  root = root || document;
+  opts = opts || {};
+  var selector = opts.selector || '.ct-copy-btn';
+  var targetAttr = opts.targetAttr || 'data-copy-target';
+  var skipWhen = (typeof opts.skipWhen === 'function') ? opts.skipWhen : null;
+  root.addEventListener('click', function (e) {
+    var btn = (e.target && e.target.closest) ? e.target.closest(selector) : null;
+    if (!btn || (root.contains && !root.contains(btn))) return;
+    var id = btn.getAttribute(targetAttr);
+    if (!id) return;
+    var target = document.querySelector('[data-testid="' + id + '"]') || document.getElementById(id);
+    if (!target) return;
+    var text = (target.value != null) ? target.value : target.textContent;
+    if (skipWhen && skipWhen(text, target, btn)) return;
+    if (!text) return;
+    if (typeof opts.copy !== 'function') return;
+    Promise.resolve(opts.copy(text)).then(function (ok) {
+      if (ok && typeof opts.flash === 'function') {
+        opts.flash(btn, { label: opts.flashLabel || '✅', revertTo: opts.revertTo });
+      }
+    });
+  });
+}
+
+function wireEditableCopy(input, btn) {
+  if (!input || !btn) return;
+  function refresh() { btn.hidden = !(input.value && input.value.length); }
+  input.addEventListener('input', refresh);
+  refresh();
+}
+
+/** Aggregator (decision #3): statics REFERENCE the named exports above. */
+class CtComponents {
+  static iconButton = iconButton;
+  static wireSegmented = wireSegmented;
+  static wireTabs = wireTabs;
+  static wireDropzone = wireDropzone;
+  static showError = showBanner;
+  static showWarning = showBanner;
+  static hideError = hideBanner;
+  static hideWarning = hideBanner;
+  static showBanner = showBanner;
+  static hideBanner = hideBanner;
+  static announce = announce;
+  static wireCopyButtons = wireCopyButtons;
+  static wireEditableCopy = wireEditableCopy;
+}
+// ===== end CtComponents =====
+// ===== Begin CtUtil (ES module) =====
+/*
+ * CtUtil — tiny, dependency-free runtime helpers for single-file tools (ES module;
+ * was the classic-script window-global in util.js, plus the posAt /
+ * slugify / wrapText modules, absorbed here — jbc ES6 modularization · Train 37 · R12).
+ * ---------------------------------------------------------------------------
+ *     import { onceFlag, downloadBlob, debounce } from '<rel>/jbc-include/CtUtil.mjs';
+ *     // (or `CtUtil.onceFlag` etc. via the aggregator class at the bottom — the
+ *     //  statics REFERENCE the named bindings, single implementation.)
+ *
+ * Bodies are moved VERBATIM from util.js (and posAt.mjs / slugify.mjs / wrapText.mjs);
+ * only the access path changed (the old util.js global's `X` -> named import `X`). SELF-CONTAINED: no
+ * imports (so flattening never drags another module's top-level names into a page).
+ * Where each former util.js helper went:
+ *   - getRandomBytes + makeId      -> CtByteUtil.mjs (makeId rides with getRandomBytes so
+ *                                      this module needs no import of CtByteUtil)
+ *   - showWarning / hideError / hideWarning / showBanner / hideBanner
+ *                                  -> components/CtComponents.mjs (next to showError)
+ *   - iconButton / wireTabs / ... / announce  -> components/CtComponents.mjs (R11)
+ *   - loadImageFile / canvasToBlob / canvasToPngBytes -> image/CtImageUtil.mjs
+ *
+ * These are the browser/DOM-facing idioms every tool re-rolled by hand. Most touch
+ * runtime-only surfaces (document / URL / localStorage / setTimeout) but only inside
+ * function bodies, so the module is safe to import from Node (the pure helpers —
+ * clamp/num/escape*, posAt/slugify/wrapText — are usable in a unit-tested logic.mjs).
+ *
+ * downloadBlob(data, filename, mime?):
+ * - Triggers a file download. `data` may be a Blob, a string, or a Uint8Array
+ *   (anything the Blob constructor accepts). A Blob is used as-is; anything
+ *   else is wrapped in a Blob (with `mime` as its type when given).
+ * - Creates an object URL, clicks a temporary hidden <a download>, then revokes
+ *   the URL on a short timeout so the download has time to start.
+ *
+ * debounce(fn, ms):
+ * - Returns a trailing-edge debounced wrapper: repeated calls reset the timer,
+ *   and `fn` runs once, `ms` after the last call, with the latest args and `this`.
+ *
+ * (formatBytes is NOT here: the single formatBytes(bytes, opts) lives in CtByteUtil.mjs. The old
+ *   compact util.js variant — no space, lowercase "b", 2 decimals — was removed; callers use
+ *   CtByteUtil.formatBytes, which prints "1.5 KB" style.)
+ *
+ * clamp(n, lo, hi):  Coerces `n` to a number and clamps it to [lo, hi]. Non-finite -> `lo`.
+ * num(v, fallback?): Coerces `v` to a finite number, else `fallback` (default 0).
+ * clampInt(v, lo, hi, fallback): parseInt(v, 10) then clamps to [lo, hi]; non-integer -> `fallback`.
+ *
+ * escapeHtml(s): Escapes & < > (safe for a text node; quotes left as-is).
+ * escapeAttr(s): escapeHtml plus " -> &quot; and ' -> &#39; (for attribute values).
+ * (escapeXml is NOT here: the canonical escapeXml(text, strict?) lives in formats/CtEscaper.mjs.
+ *   The old util.js escapeXml / escapeXmlBasic was folded into it.)
+ *
+ * persistState(key, defaults):
+ * - Versioned, best-effort localStorage persistence driven by a `defaults` shape.
+ *   Put a version in the key (e.g. "mytool:v1"). Returns { load, save }. `load()`
+ *   overlays stored values on the defaults, coercing by the default's TYPE and
+ *   dropping non-finite numbers; `save(state)` stores ONLY the keys in `defaults`.
+ *   All access is try/catch-guarded (private mode / disabled storage degrade silently).
+ *
+ * onceFlag(key):
+ * - A one-shot "have they seen this?" flag on `key`. Returns { seen, mark }.
+ *   `seen()` is true once `mark()` has run; a storage throw is treated as
+ *   already-seen (never re-nag). Used for first-load help auto-open.
+ *
+ * el(tag, props?, children?):
+ * - Hyperscript element factory. `props` keys: `class`/`className`, `text`/
+ *   `textContent`, `html`/`innerHTML`, any `data-*`/`aria-*` + `role`/`title`/
+ *   `for`/`type`/`value`/`name`/`href`/`id`/`placeholder` (set as attributes),
+ *   everything else assigned as a property; null/undefined values are skipped.
+ *   `children` is a node, a string/number (-> text node), or an array of those;
+ *   null/false entries are skipped.
+ *
+ * prefersReducedMotion(): True when the user asked for reduced motion (false if unavailable).
+ * restartAnimation(el, cls): remove `cls`, force reflow (`void el.offsetWidth`), re-add `cls`.
+ *
+ * setupHiDPICanvas(canvas, opts?):
+ * - Sizes a canvas' backing store for crisp rendering on high-DPR displays. CSS
+ *   size is opts.width/opts.height (CSS px) or the canvas' current
+ *   clientWidth/clientHeight. dpr = devicePixelRatio (capped at opts.maxDpr when
+ *   given). Sets canvas.width/height = round(css * dpr); sets the CSS pixel size
+ *   via style unless opts.style===false; gets the 2d context (unless
+ *   opts.context===false) and applies setTransform(dpr,0,0,dpr,0,0) unless
+ *   opts.transform===false. Returns { dpr, cssW, cssH, ctx }.
+ *
+ * posAt(text, index) / slugify(str, opts?) / wrapText(text, maxWidth, measure):
+ * - Pure text helpers (ex posAt.mjs / slugify.mjs / wrapText.mjs); full doc blocks
+ *   at their sections below.
+ *
+ * This is a shared component inlined by the build (import-inlining; no globals).
+ * Edit the canonical copy, re-vendor, run `npm run build`. Canonical source:
+ * html-single-file/assets/CtUtil.mjs
+ */
+
+// =====================================================================
+// Section: downloadBlob / debounce / clamp / num / clampInt
+// =====================================================================
+function downloadBlob(data, filename, mime) {
+  var blob = (data instanceof Blob)
+    ? data
+    : new Blob([data], mime ? { type: mime } : undefined);
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename == null ? '' : String(filename);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+function debounce(fn, ms) {
+  var t;
+  return function () {
+    var self = this, args = arguments;
+    clearTimeout(t);
+    t = setTimeout(function () { fn.apply(self, args); }, ms);
+  };
+}
+
+function clamp(n, lo, hi) {
+  var v = Number(n);
+  // NaN has no position on the number line → lo. ±Infinity DO: +Infinity clamps to hi,
+  // -Infinity to lo via the normal comparison below (#1014-O).
+  if (Number.isNaN(v)) return lo;
+  return v < lo ? lo : (v > hi ? hi : v);
+}
+
+function num(v, fallback) {
+  var n = Number(v);
+  return Number.isFinite(n) ? n : (fallback === undefined ? 0 : fallback);
+}
+
+function clampInt(v, lo, hi, fallback) {
+  var n = parseInt(v, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(lo, Math.min(hi, n));
+}
+
+// =====================================================================
+// Section: escapeHtml / escapeAttr  (escapeXml lives in CtEscaper)
+// =====================================================================
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// =====================================================================
+// Section: persistState / onceFlag
+// =====================================================================
+function persistState(key, defaults) {
+  function load() {
+    var out = {};
+    for (var k in defaults) {
+      if (Object.prototype.hasOwnProperty.call(defaults, k)) out[k] = defaults[k];
+    }
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return out;
+      var p = JSON.parse(raw);
+      if (!p || typeof p !== 'object') return out;
+      for (var k2 in defaults) {
+        if (!Object.prototype.hasOwnProperty.call(defaults, k2)) continue;
+        if (p[k2] === undefined) continue;
+        var d = defaults[k2];
+        if (typeof d === 'boolean') out[k2] = !!p[k2];
+        else if (typeof d === 'number') { var nn = Number(p[k2]); if (Number.isFinite(nn)) out[k2] = nn; }
+        else out[k2] = String(p[k2]);
+      }
+    } catch (e) { /* ignore malformed / disabled storage */ }
+    return out;
+  }
+  function save(state) {
+    var toStore = {};
+    for (var k in defaults) {
+      if (!Object.prototype.hasOwnProperty.call(defaults, k)) continue;
+      if (state && state[k] !== undefined) toStore[k] = state[k];
+    }
+    try { localStorage.setItem(key, JSON.stringify(toStore)); } catch (e) { /* best-effort */ }
+  }
+  return { load: load, save: save };
+}
+
+function onceFlag(key) {
+  return {
+    seen: function () { try { return localStorage.getItem(key) === '1'; } catch (e) { return true; } },
+    mark: function () { try { localStorage.setItem(key, '1'); } catch (e) { /* best-effort */ } }
+  };
+}
+
+// =====================================================================
+// Section: el (hyperscript factory)
+// =====================================================================
+var ATTR_KEYS = { role: 1, title: 1, 'for': 1, type: 1, value: 1, name: 1, href: 1, id: 1, placeholder: 1 };
+function el(tag, props, children) {
+  var node = document.createElement(tag);
+  if (props) {
+    for (var k in props) {
+      if (!Object.prototype.hasOwnProperty.call(props, k)) continue;
+      var v = props[k];
+      if (v == null) continue;
+      if (k === 'class' || k === 'className') node.className = v;
+      else if (k === 'text' || k === 'textContent') node.textContent = v;
+      else if (k === 'html' || k === 'innerHTML') node.innerHTML = v;
+      else if (k.indexOf('data-') === 0 || k.indexOf('aria-') === 0 || ATTR_KEYS[k]) node.setAttribute(k, v);
+      else node[k] = v;
+    }
+  }
+  var kids = (children == null) ? [] : (Array.isArray(children) ? children : [children]);
+  for (var i = 0; i < kids.length; i++) {
+    var c = kids[i];
+    if (c == null || c === false) continue;
+    node.appendChild((typeof c === 'string' || typeof c === 'number') ? document.createTextNode(String(c)) : c);
+  }
+  return node;
+}
+
+// =====================================================================
+// Section: prefersReducedMotion / restartAnimation / setupHiDPICanvas
+// =====================================================================
+function prefersReducedMotion() {
+  try {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (e) { return false; }
+}
+
+function restartAnimation(elm, cls) {
+  if (!elm) return;
+  if (cls) elm.classList.remove(cls);
+  void elm.offsetWidth;
+  if (cls) elm.classList.add(cls);
+}
+
+function setupHiDPICanvas(canvas, opts) {
+  opts = opts || {};
+  var cssW = (opts.width != null) ? opts.width : (canvas.clientWidth || 0);
+  var cssH = (opts.height != null) ? opts.height : (canvas.clientHeight || 0);
+  var dpr = window.devicePixelRatio || 1;
+  if (opts.maxDpr != null) dpr = Math.min(dpr, opts.maxDpr);
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  if (opts.style !== false) {
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+  }
+  var ctx = (opts.context === false) ? null : canvas.getContext('2d');
+  if (ctx && opts.transform !== false) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { dpr: dpr, cssW: cssW, cssH: cssH, ctx: ctx };
+}
+
+// =====================================================================
+// Section: posAt  (was posAt.mjs — jbcPosAt)
+// =====================================================================
+/*
+ * posAt(text, index) -> { line, column }
+ * ---------------------------------------------------------------------------
+ * Map a 0-based character offset into `text` to a 1-based { line, column }
+ * position — the readout a parser wants when reporting where an error occurred.
+ * Lines are split on `\n`; `column` counts characters from the line start
+ * (1-based). `index` is clamped to `text.length`, so an offset at or past the
+ * end returns the position just after the final character. Every other character
+ * (including `\r` and `\t`) advances the column by one.
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * needs offset->line/column imports this module directly (so `node --test` can
+ * load it); the single-file build inlines this module body into the shipped
+ * index.html — stripping the `export` — so the shipped tool stays
+ * dependency-free and file://-openable. See the consuming repo's build docs
+ * (§ "Build-assembled tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function posAt(text, index) {
+  let line = 1;
+  let col = 1;
+  const end = Math.min(index, text.length);
+  for (let i = 0; i < end; i++) {
+    if (text[i] === '\n') { line++; col = 1; } else { col++; }
+  }
+  return { line, column: col };
+}
+
+// =====================================================================
+// Section: slugify  (was slugify.mjs — jbcSlugify)
+// =====================================================================
+/*
+ * slugify(str, opts?) -> string
+ * ---------------------------------------------------------------------------
+ * Turn arbitrary text into a filename-safe ASCII slug: trim, lowercase, drop
+ * straight/curly-free quotes, collapse every run of non-alphanumeric characters
+ * to a single hyphen, strip leading/trailing hyphens, and cap the result at 60
+ * characters. `null`/`undefined` become `''`. This is the conservative, ASCII
+ * form used for download filenames (e.g. "My Card!" -> "my-card").
+ *
+ * With NO options this is exactly the historical ASCII slugifier, so an
+ * option-free call is byte-identical to the pre-parameterization function.
+ *
+ * DIACRITIC-AWARE VARIANT — `slugify(str, { diacritics: true, cap? })`. Some
+ * tools need "Café Menu" -> "cafe-menu" (the default ASCII form drops the
+ * accented letters). Passing `diacritics: true` selects a different pipeline
+ * that (1) NFKD-normalizes and strips combining diacritical marks (U+0300–U+036F)
+ * so "é" -> "e", then (2) splits into words with a camelCase / acronym / digit-
+ * run-aware splitter (the text-toolkit word model: "fooBar" -> foo, Bar;
+ * "HTMLParser" -> HTML, Parser; "foo2bar" -> foo, 2, bar), lowercases each, and
+ * joins with '-'. This is NOT the same word model as the default (which collapses
+ * every non-alphanumeric run) — it is the diacritic slug several text tools rolled
+ * by hand. `opts.cap` (a number) caps the length; omitted / null leaves it
+ * UNCAPPED (text-toolkit's slug is uncapped).
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * needs a slug imports this module directly (so `node --test` can load it); the
+ * single-file build inlines this module body into the shipped index.html —
+ * stripping the `export` — so the shipped tool stays dependency-free and
+ * file://-openable. See the consuming repo's build docs (§ "Build-assembled
+ * tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function slugify(str, opts) {
+  opts = opts || {};
+  if (opts.diacritics) {
+    if (str == null) return '';
+    const stripped = String(str).normalize('NFKD').replace(/[̀-ͯ]/g, '');
+    const words = stripped.match(/[A-Z]+(?=[A-Z][a-z])|[A-Z][a-z]+|[A-Z]+|[a-z]+|[0-9]+/g) || [];
+    const slug = words.map((w) => w.toLowerCase()).join('-');
+    // Strip a trailing hyphen the cap may have left mid-separator (#1014-O).
+    return opts.cap == null ? slug : slug.slice(0, opts.cap).replace(/-+$/g, '');
+  }
+  return String(str == null ? '' : str)
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/g, ''); // the 60-char cap can land mid-separator, re-stripping a trailing hyphen (#1014-O)
+}
+
+// =====================================================================
+// Section: wrapText  (was wrapText.mjs — jbcWrapText)
+// =====================================================================
+/*
+ * wrapText(text, maxWidth, measure) -> string[]
+ * ---------------------------------------------------------------------------
+ * Greedy word-wrap of `text` to a maximum width, returning an array of lines
+ * (always at least one, possibly `''`). Explicit newlines are honored as hard
+ * breaks first; within a paragraph, words are packed greedily and a single word
+ * wider than `maxWidth` is kept whole on its own line (never dropped or split).
+ *
+ * Width is measured by the injected `measure(str) -> number` callback — the
+ * pure wrapping logic lives here; the canvas/DOM text-measurement stays at the
+ * call site (pass `ctx.measureText(s).width`). `maxWidth` is coerced to a finite
+ * number (non-finite -> 0); a limit of 0 (or less) disables width-wrapping, so
+ * only explicit newlines break the text and `measure` is never called.
+ *
+ * Node-importable ES module. A tool whose pure, unit-tested source/logic.mjs
+ * wraps text imports this module directly (so `node --test` can load it, feeding
+ * a deterministic `measure`); the single-file build inlines this module body
+ * into the shipped index.html — stripping the `export` — so the shipped tool
+ * stays dependency-free and file://-openable. See the consuming repo's build
+ * docs (§ "Build-assembled tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build. No hash to recompute.
+ */
+function wrapText(text, maxWidth, measure) {
+  const src = text == null ? '' : String(text);
+  const mw = Number(maxWidth);
+  const limit = Number.isFinite(mw) ? mw : 0;
+  const paras = src.split('\n');
+  const out = [];
+  for (const para of paras) {
+    const words = para.split(/(\s+)/).filter((t) => t.length > 0);
+    if (words.length === 0) { out.push(''); continue; }
+    let line = '';
+    for (const token of words) {
+      const isSpace = /^\s+$/.test(token);
+      const candidate = line + token;
+      if (line === '') {
+        line = isSpace ? '' : token;
+        continue;
+      }
+      if (limit > 0 && measure(candidate) > limit && !isSpace) {
+        out.push(line.replace(/\s+$/, ''));
+        line = token;
+      } else {
+        line = candidate;
+      }
+    }
+    out.push(line.replace(/\s+$/, ''));
+  }
+  return out.length ? out : [''];
+}
+
+// =====================================================================
+// Aggregator — static members REFERENCE the named functions above (single
+// implementation; nothing is reimplemented here). Defined LAST.
+// =====================================================================
+class CtUtil {
+  static downloadBlob = downloadBlob;
+  static debounce = debounce;
+  static clamp = clamp;
+  static num = num;
+  static clampInt = clampInt;
+  static escapeHtml = escapeHtml;
+  static escapeAttr = escapeAttr;
+  static persistState = persistState;
+  static onceFlag = onceFlag;
+  static el = el;
+  static prefersReducedMotion = prefersReducedMotion;
+  static restartAnimation = restartAnimation;
+  static setupHiDPICanvas = setupHiDPICanvas;
+  static posAt = posAt;
+  static slugify = slugify;
+  static wrapText = wrapText;
+}
+// ===== end CtUtil (ES module) =====
+
+  // =====================================================================
+  // Pretty-Printer & Minifier — app (DOM wiring, render, persistence).
+  // The pure engine is inlined below; nothing in logic.mjs touches the DOM
+  // or localStorage.
+  // =====================================================================
+// ===== Begin jbcPretty (ES module) =====
+/*
+ * jbcPretty — multi-language pretty-printer / minifier engine.
+ * ---------------------------------------------------------------------------
+ * A DOM-free, Node-importable ES module: six hand-rolled, zero-dependency
+ * language engines (JSON, YAML, HTML, CSS, SQL, JavaScript). Every engine's
+ * overriding invariant is that output is *semantically equivalent* to input:
+ * JSON/YAML/HTML/CSS get full pretty + minify; JS and SQL get reliable
+ * pretty-print + SAFE minify only (comments + insignificant whitespace, fully
+ * string/regex/template aware — never identifier renaming, dead-code removal,
+ * or AST rewriting). Each public fn takes (src, opts) and returns a string, or
+ * throws Error with a friendly .message (line/col where locatable) on invalid
+ * input. The tokenizers (tokenizeJS, tokenizeSQL) are exported for consumers
+ * that want to assert token-stream equivalence. Any built-in demo/sample text
+ * stays with the consuming tool, not in this shared engine.
+ *
+ * A tool whose pure, unit-tested source/logic.mjs needs this engine imports the
+ * module directly (so `node --test` can load it); the single-file build inlines
+ * this module body into the shipped index.html — stripping each `export` — so
+ * the shipped tool stays dependency-free and file://-openable. See the consuming
+ * repo's build docs (§ "Build-assembled tools" › import inlining).
+ *
+ * This is a shared component. Edit the canonical copy and re-vendor; every tool
+ * picks it up on its next build.
+ */
+
+// ---------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------
+
+// Number of bytes in a UTF-8 encoding of a string (for the stats line).
+function byteLength(str) {
+  // TextEncoder exists in browsers and Node >= 11; fall back to a manual
+  // UTF-8 byte count if it is somehow unavailable.
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(str).length;
+  }
+  let bytes = 0;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.codePointAt(i);
+    if (c > 0xffff) i++; // surrogate pair
+    bytes += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
+  }
+  return bytes;
+}
+
+// Turn a numeric or string indent option into the actual indent unit.
+function indentUnit(indent) {
+  if (indent === '\t' || indent === 'tab') return '\t';
+  const n = Number(indent);
+  if (Number.isFinite(n) && n >= 0) return ' '.repeat(n);
+  return '  ';
+}
+
+// Compute { line, col } (1-based) for a character offset in src.
+function lineColFromOffset(src, offset) {
+  let line = 1;
+  let col = 1;
+  const lim = Math.max(0, Math.min(offset, src.length));
+  for (let i = 0; i < lim; i++) {
+    if (src[i] === '\n') {
+      line++;
+      col = 1;
+    } else {
+      col++;
+    }
+  }
+  return { line, col };
+}
+
+// =====================================================================
+// JSON (full pretty + minify)
+// =====================================================================
+
+function jsonError(src, err) {
+  let msg = err && err.message ? err.message : String(err);
+  // Newer V8 error messages for the "Unexpected token" case embed the whole
+  // source ("Unexpected token 'x', \"<source>\" is not valid JSON") — trim it
+  // down to the readable reason.
+  const tokMatch = /^(Unexpected token .+?),\s*"[\s\S]*"\s*is not valid JSON$/.exec(msg);
+  if (tokMatch) msg = tokMatch[1];
+  // Prefer an explicit "line L column C"; fall back to "position N".
+  const lineColMatch = /line (\d+) column (\d+)/.exec(err && err.message ? err.message : '');
+  if (lineColMatch) {
+    const reason = msg.replace(/\s+in JSON at position \d+.*$/, '');
+    return new Error(`Invalid JSON: ${reason} (line ${lineColMatch[1]}, col ${lineColMatch[2]})`);
+  }
+  const posMatch = /position (\d+)/.exec(err && err.message ? err.message : '');
+  if (posMatch) {
+    const { line, col } = lineColFromOffset(src, Number(posMatch[1]));
+    const reason = msg.replace(/\s+in JSON at position \d+.*$/, '');
+    return new Error(`Invalid JSON: ${reason} (line ${line}, col ${col})`);
+  }
+  return new Error(`Invalid JSON: ${msg}`);
+}
+
+function formatJSON(src, opts = {}) {
+  const indent = opts.indent === undefined ? 2 : opts.indent;
+  let value;
+  try {
+    value = JSON.parse(src);
+  } catch (err) {
+    throw jsonError(src, err);
+  }
+  const unit = indent === '\t' || indent === 'tab' ? '\t' : Number(indent);
+  return JSON.stringify(value, null, unit);
+}
+
+function minifyJSON(src) {
+  let value;
+  try {
+    value = JSON.parse(src);
+  } catch (err) {
+    throw jsonError(src, err);
+  }
+  return JSON.stringify(value);
+}
+
+// =====================================================================
+// CSS (full pretty + minify)
+// =====================================================================
+//
+// A small, string-aware parser. It correctly skips strings ('/"), comments
+// (/* */) and url(...) (incl. unquoted) so structural characters ({ } ; )
+// inside those are never misread. Format builds a node tree and re-indents;
+// minify is a single string-aware pass.
+
+// Read a quoted string starting at src[i] (a quote char). Returns end index
+// (one past the closing quote).
+function cssReadString(src, i) {
+  const quote = src[i];
+  i++;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '\\') { i += 2; continue; }
+    if (c === quote) return i + 1;
+    i++;
+  }
+  return i;
+}
+
+// Read a url(...) token starting at src[i] === '(' (called after "url").
+// Handles quoted and unquoted contents; returns end index (past ')').
+function cssReadUrlParen(src, i) {
+  i++; // past '('
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '"' || c === "'") { i = cssReadString(src, i); continue; }
+    if (c === '\\') { i += 2; continue; }
+    if (c === ')') return i + 1;
+    i++;
+  }
+  return i;
+}
+
+// True when a "url(" function token begins at src[i] (i at 'u'/'U'), and it
+// is a real function call (not the tail of an identifier like "myurl").
+function cssIsUrlAt(src, i) {
+  if (i + 3 >= src.length) return false;
+  if (src.slice(i, i + 4).toLowerCase() !== 'url(') return false;
+  const prev = i > 0 ? src[i - 1] : '';
+  return !/[A-Za-z0-9_-]/.test(prev);
+}
+
+// Parse a CSS block body (or the whole stylesheet when top-level) into nodes.
+// Returns { nodes, next } where next is the index after the block (past '}').
+function cssParseNodes(src, start, topLevel) {
+  const nodes = [];
+  let i = start;
+  let buf = '';
+  const n = src.length;
+  const pushDecl = () => {
+    if (buf.trim() !== '') nodes.push({ type: 'decl', text: buf });
+    buf = '';
+  };
+  while (i < n) {
+    const c = src[i];
+    if (c === '/' && src[i + 1] === '*') {
+      const cs = i;
+      i += 2;
+      while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      i = Math.min(i + 2, n);
+      const comment = src.slice(cs, i);
+      if (buf.trim() === '') nodes.push({ type: 'comment', text: comment });
+      // inline comments (mid-declaration/prelude) are dropped — harmless in CSS
+      continue;
+    }
+    if (c === '"' || c === "'") { const e = cssReadString(src, i); buf += src.slice(i, e); i = e; continue; }
+    if ((c === 'u' || c === 'U') && cssIsUrlAt(src, i)) {
+      const e = cssReadUrlParen(src, i + 3);
+      buf += src.slice(i, e);
+      i = e;
+      continue;
+    }
+    if (c === '{') {
+      const prelude = buf;
+      buf = '';
+      const inner = cssParseNodes(src, i + 1, false);
+      nodes.push({ type: 'rule', prelude, body: inner.nodes });
+      i = inner.next;
+      continue;
+    }
+    if (c === '}') {
+      pushDecl();
+      return { nodes, next: i + 1 };
+    }
+    if (c === ';') {
+      pushDecl();
+      i++;
+      continue;
+    }
+    buf += c;
+    i++;
+  }
+  pushDecl();
+  return { nodes, next: i };
+}
+
+// Collapse insignificant whitespace in a CSS fragment, string/url aware.
+function cssCollapseWS(text) {
+  let out = '';
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    if (c === '"' || c === "'") { const e = cssReadString(text, i); out += text.slice(i, e); i = e; continue; }
+    if ((c === 'u' || c === 'U') && cssIsUrlAt(text, i)) {
+      const e = cssReadUrlParen(text, i + 3);
+      out += text.slice(i, e);
+      i = e;
+      continue;
+    }
+    if (/\s/.test(c)) {
+      let j = i;
+      while (j < n && /\s/.test(text[j])) j++;
+      out += ' ';
+      i = j;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+// Find the first top-level ':' in a declaration (skips strings/url/parens).
+function cssFindColon(text) {
+  let depth = 0;
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    if (c === '"' || c === "'") { i = cssReadString(text, i); continue; }
+    if ((c === 'u' || c === 'U') && cssIsUrlAt(text, i)) { i = cssReadUrlParen(text, i + 3); continue; }
+    if (c === '(') { depth++; i++; continue; }
+    if (c === ')') { depth--; i++; continue; }
+    if (c === ':' && depth === 0) return i;
+    i++;
+  }
+  return -1;
+}
+
+function cssFormatDecl(text) {
+  const t = cssCollapseWS(text).trim();
+  const idx = cssFindColon(t);
+  if (idx < 0) return t + ';';
+  const prop = t.slice(0, idx).trim();
+  const value = t.slice(idx + 1).trim();
+  return `${prop}: ${value};`;
+}
+
+function cssFormatPrelude(text, pad) {
+  const t = cssCollapseWS(text).replace(/\s*,\s*/g, ',').trim();
+  // one selector per line for readability
+  const parts = cssSplitTopLevel(t, ',');
+  return parts.map((p) => p.trim()).join(',\n' + pad);
+}
+
+// Split on a separator char at top level (skip strings/url/parens).
+function cssSplitTopLevel(text, sep) {
+  const parts = [];
+  let depth = 0;
+  let cur = '';
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    if (c === '"' || c === "'") { const e = cssReadString(text, i); cur += text.slice(i, e); i = e; continue; }
+    if ((c === 'u' || c === 'U') && cssIsUrlAt(text, i)) { const e = cssReadUrlParen(text, i + 3); cur += text.slice(i, e); i = e; continue; }
+    if (c === '(') { depth++; cur += c; i++; continue; }
+    if (c === ')') { depth--; cur += c; i++; continue; }
+    if (c === sep && depth === 0) { parts.push(cur); cur = ''; i++; continue; }
+    cur += c;
+    i++;
+  }
+  parts.push(cur);
+  return parts;
+}
+
+function cssEmit(nodes, depth, unit, lines) {
+  const pad = unit.repeat(depth);
+  for (const node of nodes) {
+    if (node.type === 'comment') {
+      lines.push(pad + node.text.trim());
+    } else if (node.type === 'decl') {
+      lines.push(pad + cssFormatDecl(node.text));
+    } else if (node.type === 'rule') {
+      const prelude = cssFormatPrelude(node.prelude, pad);
+      if (node.body.length === 0) {
+        lines.push(pad + prelude + ' {');
+        lines.push(pad + '}');
+      } else {
+        lines.push(pad + prelude + ' {');
+        cssEmit(node.body, depth + 1, unit, lines);
+        lines.push(pad + '}');
+      }
+    }
+  }
+}
+
+function formatCSS(src, opts = {}) {
+  const unit = indentUnit(opts.indent === undefined ? 2 : opts.indent);
+  const { nodes } = cssParseNodes(src, 0, true);
+  const lines = [];
+  // Blank line between top-level rules for readability.
+  for (let k = 0; k < nodes.length; k++) {
+    if (k > 0 && (nodes[k].type === 'rule' || nodes[k - 1].type === 'rule')) {
+      lines.push('');
+    }
+    cssEmit([nodes[k]], 0, unit, lines);
+  }
+  // No global \n{3,} collapse: the emitter only inserts single structural blank lines, so any
+  // run of 3+ newlines lives inside a comment or a multi-line string and must be preserved.
+  return lines.join('\n').trim() + '\n';
+}
+
+function minifyCSS(src) {
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  const STRUCT = new Set(['{', '}', ';', ',', ':']);
+  while (i < n) {
+    const c = src[i];
+    if (c === '/' && src[i + 1] === '*') {
+      i += 2;
+      while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      i = Math.min(i + 2, n);
+      // A dropped comment acts like whitespace, but gets the SAME neighbour-trimming as a
+      // whitespace run: insert a single space only when it actually separates two tokens, never
+      // adjacent to a structural char (keeps minify idempotent and avoids a stray `red ;`).
+      const next = src[i];
+      const prev = out[out.length - 1];
+      if (next !== undefined && !/\s/.test(next) && !STRUCT.has(next)
+        && prev !== undefined && !/\s/.test(prev) && !STRUCT.has(prev)) {
+        out += ' ';
+      }
+      continue;
+    }
+    if (c === '"' || c === "'") { const e = cssReadString(src, i); out += src.slice(i, e); i = e; continue; }
+    if ((c === 'u' || c === 'U') && cssIsUrlAt(src, i)) { const e = cssReadUrlParen(src, i + 3); out += src.slice(i, e); i = e; continue; }
+    if (/\s/.test(c)) {
+      let j = i;
+      while (j < n && /\s/.test(src[j])) j++;
+      // find the next non-space char
+      const next = src[j];
+      const prev = out[out.length - 1];
+      if (STRUCT.has(next) || STRUCT.has(prev) || prev === undefined || next === undefined) {
+        // drop the whitespace entirely
+      } else {
+        out += ' ';
+      }
+      i = j;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  // Drop the last ';' in each block: ';}' -> '}' (string-aware pass).
+  let result = '';
+  i = 0;
+  while (i < out.length) {
+    const c = out[i];
+    if (c === '"' || c === "'") { const e = cssReadString(out, i); result += out.slice(i, e); i = e; continue; }
+    if ((c === 'u' || c === 'U') && cssIsUrlAt(out, i)) { const e = cssReadUrlParen(out, i + 3); result += out.slice(i, e); i = e; continue; }
+    // Collapse redundant semicolons (`;;` → `;`) and drop the last one in a block (`;}` → `}`).
+    if (c === ';' && (out[i + 1] === ';' || out[i + 1] === '}')) { i++; continue; }
+    result += c;
+    i++;
+  }
+  return result.trim();
+}
+
+// =====================================================================
+// SQL (pretty-print full; SAFE minify)
+// =====================================================================
+//
+// Token-based, NOT a full parser. Aware of string literals ('...' with ''
+// escapes), quoted identifiers ("..." and `...`), line comments (-- ...) and
+// block comments (/* */). Format only moves whitespace and changes the case
+// of recognized keywords; minify only strips comments and collapses
+// whitespace. Neither ever removes, reorders, or rewrites a token.
+
+const SQL_KEYWORDS = new Set([
+  'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'AS', 'ON', 'JOIN', 'INNER',
+  'LEFT', 'RIGHT', 'FULL', 'OUTER', 'CROSS', 'NATURAL', 'USING', 'GROUP', 'BY',
+  'HAVING', 'ORDER', 'ASC', 'DESC', 'LIMIT', 'OFFSET', 'UNION', 'ALL', 'EXCEPT',
+  'INTERSECT', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE',
+  'TABLE', 'VIEW', 'INDEX', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'PRIMARY', 'KEY',
+  'FOREIGN', 'REFERENCES', 'DEFAULT', 'NULL', 'IS', 'IN', 'LIKE', 'BETWEEN',
+  'EXISTS', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'DISTINCT', 'COUNT', 'SUM',
+  'AVG', 'MIN', 'MAX', 'CAST', 'WITH', 'RETURNING', 'INT', 'INTEGER', 'VARCHAR',
+  'TEXT', 'BOOLEAN', 'DATE', 'TIMESTAMP', 'CONSTRAINT', 'UNIQUE', 'CHECK',
+  'TRUE', 'FALSE', 'LIMIT', 'OVER', 'PARTITION',
+]);
+
+function tokenizeSQL(src) {
+  const tokens = [];
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    const c = src[i];
+    if (/\s/.test(c)) {
+      let j = i;
+      while (j < n && /\s/.test(src[j])) j++;
+      tokens.push({ type: 'ws', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (c === '-' && src[i + 1] === '-') {
+      let j = i;
+      while (j < n && src[j] !== '\n') j++;
+      tokens.push({ type: 'lineComment', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (c === '/' && src[i + 1] === '*') {
+      let j = i + 2;
+      while (j < n && !(src[j] === '*' && src[j + 1] === '/')) j++;
+      j = Math.min(j + 2, n);
+      tokens.push({ type: 'blockComment', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (c === "'") {
+      let j = i + 1;
+      while (j < n) {
+        if (src[j] === "'" && src[j + 1] === "'") { j += 2; continue; }
+        if (src[j] === "'") { j++; break; }
+        j++;
+      }
+      tokens.push({ type: 'string', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (c === '"' || c === '`') {
+      const q = c;
+      let j = i + 1;
+      while (j < n) {
+        if (src[j] === q && src[j + 1] === q) { j += 2; continue; }
+        if (src[j] === q) { j++; break; }
+        j++;
+      }
+      tokens.push({ type: 'quotedId', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i + 1] || ''))) {
+      let j = i;
+      while (j < n && /[0-9.eE+\-xXa-fA-F]/.test(src[j])) {
+        // stop a stray +/- that is not part of an exponent
+        if ((src[j] === '+' || src[j] === '-') && !/[eE]/.test(src[j - 1] || '')) break;
+        j++;
+      }
+      tokens.push({ type: 'number', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (/[A-Za-z_@#$]/.test(c)) {
+      let j = i;
+      while (j < n && /[A-Za-z0-9_@#$]/.test(src[j])) j++;
+      tokens.push({ type: 'word', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    tokens.push({ type: 'punct', value: c });
+    i++;
+  }
+  return tokens;
+}
+
+function sqlApplyCase(word, keywordCase) {
+  if (keywordCase === 'unchanged') return word;
+  if (!SQL_KEYWORDS.has(word.toUpperCase())) return word;
+  return keywordCase === 'lower' ? word.toLowerCase() : word.toUpperCase();
+}
+
+// Significant tokens only (drop whitespace) for format layout; comments kept.
+function sqlSignificant(tokens) {
+  return tokens.filter((t) => t.type !== 'ws');
+}
+
+const SQL_CLAUSE = new Set([
+  'SELECT', 'FROM', 'WHERE', 'HAVING', 'LIMIT', 'OFFSET', 'VALUES', 'SET',
+  'UNION', 'EXCEPT', 'INTERSECT', 'RETURNING', 'JOIN',
+]);
+const SQL_CLAUSE2 = new Set([
+  'GROUP BY', 'ORDER BY', 'INSERT INTO', 'DELETE FROM', 'UNION ALL',
+  'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'FULL JOIN', 'CROSS JOIN',
+  'OUTER JOIN', 'PARTITION BY',
+]);
+const SQL_CLAUSE3 = new Set([
+  'LEFT OUTER JOIN', 'RIGHT OUTER JOIN', 'FULL OUTER JOIN',
+]);
+const SQL_SUBCLAUSE = new Set(['AND', 'OR', 'ON']);
+// Keyword-named functions: a following '(' is a call, so no space before it.
+const SQL_FUNCTIONS = new Set(['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'CAST']);
+
+function formatSQL(src, opts = {}) {
+  const unit = indentUnit(opts.indent === undefined ? 2 : opts.indent);
+  const keywordCase = opts.keywordCase || 'unchanged';
+  const toks = sqlSignificant(tokenizeSQL(src));
+  // words for multi-word clause lookahead
+  const upperAt = (k) => (toks[k] && toks[k].type === 'word' ? toks[k].value.toUpperCase() : null);
+
+  let out = '';
+  let depth = 0; // paren depth
+  let atLineStart = true;
+
+  const nl = (level) => {
+    out = out.replace(/[ \t]+$/, '');
+    out += '\n' + unit.repeat(Math.max(0, level));
+    atLineStart = true;
+  };
+  const emit = (text) => { out += text; atLineStart = false; };
+
+  const needSpace = (prev, cur) => {
+    if (!prev) return false;
+    const pv = prev.value, cv = cur.value;
+    if (pv === '(') return false;
+    if (cv === ')' || cv === ',' || cv === ';') return false;
+    if (cv === '.' || pv === '.') return false;
+    if (cv === '(') {
+      if (prev.type === 'word' && !SQL_KEYWORDS.has(pv.toUpperCase())) return false;
+      if (prev.type === 'word' && SQL_FUNCTIONS.has(pv.toUpperCase())) return false; // keyword function call
+      if (prev.type === 'quotedId') return false;
+      return true;
+    }
+    return true;
+  };
+
+  let prev = null;
+  for (let k = 0; k < toks.length; k++) {
+    const t = toks[k];
+    if (t.type === 'lineComment' || t.type === 'blockComment') {
+      if (!atLineStart) emit(' ');
+      emit(t.value);
+      if (t.type === 'lineComment') nl(depth);
+      prev = t;
+      continue;
+    }
+    // multi-word clause detection (words only)
+    if (t.type === 'word') {
+      const w1 = upperAt(k);
+      const w2 = upperAt(k + 1);
+      const w3 = upperAt(k + 2);
+      const three = w1 && w2 && w3 ? `${w1} ${w2} ${w3}` : null;
+      const two = w1 && w2 ? `${w1} ${w2}` : null;
+      if (three && SQL_CLAUSE3.has(three)) {
+        if (out !== '') nl(depth);
+        emit([toks[k], toks[k + 1], toks[k + 2]].map((x) => sqlApplyCase(x.value, keywordCase)).join(' '));
+        prev = toks[k + 2];
+        k += 2;
+        continue;
+      }
+      if (two && SQL_CLAUSE2.has(two)) {
+        if (out !== '') nl(depth);
+        emit([toks[k], toks[k + 1]].map((x) => sqlApplyCase(x.value, keywordCase)).join(' '));
+        prev = toks[k + 1];
+        k += 1;
+        continue;
+      }
+      if (SQL_CLAUSE.has(w1)) {
+        if (out !== '') nl(depth);
+        emit(sqlApplyCase(t.value, keywordCase));
+        prev = t;
+        continue;
+      }
+      if (SQL_SUBCLAUSE.has(w1)) {
+        if (out !== '') nl(depth + 1);
+        emit(sqlApplyCase(t.value, keywordCase));
+        prev = t;
+        continue;
+      }
+      if (needSpace(prev, t)) emit(' ');
+      emit(sqlApplyCase(t.value, keywordCase));
+      prev = t;
+      continue;
+    }
+    // punctuation / operators
+    if (t.value === '(') {
+      if (needSpace(prev, t)) emit(' ');
+      emit('(');
+      depth++;
+      // A following SELECT is a clause and places its own newline at the new depth; don't pre-emit one
+      // here too, or the subquery opens with a stray blank line after "(" (#1014-O.2).
+      prev = t;
+      continue;
+    }
+    if (t.value === ')') {
+      depth = Math.max(0, depth - 1);
+      emit(')');
+      prev = t;
+      continue;
+    }
+    if (t.value === ',' && depth === 0) {
+      emit(',');
+      nl(depth + 1);
+      prev = t;
+      continue;
+    }
+    if (t.value === ';') {
+      emit(';');
+      nl(depth);
+      prev = t;
+      continue;
+    }
+    if (needSpace(prev, t)) emit(' ');
+    emit(t.value);
+    prev = t;
+  }
+  return out.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function minifySQL(src) {
+  const toks = tokenizeSQL(src);
+  let out = '';
+  let pendingSpace = false;
+  for (const t of toks) {
+    if (t.type === 'ws') { if (out !== '') pendingSpace = true; continue; }
+    if (t.type === 'lineComment' || t.type === 'blockComment') { if (out !== '') pendingSpace = true; continue; }
+    if (pendingSpace && out !== '') out += ' ';
+    out += t.value;
+    pendingSpace = false;
+  }
+  return out.trim();
+}
+
+// =====================================================================
+// HTML (full pretty + conservative minify)
+// =====================================================================
+//
+// Hand-rolled tokenizer: tags (open/close/self-closing), attributes (kept as
+// the verbatim raw open-tag string, so quotes and values with < > are never
+// corrupted), text, comments, doctype, and raw-text elements (script, style,
+// pre, textarea) whose contents are preserved byte-for-byte. HTML whitespace
+// can be significant, so minify is deliberately conservative.
+
+const HTML_VOID = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
+  'param', 'source', 'track', 'wbr',
+]);
+const HTML_RAWTEXT = new Set(['script', 'style', 'pre', 'textarea']);
+const HTML_INLINE = new Set([
+  'a', 'abbr', 'b', 'bdi', 'bdo', 'br', 'cite', 'code', 'data', 'dfn', 'em',
+  'i', 'kbd', 'mark', 'q', 'rp', 'rt', 'ruby', 's', 'samp', 'small', 'span',
+  'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr', 'img', 'button', 'label',
+  'select', 'input',
+]);
+
+function htmlTagName(rawOpen) {
+  const m = /^<\s*([a-zA-Z][a-zA-Z0-9:-]*)/.exec(rawOpen);
+  return m ? m[1].toLowerCase() : '';
+}
+
+function tokenizeHTML(src) {
+  const tokens = [];
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    if (src[i] === '<') {
+      if (src.startsWith('<!--', i)) {
+        let end = src.indexOf('-->', i + 4);
+        end = end < 0 ? n : end + 3;
+        tokens.push({ type: 'comment', value: src.slice(i, end) });
+        i = end;
+        continue;
+      }
+      if (src[i + 1] === '!') {
+        let end = src.indexOf('>', i);
+        end = end < 0 ? n : end + 1;
+        tokens.push({ type: 'doctype', value: src.slice(i, end) });
+        i = end;
+        continue;
+      }
+      if (src[i + 1] === '/') {
+        let end = src.indexOf('>', i);
+        end = end < 0 ? n : end + 1;
+        const raw = src.slice(i, end);
+        tokens.push({ type: 'endTag', name: htmlTagName(raw.replace('/', '')), raw });
+        i = end;
+        continue;
+      }
+      if (/[a-zA-Z]/.test(src[i + 1] || '')) {
+        // read start tag, respecting quotes in attribute values
+        let j = i + 1;
+        while (j < n) {
+          const c = src[j];
+          if (c === '"' || c === "'") {
+            const q = c;
+            j++;
+            while (j < n && src[j] !== q) j++;
+            j++;
+            continue;
+          }
+          if (c === '>') { j++; break; }
+          j++;
+        }
+        const raw = src.slice(i, j);
+        const name = htmlTagName(raw);
+        const selfClosing = /\/\s*>$/.test(raw) || HTML_VOID.has(name);
+        tokens.push({ type: 'startTag', name, raw, selfClosing });
+        i = j;
+        if (HTML_RAWTEXT.has(name) && !/\/\s*>$/.test(raw)) {
+          // consume verbatim raw content up to the matching close tag
+          const closeRe = new RegExp('</\\s*' + name + '\\b', 'i');
+          const rest = src.slice(i);
+          const m = closeRe.exec(rest);
+          const contentEnd = m ? i + m.index : n;
+          tokens.push({ type: 'text', value: src.slice(i, contentEnd), raw: true });
+          i = contentEnd;
+        }
+        continue;
+      }
+      // a bare '<' that is not a tag — treat as text
+      let j = i + 1;
+      while (j < n && src[j] !== '<') j++;
+      tokens.push({ type: 'text', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    let j = i;
+    while (j < n && src[j] !== '<') j++;
+    tokens.push({ type: 'text', value: src.slice(i, j) });
+    i = j;
+  }
+  return tokens;
+}
+
+function htmlBuildTree(tokens) {
+  const root = { type: 'root', children: [] };
+  const stack = [root];
+  const top = () => stack[stack.length - 1];
+  for (const t of tokens) {
+    if (t.type === 'startTag') {
+      const el = {
+        type: 'element',
+        name: t.name,
+        raw: t.raw,
+        rawText: HTML_RAWTEXT.has(t.name),
+        children: [],
+      };
+      top().children.push(el);
+      if (!t.selfClosing) stack.push(el);
+    } else if (t.type === 'endTag') {
+      // lenient: pop to the nearest matching open element
+      let idx = -1;
+      for (let k = stack.length - 1; k >= 1; k--) {
+        if (stack[k].type === 'element' && stack[k].name === t.name) { idx = k; break; }
+      }
+      if (idx >= 0) stack.length = idx;
+    } else {
+      top().children.push(t);
+    }
+  }
+  return root;
+}
+
+function htmlCollapse(text) {
+  return text.replace(/\s+/g, ' ');
+}
+
+// Try to render an element (and inline descendants) on a single line.
+// Returns the string, or null if a block-level child forces block layout.
+function htmlRenderInline(node) {
+  if (node.type === 'text') return htmlCollapse(node.value);
+  if (node.type === 'comment' || node.type === 'doctype') return null;
+  if (node.type !== 'element') return null;
+  if (node.rawText) return null; // raw-text elements always block
+  if (HTML_VOID.has(node.name) || /\/\s*>$/.test(node.raw)) return node.raw;
+  let inner = '';
+  for (const c of node.children) {
+    if (c.type === 'comment' || c.type === 'doctype') return null;
+    if (c.type === 'element' && !HTML_INLINE.has(c.name)) return null;
+    const piece = htmlRenderInline(c);
+    if (piece === null) return null;
+    inner += piece;
+  }
+  return node.raw + inner + `</${node.name}>`;
+}
+
+function htmlEmit(node, depth, unit, lines) {
+  const pad = unit.repeat(depth);
+  if (node.type === 'text') {
+    const t = htmlCollapse(node.value).trim();
+    if (t) lines.push(pad + t);
+    return;
+  }
+  if (node.type === 'comment' || node.type === 'doctype') {
+    lines.push(pad + node.value.trim());
+    return;
+  }
+  if (node.type !== 'element') return;
+  if (node.rawText) {
+    const raw = node.children.map((c) => (c.raw ? c.value : '')).join('');
+    lines.push(pad + node.raw + raw + `</${node.name}>`);
+    return;
+  }
+  if (HTML_VOID.has(node.name) || /\/\s*>$/.test(node.raw)) {
+    lines.push(pad + node.raw);
+    return;
+  }
+  // element with children: try single-line inline first
+  const nonWs = node.children.filter((c) => !(c.type === 'text' && c.value.trim() === ''));
+  if (nonWs.length === 0) {
+    lines.push(pad + node.raw + `</${node.name}>`);
+    return;
+  }
+  const inlineAll = nonWs.every((c) => c.type === 'text' || (c.type === 'element' && HTML_INLINE.has(c.name)));
+  if (inlineAll) {
+    const rendered = htmlRenderInline(node);
+    if (rendered !== null && !rendered.includes('\n')) {
+      lines.push(pad + rendered);
+      return;
+    }
+  }
+  lines.push(pad + node.raw);
+  for (const c of node.children) htmlEmit(c, depth + 1, unit, lines);
+  lines.push(pad + `</${node.name}>`);
+}
+
+function formatHTML(src, opts = {}) {
+  const unit = indentUnit(opts.indent === undefined ? 2 : opts.indent);
+  const root = htmlBuildTree(tokenizeHTML(src));
+  const lines = [];
+  for (const c of root.children) htmlEmit(c, 0, unit, lines);
+  // No global \n{3,} collapse: htmlEmit never inserts blank lines, so any run of 3+ newlines
+  // lives inside a raw-text element (<pre>/<textarea>/<script>/<style>) or a comment — preserve it.
+  return lines.join('\n').trim() + '\n';
+}
+
+function htmlKeepComment(value) {
+  // Preserve IE conditional comments and bang-comments (<!--! ... -->).
+  return /^<!--\[if/i.test(value) || /^<!--!/.test(value) || /\[endif\]/i.test(value);
+}
+
+function minifyChildren(children, out) {
+  for (let k = 0; k < children.length; k++) {
+    const c = children[k];
+    if (c.type === 'comment') {
+      if (htmlKeepComment(c.value)) out.push(c.value);
+      continue;
+    }
+    if (c.type === 'doctype') { out.push(c.value); continue; }
+    if (c.type === 'text') {
+      if (c.raw) { out.push(c.value); continue; }
+      const prev = children[k - 1];
+      const next = children[k + 1];
+      const isBlockNeighbor = (sib) =>
+        !sib || (sib.type === 'element' && !HTML_INLINE.has(sib.name)) ||
+        sib.type === 'comment' || sib.type === 'doctype';
+      if (c.value.trim() === '') {
+        // whitespace-only: drop between block elements; keep one space between inline
+        if (isBlockNeighbor(prev) && isBlockNeighbor(next)) continue;
+        out.push(' ');
+      } else {
+        // collapse internal runs; preserve a single leading/trailing space
+        out.push(c.value.replace(/\s+/g, ' '));
+      }
+      continue;
+    }
+    if (c.type === 'element') {
+      if (c.rawText) {
+        const raw = c.children.map((x) => (x.raw ? x.value : '')).join('');
+        out.push(c.raw + raw + `</${c.name}>`);
+        continue;
+      }
+      out.push(c.raw);
+      if (!(HTML_VOID.has(c.name) || /\/\s*>$/.test(c.raw))) {
+        minifyChildren(c.children, out);
+        out.push(`</${c.name}>`);
+      }
+    }
+  }
+}
+
+function minifyHTML(src) {
+  const root = htmlBuildTree(tokenizeHTML(src));
+  const out = [];
+  minifyChildren(root.children, out);
+  return out.join('').trim();
+}
+
+// =====================================================================
+// YAML (documented subset — full pretty + minify)
+// =====================================================================
+//
+// Supported: block mappings, block sequences, nesting, scalars (plain,
+// single/double-quoted), booleans/null/numbers, "#" comments, blank lines,
+// flow collections ([...] / {...}), and a single optional leading "---".
+// Explicitly UNSUPPORTED (detected and rejected, never mis-parsed):
+// anchors/aliases (&/*), tags (!/!!), complex keys (?), block scalars (|/>),
+// and multiple documents. Comments are dropped by format/minify.
+
+function yamlErr(msg, line) {
+  return new Error(line ? `${msg} (line ${line})` : msg);
+}
+
+// Strip a trailing "# comment" from a line, respecting quotes. A '#' starts a
+// comment only at start-of-line or when preceded by whitespace.
+function yamlStripComment(line) {
+  let i = 0;
+  const n = line.length;
+  let quote = null;
+  while (i < n) {
+    const c = line[i];
+    if (quote) {
+      if (c === '\\' && quote === '"') { i += 2; continue; }
+      if (c === quote) quote = null;
+      i++;
+      continue;
+    }
+    if (c === '"' || c === "'") { quote = c; i++; continue; }
+    if (c === '#' && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
+    i++;
+  }
+  return line;
+}
+
+function yamlUnsupportedScan(content, line) {
+  const t = content.trim();
+  if (t === '') return;
+  if (t[0] === '&') throw yamlErr('Unsupported YAML feature: anchors', line);
+  if (t[0] === '*') throw yamlErr('Unsupported YAML feature: aliases', line);
+  if (t[0] === '!') throw yamlErr('Unsupported YAML feature: tags', line);
+  if (t === '?' || t.startsWith('? ')) throw yamlErr('Unsupported YAML feature: complex keys', line);
+}
+
+function yamlValueUnsupported(value, line) {
+  const t = value.trim();
+  if (t === '') return;
+  if (t === '|' || t === '>' || /^[|>][+-]?\d*\s*$/.test(t)) {
+    throw yamlErr('Unsupported YAML feature: block scalars', line);
+  }
+  if (t[0] === '&') throw yamlErr('Unsupported YAML feature: anchors', line);
+  if (t[0] === '*') throw yamlErr('Unsupported YAML feature: aliases', line);
+  if (t[0] === '!') throw yamlErr('Unsupported YAML feature: tags', line);
+}
+
+function parseYAML(src) {
+  const rawLines = src.split(/\r?\n/);
+  const lines = [];
+  let seenDoc = false;
+  for (let k = 0; k < rawLines.length; k++) {
+    const lineNo = k + 1;
+    const raw = rawLines[k];
+    if (/\t/.test(raw.slice(0, raw.length - raw.trimStart().length))) {
+      throw yamlErr('Unsupported YAML feature: tab indentation', lineNo);
+    }
+    const stripped = yamlStripComment(raw).replace(/\s+$/, '');
+    const trimmed = stripped.trim();
+    if (trimmed === '') continue;
+    if (trimmed === '---') {
+      if (seenDoc || lines.length > 0) throw yamlErr('Unsupported YAML feature: multiple documents', lineNo);
+      seenDoc = true;
+      continue;
+    }
+    if (trimmed === '...') { continue; }
+    const indent = stripped.length - stripped.trimStart().length;
+    const content = stripped.slice(indent);
+    yamlUnsupportedScan(content, lineNo);
+    lines.push({ indent, content, lineNo });
+  }
+  if (lines.length === 0) return null;
+  // A top-level flow document (e.g. the output of minifyYAML): parse the
+  // whole thing as a single flow collection.
+  if (lines[0].content[0] === '{' || lines[0].content[0] === '[') {
+    return yamlParseFlow(lines.map((l) => l.content).join(' '), lines[0].lineNo);
+  }
+  return yamlParseLines(lines);
+}
+
+function yamlParseLines(lines) {
+  const base = lines[0].indent;
+  if (yamlIsSeqMarker(lines[0].content)) return yamlParseSeq(lines, base);
+  return yamlParseMap(lines, base);
+}
+
+function yamlIsSeqMarker(content) {
+  return content === '-' || content.startsWith('- ');
+}
+
+function yamlAfterDash(content) {
+  return content === '-' ? '' : content.slice(2).trim();
+}
+
+// Find the ':' that separates a mapping key from its value: colon followed by
+// whitespace or end-of-string, at top level (skip quotes and flow brackets).
+function yamlFindColon(text) {
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === '\\' && quote === '"') { i++; continue; }
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") { quote = c; continue; }
+    if (c === '[' || c === '{') depth++;
+    else if (c === ']' || c === '}') depth--;
+    else if (c === ':' && depth === 0 && (i + 1 >= text.length || /\s/.test(text[i + 1]))) return i;
+  }
+  return -1;
+}
+
+function yamlParseMap(lines, base) {
+  const obj = {};
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.indent !== base) throw yamlErr('Bad indentation', line.lineNo);
+    const idx = yamlFindColon(line.content);
+    if (idx < 0) throw yamlErr('Expected "key: value"', line.lineNo);
+    const key = yamlParseScalar(line.content.slice(0, idx).trim(), line.lineNo);
+    const rest = line.content.slice(idx + 1).trim();
+    i++;
+    if (rest !== '') {
+      yamlValueUnsupported(rest, line.lineNo);
+      obj[String(key)] = yamlParseFlowOrScalar(rest, line.lineNo);
+      // A deeper-indented line following an inline value is malformed YAML — error rather
+      // than silently discarding its content (consistent with the under-indent throw below).
+      if (i < lines.length && lines[i].indent > base) throw yamlErr('Bad indentation', lines[i].lineNo);
+    } else {
+      // A block value is either deeper-indented, OR a same-indent block
+      // sequence (valid YAML: a "- item" list may sit at the key's column).
+      const valueLines = [];
+      while (i < lines.length && (lines[i].indent > base ||
+        (lines[i].indent === base && yamlIsSeqMarker(lines[i].content)))) {
+        valueLines.push(lines[i++]);
+      }
+      obj[String(key)] = valueLines.length ? yamlParseLines(valueLines) : null;
+    }
+  }
+  return obj;
+}
+
+function yamlParseSeq(lines, base) {
+  const arr = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.indent !== base || !yamlIsSeqMarker(line.content)) throw yamlErr('Bad sequence item', line.lineNo);
+    const rest = yamlAfterDash(line.content);
+    const contentCol = base + 2;
+    i++;
+    const children = [];
+    while (i < lines.length && lines[i].indent > base) children.push(lines[i++]);
+    if (rest === '') {
+      arr.push(children.length ? yamlParseLines(children) : null);
+    } else if (rest[0] === '[' || rest[0] === '{') {
+      if (children.length) throw yamlErr('Bad indentation', children[0].lineNo);
+      arr.push(yamlParseFlow(rest, line.lineNo));
+    } else if (yamlFindColon(rest) >= 0) {
+      const sub = [{ indent: contentCol, content: rest, lineNo: line.lineNo }, ...children];
+      arr.push(yamlParseLines(sub));
+    } else {
+      // A plain scalar item cannot own deeper-indented child lines — error rather than drop them.
+      if (children.length) throw yamlErr('Bad indentation', children[0].lineNo);
+      yamlValueUnsupported(rest, line.lineNo);
+      arr.push(yamlParseScalar(rest, line.lineNo));
+    }
+  }
+  return arr;
+}
+
+function yamlParseFlowOrScalar(text, lineNo) {
+  const t = text.trim();
+  if (t[0] === '[' || t[0] === '{') return yamlParseFlow(t, lineNo);
+  return yamlParseScalar(t, lineNo);
+}
+
+function yamlParseScalar(text, lineNo) {
+  const t = text.trim();
+  if (t === '' || t === '~' || t === 'null' || t === 'Null' || t === 'NULL') return null;
+  if (t === 'true' || t === 'True' || t === 'TRUE') return true;
+  if (t === 'false' || t === 'False' || t === 'FALSE') return false;
+  if (t[0] === '"') return yamlParseDouble(t, lineNo);
+  if (t[0] === "'") return yamlParseSingle(t, lineNo);
+  if (/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(t)) return Number(t);
+  if (/^[-+]?0x[0-9a-fA-F]+$/.test(t)) return Number(t);
+  return t;
+}
+
+function yamlParseDouble(t, lineNo) {
+  // find the matching closing quote
+  let i = 1;
+  let out = '';
+  while (i < t.length) {
+    const c = t[i];
+    if (c === '\\') {
+      const next = t[i + 1];
+      const map = { n: '\n', t: '\t', r: '\r', '"': '"', '\\': '\\', '/': '/', '0': '\0' };
+      out += map[next] !== undefined ? map[next] : next;
+      i += 2;
+      continue;
+    }
+    if (c === '"') return out;
+    out += c;
+    i++;
+  }
+  throw yamlErr('Unterminated double-quoted string', lineNo);
+}
+
+function yamlParseSingle(t, lineNo) {
+  let i = 1;
+  let out = '';
+  while (i < t.length) {
+    const c = t[i];
+    if (c === "'" && t[i + 1] === "'") { out += "'"; i += 2; continue; }
+    if (c === "'") return out;
+    out += c;
+    i++;
+  }
+  throw yamlErr('Unterminated single-quoted string', lineNo);
+}
+
+// Flow collection parser: [a, b], {k: v}, and nested combinations.
+function yamlParseFlow(text, lineNo) {
+  const state = { s: text, i: 0, lineNo };
+  yamlSkipWs(state);
+  const value = yamlFlowValue(state);
+  yamlSkipWs(state);
+  return value;
+}
+
+function yamlSkipWs(state) {
+  while (state.i < state.s.length && /\s/.test(state.s[state.i])) state.i++;
+}
+
+function yamlFlowValue(state) {
+  yamlSkipWs(state);
+  const c = state.s[state.i];
+  if (c === '[') return yamlFlowArray(state);
+  if (c === '{') return yamlFlowObject(state);
+  return yamlFlowScalar(state);
+}
+
+function yamlFlowArray(state) {
+  state.i++; // '['
+  const arr = [];
+  yamlSkipWs(state);
+  if (state.s[state.i] === ']') { state.i++; return arr; }
+  while (state.i < state.s.length) {
+    arr.push(yamlFlowValue(state));
+    yamlSkipWs(state);
+    const c = state.s[state.i];
+    if (c === ',') { state.i++; yamlSkipWs(state); continue; }
+    if (c === ']') { state.i++; return arr; }
+    throw yamlErr('Malformed flow sequence', state.lineNo);
+  }
+  throw yamlErr('Unterminated flow sequence', state.lineNo);
+}
+
+function yamlFlowObject(state) {
+  state.i++; // '{'
+  const obj = {};
+  yamlSkipWs(state);
+  if (state.s[state.i] === '}') { state.i++; return obj; }
+  while (state.i < state.s.length) {
+    yamlSkipWs(state);
+    const key = yamlFlowScalarRaw(state, true);
+    yamlSkipWs(state);
+    if (state.s[state.i] !== ':') throw yamlErr('Expected ":" in flow mapping', state.lineNo);
+    state.i++;
+    const value = yamlFlowValue(state);
+    obj[String(key)] = value;
+    yamlSkipWs(state);
+    const c = state.s[state.i];
+    if (c === ',') { state.i++; continue; }
+    if (c === '}') { state.i++; return obj; }
+    throw yamlErr('Malformed flow mapping', state.lineNo);
+  }
+  throw yamlErr('Unterminated flow mapping', state.lineNo);
+}
+
+function yamlFlowScalar(state) {
+  return yamlFlowScalarRaw(state, false);
+}
+
+function yamlFlowScalarRaw(state, isKey) {
+  yamlSkipWs(state);
+  const c = state.s[state.i];
+  if (c === '"' || c === "'") {
+    const start = state.i;
+    const quote = c;
+    state.i++;
+    while (state.i < state.s.length) {
+      if (quote === '"' && state.s[state.i] === '\\') { state.i += 2; continue; }
+      if (quote === "'" && state.s[state.i] === "'" && state.s[state.i + 1] === "'") { state.i += 2; continue; }
+      if (state.s[state.i] === quote) { state.i++; break; }
+      state.i++;
+    }
+    const raw = state.s.slice(start, state.i);
+    return quote === '"' ? yamlParseDouble(raw, state.lineNo) : yamlParseSingle(raw, state.lineNo);
+  }
+  let start = state.i;
+  while (state.i < state.s.length && !/[,\]}:]/.test(state.s[state.i])) {
+    // a ':' only terminates a key
+    state.i++;
+  }
+  const token = state.s.slice(start, state.i).trim();
+  return yamlParseScalar(token, state.lineNo);
+}
+
+// ---- YAML emitters ----
+
+function yamlScalarNeedsQuote(str) {
+  if (str === '') return true;
+  if (/^[\s]|[\s]$/.test(str)) return true;
+  // A newline/CR/tab anywhere must be quoted — a raw newline produces invalid YAML and a
+  // silent value change on re-parse. JSON.stringify escapes these to a valid double-quoted scalar.
+  if (/[\n\r\t]/.test(str)) return true;
+  if (/[:#\[\]{}&*!|>'"%@`,]/.test(str)) return true;
+  if (/^[-?]/.test(str) && (str.length === 1 || /\s/.test(str[1]))) return true;
+  if (/^(true|false|null|~|yes|no|on|off)$/i.test(str)) return true;
+  if (/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(str)) return true;
+  return false;
+}
+
+function yamlDumpScalar(value) {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'number') return String(value);
+  const str = String(value);
+  if (yamlScalarNeedsQuote(str)) return JSON.stringify(str);
+  return str;
+}
+
+function yamlEmitBlock(value, pad, unit, lines) {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return;
+    for (const item of value) {
+      if (item !== null && typeof item === 'object') {
+        if (Array.isArray(item)) {
+          if (item.length === 0) { lines.push(pad + '- []'); continue; }
+          lines.push(pad + '-');
+          yamlEmitBlock(item, pad + unit, unit, lines);
+        } else {
+          const keys = Object.keys(item);
+          if (keys.length === 0) { lines.push(pad + '- {}'); continue; }
+          const sub = [];
+          yamlEmitBlock(item, pad + '  ', unit, sub);
+          lines.push(pad + '- ' + sub[0].slice((pad + '  ').length));
+          for (let k = 1; k < sub.length; k++) lines.push(sub[k]);
+        }
+      } else {
+        lines.push(pad + '- ' + yamlDumpScalar(item));
+      }
+    }
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const key of Object.keys(value)) {
+      const v = value[key];
+      const keyStr = yamlScalarNeedsQuote(key) ? JSON.stringify(key) : key;
+      if (Array.isArray(v)) {
+        if (v.length === 0) lines.push(pad + keyStr + ': []');
+        else { lines.push(pad + keyStr + ':'); yamlEmitBlock(v, pad + unit, unit, lines); }
+      } else if (v !== null && typeof v === 'object') {
+        if (Object.keys(v).length === 0) lines.push(pad + keyStr + ': {}');
+        else { lines.push(pad + keyStr + ':'); yamlEmitBlock(v, pad + unit, unit, lines); }
+      } else {
+        lines.push(pad + keyStr + ': ' + yamlDumpScalar(v));
+      }
+    }
+    return;
+  }
+  lines.push(pad + yamlDumpScalar(value));
+}
+
+function formatYAML(src, opts = {}) {
+  const unit = indentUnit(opts.indent === undefined ? 2 : opts.indent);
+  const value = parseYAML(src);
+  if (value === null) return '';
+  if (typeof value !== 'object') return yamlDumpScalar(value) + '\n';
+  const lines = [];
+  yamlEmitBlock(value, '', unit, lines);
+  return lines.join('\n') + '\n';
+}
+
+function yamlDumpFlowScalar(value) {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'number') return String(value);
+  const str = String(value);
+  // stricter quoting inside flow (commas/brackets matter)
+  if (yamlScalarNeedsQuote(str)) return JSON.stringify(str);
+  return str;
+}
+
+function yamlDumpFlow(value) {
+  if (Array.isArray(value)) {
+    return '[' + value.map(yamlDumpFlow).join(', ') + ']';
+  }
+  if (value !== null && typeof value === 'object') {
+    return '{' + Object.keys(value).map((k) => {
+      const keyStr = yamlScalarNeedsQuote(k) ? JSON.stringify(k) : k;
+      return keyStr + ': ' + yamlDumpFlow(value[k]);
+    }).join(', ') + '}';
+  }
+  return yamlDumpFlowScalar(value);
+}
+
+function minifyYAML(src) {
+  const value = parseYAML(src);
+  if (value === null) return '';
+  return yamlDumpFlow(value);
+}
+
+// =====================================================================
+// JavaScript (pretty-print + SAFE minify; token-level, NO AST)
+// =====================================================================
+//
+// The tokenizer is the crux. It distinguishes line/block comments, single/
+// double strings, template literals (incl. nested ${...} and nested
+// templates), regex-literals-vs-division (via the preceding-significant-token
+// rule), numbers, identifiers/keywords, and punctuators. Both transforms only
+// move/normalize whitespace — never reorder, remove (except comments/
+// whitespace), or rewrite a token. Minify is conservative around ASI: it
+// never joins tokens across an existing newline.
+
+// Keywords after which a '/' begins a regex (not division).
+const JS_REGEX_KEYWORDS = new Set([
+  'return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'do',
+  'else', 'yield', 'await', 'throw', 'case', 'default', 'else',
+]);
+// Identifier-like tokens after which '/' is division.
+const JS_VALUE_KEYWORDS = new Set(['this', 'super', 'true', 'false', 'null']);
+
+const JS_PUNCT = [
+  '>>>=', '...', '===', '!==', '**=', '<<=', '>>=', '>>>', '&&=', '||=', '??=',
+  '=>', '==', '!=', '<=', '>=', '&&', '||', '??', '?.', '++', '--', '+=', '-=',
+  '*=', '/=', '%=', '&=', '|=', '^=', '**', '<<', '>>',
+  '{', '}', '(', ')', '[', ']', ';', ',', '.', '?', ':', '=', '+', '-', '*',
+  '/', '%', '<', '>', '!', '~', '&', '|', '^',
+];
+
+function tokenizeJS(src) {
+  const tokens = [];
+  let i = 0;
+  const n = src.length;
+  const braceStack = []; // 'block' or 'template'
+
+  const prevSignificant = () => {
+    for (let k = tokens.length - 1; k >= 0; k--) {
+      const t = tokens[k].type;
+      if (t !== 'ws' && t !== 'lineComment' && t !== 'blockComment') return tokens[k];
+    }
+    return null;
+  };
+
+  const regexAllowed = () => {
+    const p = prevSignificant();
+    if (!p) return true;
+    if (p.type === 'number' || p.type === 'string' || p.type === 'regex') return false;
+    // A template token ending in `${` is an expression head/continuation → a regex may start there;
+    // a closed template (ending in `` ` ``) or a tail span is a value → division.
+    if (p.type === 'template') return /\$\{$/.test(p.value);
+    if (p.type === 'name') {
+      if (JS_VALUE_KEYWORDS.has(p.value)) return false;
+      if (JS_REGEX_KEYWORDS.has(p.value)) return true;
+      return false; // ordinary identifier => division
+    }
+    if (p.type === 'punct') {
+      if (p.value === ')' || p.value === ']') return false;
+      if (p.value === '}') return true; // treat block close as statement position
+      if (p.value === '++' || p.value === '--') return false; // postfix yields a value → division
+      return true; // after any other operator/punctuator, regex is allowed
+    }
+    return true;
+  };
+
+  const readTemplateSpan = () => {
+    const start = i;
+    i++; // consume ` or }
+    while (i < n) {
+      const c = src[i];
+      if (c === '\\') { i += 2; continue; }
+      if (c === '`') { i++; return { value: src.slice(start, i), open: false }; }
+      if (c === '$' && src[i + 1] === '{') { i += 2; return { value: src.slice(start, i), open: true }; }
+      i++;
+    }
+    return { value: src.slice(start, i), open: false };
+  };
+
+  while (i < n) {
+    const c = src[i];
+    if (/\s/.test(c)) {
+      let j = i;
+      while (j < n && /\s/.test(src[j])) j++;
+      tokens.push({ type: 'ws', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (c === '/' && src[i + 1] === '/') {
+      let j = i;
+      while (j < n && src[j] !== '\n') j++;
+      tokens.push({ type: 'lineComment', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (c === '/' && src[i + 1] === '*') {
+      let j = i + 2;
+      while (j < n && !(src[j] === '*' && src[j + 1] === '/')) j++;
+      j = Math.min(j + 2, n);
+      tokens.push({ type: 'blockComment', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (c === '/' && regexAllowed()) {
+      // read a regex literal
+      let j = i + 1;
+      let inClass = false;
+      let ok = false;
+      while (j < n) {
+        const cc = src[j];
+        if (cc === '\\') { j += 2; continue; }
+        if (cc === '\n') break; // unterminated — bail to division
+        if (cc === '[') inClass = true;
+        else if (cc === ']') inClass = false;
+        else if (cc === '/' && !inClass) { ok = true; j++; break; }
+        j++;
+      }
+      if (ok) {
+        while (j < n && /[a-zA-Z]/.test(src[j])) j++; // flags
+        tokens.push({ type: 'regex', value: src.slice(i, j) });
+        i = j;
+        continue;
+      }
+      // not a valid regex — fall through and treat '/' as punctuator
+    }
+    if (c === '"' || c === "'") {
+      const q = c;
+      let j = i + 1;
+      while (j < n) {
+        if (src[j] === '\\') { j += 2; continue; }
+        if (src[j] === '\n') break; // unterminated
+        if (src[j] === q) { j++; break; }
+        j++;
+      }
+      tokens.push({ type: 'string', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (c === '`') {
+      const span = readTemplateSpan();
+      tokens.push({ type: 'template', value: span.value });
+      if (span.open) braceStack.push('template');
+      continue;
+    }
+    if (c === '}' && braceStack.length && braceStack[braceStack.length - 1] === 'template') {
+      braceStack.pop();
+      const span = readTemplateSpan(); // consumes the '}' and continues the template
+      tokens.push({ type: 'template', value: span.value });
+      if (span.open) braceStack.push('template');
+      continue;
+    }
+    if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i + 1] || ''))) {
+      let j = i;
+      if (c === '0' && /[xXoObB]/.test(src[i + 1] || '')) {
+        j = i + 2;
+        while (j < n && /[0-9a-fA-F_]/.test(src[j])) j++;
+      } else {
+        while (j < n && /[0-9._]/.test(src[j])) j++;
+        if (src[j] === 'e' || src[j] === 'E') {
+          j++;
+          if (src[j] === '+' || src[j] === '-') j++;
+          while (j < n && /[0-9]/.test(src[j])) j++;
+        }
+      }
+      if (src[j] === 'n') j++; // BigInt
+      tokens.push({ type: 'number', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (/[A-Za-z_$ -￿]/.test(c)) {
+      let j = i;
+      while (j < n && /[A-Za-z0-9_$ -￿]/.test(src[j])) j++;
+      tokens.push({ type: 'name', value: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    // punctuator — longest match
+    let matched = null;
+    for (const p of JS_PUNCT) {
+      if (src.startsWith(p, i)) { matched = p; break; }
+    }
+    if (matched) {
+      tokens.push({ type: 'punct', value: matched });
+      if (matched === '{') braceStack.push('block');
+      else if (matched === '}') braceStack.pop();
+      i += matched.length;
+      continue;
+    }
+    tokens.push({ type: 'punct', value: c });
+    i++;
+  }
+  return tokens;
+}
+
+function jsIsWordish(type) {
+  return type === 'name' || type === 'number';
+}
+
+// Whether two adjacent significant tokens need a separating space so they do
+// not merge into a different token (used by both format and minify).
+function jsNeedSpace(prev, cur) {
+  if (!prev) return false;
+  const pv = prev.value, cv = cur.value;
+  const pt = prev.type, ct = cur.type;
+  if (pt === 'blockComment' || ct === 'blockComment') return true;
+  if (jsIsWordish(pt) && jsIsWordish(ct)) return true;
+  if (pt === 'number' && cv[0] === '.') return true; // 1 .toFixed()
+  // regex adjacency and comment-forming pairs
+  const last = pv[pv.length - 1];
+  const first = cv[0];
+  if ((last === '/' || first === '/') && (last + first === '//' || last + first === '/*')) return true;
+  const OP = '+-*/%<>=&|^~!?.';
+  if (OP.includes(last) && OP.includes(first)) return true;
+  // a keyword/identifier immediately before a regex/template/string is fine to
+  // keep adjacent, but keep a space between two wordish already handled above.
+  return false;
+}
+
+// ---- formatJS spacing model -----------------------------------------------
+// The re-indenter is still purely whitespace-level: it only inserts/removes
+// spaces and newlines BETWEEN tokens, so the ordered token stream (and thus
+// the program's meaning) is untouched, and ASI is preserved because existing
+// line-breaks are never removed. On top of the old bracket-depth indenting we
+// now add token-level *spacing*: spaces around binary operators (never unary),
+// after commas, before block "{", plus import/export-list statements kept on
+// one line and blank lines between top-level sections.
+
+// Binary/assignment/comparison operators that read best with a space on each
+// side. "+"/"-" are only binary when the previous token produces a value (see
+// jsOpIsBinary), so unary +/- stay tight.
+const JS_BINARY_OPS = new Set([
+  '||', '&&', '??', '==', '!=', '===', '!==', '<', '>', '<=', '>=',
+  '+', '-', '*', '/', '%', '**',
+  '=', '+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '>>>=',
+  '&=', '|=', '^=', '&&=', '||=', '??=',
+  '<<', '>>', '>>>', '&', '|', '^', '=>', '?',
+]);
+
+// Reserved words that take a space before and/or after them. Deliberately
+// EXCLUDES the value keywords (this/super/true/false/null) so they space like
+// ordinary identifiers (e.g. "!this", not "! this").
+const JS_KEYWORDS = new Set([
+  'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
+  'default', 'delete', 'do', 'else', 'export', 'extends', 'finally', 'for',
+  'function', 'if', 'import', 'in', 'instanceof', 'let', 'new', 'of', 'return',
+  'static', 'switch', 'throw', 'try', 'typeof', 'var', 'void', 'while', 'with',
+  'yield', 'as', 'from', 'async', 'get', 'set',
+]);
+
+// Keywords that begin a top-level statement (used only as an ASI fallback when
+// an import/export list has no terminating semicolon).
+const JS_STMT_START_KW = new Set([
+  'import', 'export', 'const', 'let', 'var', 'function', 'class', 'async',
+  'return', 'if', 'for', 'while', 'do', 'switch', 'throw', 'try',
+]);
+
+// True when a token produces a value, so a following "+"/"-" is binary (and a
+// following "/" would be division). Mirrors the tokenizer's regex-vs-division
+// rule so we never mistake unary +/- for binary.
+function jsIsValueEnd(prev) {
+  if (!prev) return false;
+  const t = prev.type;
+  if (t === 'number' || t === 'string' || t === 'regex') return true;
+  if (t === 'template') return !/\$\{$/.test(prev.value); // open head/middle → expression follows
+  if (t === 'name') return !JS_REGEX_KEYWORDS.has(prev.value);
+  if (t === 'punct') return prev.value === ')' || prev.value === ']' || prev.value === '++' || prev.value === '--';
+  return false;
+}
+
+function jsOpIsBinary(prev, op) {
+  if (!JS_BINARY_OPS.has(op)) return false;
+  if (op === '+' || op === '-') return jsIsValueEnd(prev); // else unary
+  return true;
+}
+
+// Whether to emit a space before `cur`. `prevBinary` says whether `prev` was a
+// binary operator (so the token after it also gets a space). This only ever
+// ADDS optional spaces; the must-not-merge cases fall back to jsNeedSpace.
+function jsSpaceBefore(prev, cur, prevBinary) {
+  if (!prev) return false;
+  if (jsNeedSpace(prev, cur)) return true;
+  const pv = prev.value, cv = cur.value, pt = prev.type, ct = cur.type;
+
+  // never a space after a member operator
+  if (pt === 'punct' && (pv === '.' || pv === '?.')) return false;
+  // hug-left tokens: no space before them
+  if (ct === 'punct' && (cv === ',' || cv === ';' || cv === ')' || cv === ']' ||
+    cv === '.' || cv === '?.' || cv === ':')) return false;
+  // a space after , ; :
+  if (pt === 'punct' && (pv === ',' || pv === ';' || pv === ':')) return true;
+
+  // binary operators get a space on both sides
+  if (ct === 'punct' && jsOpIsBinary(prev, cv)) return true;
+  if (prevBinary) return true;
+
+  // a space before a block "{" (function/if/for/while/…, => {, else {, try {)
+  if (ct === 'punct' && cv === '{') {
+    if (pt === 'punct' && (pv === ')' || pv === '=>')) return true;
+    if (pt === 'name' && JS_KEYWORDS.has(pv)) return true;
+    return false;
+  }
+  // a reserved keyword gets a space before and after it
+  if (ct === 'name' && JS_KEYWORDS.has(cv)) return true;
+  if (pt === 'name' && JS_KEYWORDS.has(pv)) return true;
+
+  return false;
+}
+
+function formatJS(src, opts = {}) {
+  const unit = indentUnit(opts.indent === undefined ? 2 : opts.indent);
+  const toks = tokenizeJS(src);
+  // significant items with a "newline before" flag (preserve existing breaks
+  // so ASI behavior never changes)
+  const items = [];
+  let pendingNL = false;
+  for (const t of toks) {
+    if (t.type === 'ws') { if (t.value.includes('\n')) pendingNL = true; continue; }
+    const nlBefore = pendingNL;
+    pendingNL = false;
+    items.push({ t, nlBefore });
+    if (t.type === 'lineComment') pendingNL = true; // a line comment forces a break after
+  }
+
+  let out = '';
+  let depth = 0;
+  let parenDepth = 0;
+  const pad = (d) => unit.repeat(Math.max(0, d));
+
+  // Top-level section tracking (for blank lines between the import group and
+  // the const/function/class definitions that follow).
+  let seenTopStmt = false;
+  let prevStmtImport = false;
+
+  // Render items[from..to] on a single line (import / export-list statements).
+  const renderInline = (from, to) => {
+    let s = '';
+    let pBinary = false;
+    for (let j = from; j <= to; j++) {
+      const cur = items[j].t;
+      const prev = j > from ? items[j - 1].t : null;
+      if (j === from) {
+        s += cur.value;
+      } else {
+        let sp = jsSpaceBefore(prev, cur, pBinary);
+        // import/export braces read nicer with inner spaces: "{ a, b }"
+        if (prev.value === '{' && cur.value !== '}') sp = true;
+        if (cur.value === '}') sp = true;
+        s += (sp ? ' ' : '') + cur.value;
+      }
+      pBinary = cur.type === 'punct' && jsOpIsBinary(prev, cur.value);
+    }
+    return s;
+  };
+
+  // Does items[k] begin an import / export-list statement (kept single-line)?
+  const isInlineStmtStart = (k) => {
+    const t = items[k].t;
+    const atStart = k === 0 || items[k].nlBefore || (items[k - 1] && items[k - 1].t.value === ';');
+    if (!atStart || t.type !== 'name') return false;
+    const next = items[k + 1] && items[k + 1].t;
+    if (t.value === 'import') return !!next && next.value !== '(' && next.value !== '.'; // not import()/import.meta
+    if (t.value === 'export') return !!next && (next.value === '{' || next.value === '*');
+    return false;
+  };
+
+  // Index of the last item of the inline statement beginning at k.
+  const inlineStmtEnd = (k) => {
+    let d = 0;
+    for (let j = k; j < items.length; j++) {
+      const { t, nlBefore } = items[j];
+      const v = t.value;
+      if (t.type === 'punct') {
+        if (v === '{' || v === '(' || v === '[') d++;
+        else if (v === '}' || v === ')' || v === ']') d--;
+      }
+      if (t.type === 'punct' && v === ';' && d === 0) return j; // terminating ;
+      // ASI fallback: a new line at depth 0 right after the specifier string
+      // or the clause "}" ends the statement.
+      if (j > k && d === 0 && nlBefore) {
+        const prevTok = items[j - 1].t;
+        if (prevTok.type === 'string' || prevTok.value === '}') return j - 1;
+      }
+    }
+    return items.length - 1;
+  };
+
+  let prevBinary = false;
+  for (let k = 0; k < items.length; k++) {
+    const { t, nlBefore } = items[k];
+    const v = t.value;
+    const prev = k > 0 ? items[k - 1].t : null;
+
+    // ---- import / export-list statements: keep on one line ----
+    if (isInlineStmtStart(k)) {
+      const end = inlineStmtEnd(k);
+      const curImport = t.value === 'import';
+      if (k > 0) {
+        let blank = false;
+        if (seenTopStmt && !(curImport && prevStmtImport)) blank = true;
+        out += (blank ? '\n' : '') + '\n' + pad(0);
+      }
+      out += renderInline(k, end);
+      seenTopStmt = true;
+      prevStmtImport = curImport;
+      prevBinary = false;
+      k = end;
+      continue;
+    }
+
+    const isCloser = t.type === 'punct' && (v === '}' || v === ']' || v === ')');
+    const isStmtToken = t.type !== 'lineComment' && t.type !== 'blockComment';
+
+    let willNL = false;
+    if (k > 0) {
+      const pv = prev.value;
+      const forceAfter = prev.type === 'punct' && (pv === '{' || (pv === ';' && parenDepth === 0));
+      const forceLineComment = prev.type === 'lineComment';
+      const forceBeforeClose = t.type === 'punct' && v === '}';
+      willNL = nlBefore || forceAfter || forceLineComment || forceBeforeClose;
+    }
+
+    if (k === 0) {
+      out += v;
+      seenTopStmt = isStmtToken;
+      prevStmtImport = false;
+    } else if (willNL) {
+      const lineDepth = isCloser ? depth - 1 : depth;
+      let blank = false;
+      if (depth === 0 && !isCloser) {
+        const isTerminator = prev.value === ';' || (prev.type === 'punct' && prev.value === '}');
+        if (!seenTopStmt) {
+          if (isStmtToken) { seenTopStmt = true; prevStmtImport = false; }
+        } else if (isTerminator) {
+          blank = true;            // a non-import top-level statement always separates
+          prevStmtImport = false;
+        }
+      }
+      out += (blank ? '\n' : '') + '\n' + pad(lineDepth) + v;
+    } else {
+      out += (jsSpaceBefore(prev, t, prevBinary) ? ' ' : '') + v;
+    }
+
+    prevBinary = t.type === 'punct' && jsOpIsBinary(prev, v);
+
+    if (t.type === 'punct') {
+      if (v === '{' || v === '[' || v === '(') depth++;
+      else if (v === '}' || v === ']' || v === ')') depth = Math.max(0, depth - 1);
+      if (v === '(') parenDepth++;
+      else if (v === ')') parenDepth = Math.max(0, parenDepth - 1);
+    }
+  }
+  return out.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
+
+function minifyJS(src) {
+  const toks = tokenizeJS(src);
+  let out = '';
+  let prevSig = null;
+  let pendingNL = false;
+  for (const t of toks) {
+    if (t.type === 'ws') {
+      if (t.value.includes('\n')) pendingNL = true;
+      continue;
+    }
+    if (t.type === 'lineComment') { pendingNL = true; continue; }
+    if (t.type === 'blockComment') {
+      if (t.value.includes('\n')) pendingNL = true;
+      continue;
+    }
+    if (prevSig !== null) {
+      if (pendingNL) out += '\n';
+      else if (jsNeedSpace(prevSig, t)) out += ' ';
+    }
+    out += t.value;
+    prevSig = t;
+    pendingNL = false;
+  }
+  return out.trim();
+}
+
+// =====================================================================
+// Exports (names are a contract — consumers import them)
+// =====================================================================
+
+// =====================================================================
+// Pretty-Printer & Minifier — pure engine (DOM-free, exported, unit-tested).
+//
+// The six language pretty/minify engines + tokenizers now live in the shared,
+// Node-importable module src/lib/utils/formats/CtPretty.mjs (promoted to jason-code,
+// vendored here). This file imports that engine and re-exports its API, and
+// keeps the tool-specific built-in SAMPLES (the "Load sample" demo text, which
+// carries claude-tools project identity) local. The unit tests read this
+// module's namespace and app.mjs inlines this file at build time, so the
+// surface is unchanged; the build resolves the import and inlines the engine
+// body (stripping each export) so the shipped index.html stays dependency-free
+// and file://-openable.
+//
+// NOTE: the SAMPLES strings below contain the WORDS import/export and a script
+// close-tag inside template literals — they are sample DATA, not code. The
+// build's import-inliner masks strings/templates, so they are left untouched;
+// the import/export lists themselves carry no interior comments so the inliner
+// parses them literally.
+// =====================================================================
+
+const SAMPLES = {
+  json: `{"name":"claude-tools","version":"0.1.0","keywords":["vanilla","tools"],"nested":{"a":1,"b":[true,false,null],"pi":3.14},"empty":{}}`,
+  yaml: `# A small project descriptor
+name: pretty-printer
+version: 0.1.0
+tags:
+  - json
+  - yaml
+  - html
+server:
+  host: localhost
+  port: 8080
+  debug: false
+matrix:
+  - {os: linux, node: 20}
+  - {os: macos, node: 22}
+`,
+  html: `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Demo</title></head>
+<body><header><h1>Hello</h1></header><main><p>This is a <strong>tiny</strong> demo with a <a href="#top">link</a>.</p>
+<ul><li>One</li><li>Two</li></ul></main>
+<script>console.log("kept verbatim  ", 1+1);</script>
+</body></html>`,
+  css: `/* theme */
+:root{--gap:8px;--fg:#1c1c1f}
+body{margin:0;font-family:system-ui,sans-serif;color:var(--fg)}
+.card,.panel{display:flex;gap:var(--gap);padding:12px;background:url("bg.png") no-repeat}
+@media (max-width:640px){.card{flex-direction:column}}`,
+  sql: `select u.id, u.name, count(o.id) as orders from users u left join orders o on o.user_id = u.id where u.active = true and u.created_at > '2020-01-01' group by u.id, u.name having count(o.id) > 3 order by orders desc limit 10;`,
+  js: `// tiny module
+import {readFile} from 'node:fs/promises';
+const re = /\\/(\\d+)\\//g;
+function greet(name='world'){
+  const msg = \`hello \${name.trim() || 'friend'}!\`;
+  return msg.replace(re, m => m.toUpperCase());
+}
+const nums = [1,2,3].map(n => n*2).filter(n => n > 2);
+export {greet, nums};
+`,
+};
+
+
+
+  // 1. Constants & state
+  // =====================================================================
+  const LANGS = ['json', 'yaml', 'html', 'css', 'sql', 'js'];
+  const LANG_LABEL = { json: 'JSON', yaml: 'YAML', html: 'HTML', css: 'CSS', sql: 'SQL', js: 'JavaScript' };
+
+  // Map (lang, mode) -> engine function.
+  const ENGINES = {
+    json: { format: formatJSON, minify: minifyJSON },
+    yaml: { format: formatYAML, minify: minifyYAML },
+    html: { format: formatHTML, minify: minifyHTML },
+    css: { format: formatCSS, minify: minifyCSS },
+    sql: { format: formatSQL, minify: minifySQL },
+    js: { format: formatJS, minify: minifyJS },
+  };
+
+  const state = {
+    tab: 'json',                 // active language
+    mode: 'format',              // 'format' | 'minify'
+    indent: '2',                 // '2' | '4' | 'tab'
+    sqlKeywordCase: 'unchanged', // 'unchanged' (default) | 'upper' | 'lower'
+    inputs: { json: '', yaml: '', html: '', css: '', sql: '', js: '' },
+  };
+
+  const STORAGE_KEY = 'pretty-printer:v1';
+  const HELP_SEEN_KEY = 'pretty-printer:help-seen:v1';
+
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        tab: state.tab,
+        mode: state.mode,
+        indent: state.indent,
+        sqlKeywordCase: state.sqlKeywordCase,
+        inputs: state.inputs, // per-language text only; never the derived output
+      }));
+    } catch (err) {
+      // Best-effort: localStorage unavailable/throwing → in-memory only.
+    }
+  }
+
+  function loadState() {
+    const fallback = {
+      tab: 'json', mode: 'format', indent: '2', sqlKeywordCase: 'unchanged',
+      inputs: { json: '', yaml: '', html: '', css: '', sql: '', js: '' },
+    };
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return fallback;
+      const p = JSON.parse(raw);
+      const inputs = { ...fallback.inputs };
+      if (p && p.inputs && typeof p.inputs === 'object') {
+        for (const lang of LANGS) {
+          if (typeof p.inputs[lang] === 'string') inputs[lang] = p.inputs[lang];
+        }
+      }
+      return {
+        tab: LANGS.includes(p && p.tab) ? p.tab : 'json',
+        mode: (p && p.mode) === 'minify' ? 'minify' : 'format',
+        indent: ['2', '4', 'tab'].includes(p && p.indent) ? p.indent : '2',
+        sqlKeywordCase: ['upper', 'lower', 'unchanged'].includes(p && p.sqlKeywordCase) ? p.sqlKeywordCase : 'unchanged',
+        inputs,
+      };
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  // =====================================================================
+  // 2. DOM references
+  // =====================================================================
+  const tablistEl = document.querySelector('[data-testid="tablist"]');
+  const tabEls = LANGS.map((lang) => document.querySelector(`[data-testid="tab-${lang}"]`));
+
+  const modeFormatBtn = document.getElementById('mode-format');
+  const modeMinifyBtn = document.getElementById('mode-minify');
+  const indentFieldEl = document.querySelector('[data-testid="indent-field"]');
+  const indentSelect = document.getElementById('indent-select');
+  const sqlCaseFieldEl = document.querySelector('[data-testid="sql-case-field"]');
+  const sqlCaseSelect = document.getElementById('sql-keyword-case');
+  const loadSampleBtn = document.getElementById('load-sample');
+  const clearBtn = document.getElementById('clear-input');
+
+  const inputEl = document.getElementById('pp-input');
+  const outputEl = document.getElementById('pp-output');
+  const inputBytesEl = document.querySelector('[data-testid="input-bytes"]');
+  const statsEl = document.querySelector('[data-testid="pp-stats"]');
+  const errorEl = document.querySelector('[data-testid="pp-error"]');
+  const copyBtn = document.getElementById('copy-output');
+  const copyInputBtn = document.getElementById('copy-input');
+  const editorPanelEl = document.getElementById('panel-editor');
+
+  const helpButtonEl = document.getElementById('help-button');
+
+  // =====================================================================
+  // 3. Rendering
+  // =====================================================================
+  function humanBytes(nBytes) {
+    return nBytes === 1 ? '1 byte' : `${nBytes} bytes`;
+  }
+
+  function showErrorBanner(message) { showError(errorEl, message); }
+  function hideErrorBanner() { hideError(errorEl); errorEl.textContent = ''; }
+
+  function currentEngine() {
+    return ENGINES[state.tab][state.mode];
+  }
+
+  function currentOpts() {
+    const indent = state.indent === 'tab' ? '\t' : Number(state.indent);
+    const opts = { indent };
+    if (state.tab === 'sql') opts.keywordCase = state.sqlKeywordCase;
+    return opts;
+  }
+
+  // The input's in-field copy button is revealed only when the input is
+  // non-empty (an editable field — CSS can't read its value, so we toggle it).
+  function refreshInputCopy() {
+    if (copyInputBtn) copyInputBtn.hidden = inputEl.value.length === 0;
+  }
+
+  // Run the active engine over the active input and render output + stats.
+  function run() {
+    const src = inputEl.value;
+    state.inputs[state.tab] = src;
+    refreshInputCopy();
+    const inBytes = byteLength(src);
+    inputBytesEl.textContent = humanBytes(inBytes);
+
+    if (src.trim() === '') {
+      outputEl.value = '';
+      statsEl.textContent = '';
+      hideErrorBanner();
+      return;
+    }
+
+    let out;
+    try {
+      out = currentEngine()(src, currentOpts());
+    } catch (err) {
+      outputEl.value = '';
+      statsEl.textContent = '';
+      showErrorBanner(err && err.message ? err.message : String(err));
+      return;
+    }
+
+    hideErrorBanner();
+    outputEl.value = out;
+    const outBytes = byteLength(out);
+    if (state.mode === 'minify') {
+      const saved = inBytes - outBytes;
+      if (saved > 0) {
+        const pct = inBytes > 0 ? Math.round((saved / inBytes) * 100) : 0;
+        statsEl.innerHTML = `${humanBytes(inBytes)} → ${humanBytes(outBytes)} · <span class="saved">−${humanBytes(saved)} (${pct}%)</span>`;
+      } else {
+        statsEl.textContent = `${humanBytes(inBytes)} → ${humanBytes(outBytes)}`;
+      }
+    } else {
+      statsEl.textContent = `${humanBytes(inBytes)} → ${humanBytes(outBytes)}`;
+    }
+  }
+
+  // =====================================================================
+  // 4. Tabs (WAI-ARIA tablist) — the shared wireTabs primitive owns the
+  // aria-selected toggle, roving tabindex and Arrow/Home/End nav. All 6 language
+  // tabs drive ONE shared editor panel (aria-controls="panel-editor"), which
+  // wireTabs' shared-panel path keeps shown (never hidden). This onChange owns the
+  // input-swap + render. The §9 restore reflects the active tab render-free and is
+  // deliberately NOT routed through select() — that would run() before inputEl is
+  // populated below.
+  // =====================================================================
+  const tabsCtl = wireTabs(tablistEl, (lang) => {
+    // remember what's currently typed before switching away
+    state.inputs[state.tab] = inputEl.value;
+    state.tab = lang;
+    editorPanelEl.setAttribute('aria-labelledby', `tab-${lang}`);
+    // SQL keyword-case control only shows on the SQL tab.
+    sqlCaseFieldEl.hidden = lang !== 'sql';
+    inputEl.value = state.inputs[lang];
+    updateControlAvailability();
+    run();
+    saveState();
+  });
+
+  // =====================================================================
+  // 5. Mode / indent / SQL-case controls
+  // =====================================================================
+  function updateControlAvailability() {
+    // Indent is only meaningful when formatting.
+    const isFormat = state.mode === 'format';
+    indentSelect.disabled = !isFormat;
+    indentFieldEl.style.opacity = isFormat ? '' : '0.55';
+    // SQL keyword-case applies to formatSQL only.
+    sqlCaseSelect.disabled = !(state.tab === 'sql' && isFormat);
+  }
+
+  // Shared single-select segmented control (wireSegmented): click /
+  // Arrow-key select + roving tabindex + aria-pressed bookkeeping.
+  const modeSeg = wireSegmented(modeFormatBtn.parentElement, (mode) => {
+    state.mode = mode === 'minify' ? 'minify' : 'format';
+    updateControlAvailability();
+    run();
+    saveState();
+  });
+  // Public/test-hook entry point drives the control (sets aria + fires onChange).
+  function setMode(mode) { modeSeg.select(mode === 'minify' ? 'minify' : 'format'); }
+  function setTab(lang) { if (LANGS.includes(lang)) tabsCtl.select(lang); }
+
+  indentSelect.addEventListener('change', () => {
+    state.indent = ['2', '4', 'tab'].includes(indentSelect.value) ? indentSelect.value : '2';
+    run();
+    saveState();
+  });
+
+  sqlCaseSelect.addEventListener('change', () => {
+    state.sqlKeywordCase = ['upper', 'lower', 'unchanged'].includes(sqlCaseSelect.value) ? sqlCaseSelect.value : 'upper';
+    run();
+    saveState();
+  });
+
+  // =====================================================================
+  // 6. Input, Load sample, Clear
+  // =====================================================================
+  // Shared trailing-edge debounce (CtUtil in the shared lib, inlined as a global).
+  const debouncedRun = debounce(() => { run(); saveState(); }, 150);
+  inputEl.addEventListener('input', () => { refreshInputCopy(); debouncedRun(); });
+
+  loadSampleBtn.addEventListener('click', async () => {
+    // Guard only when the current input is non-empty (it would be overwritten).
+    if (inputEl.value.trim() !== '') {
+      const ok = await confirmDialog(`Replace the ${LANG_LABEL[state.tab]} input with the sample?`);
+      if (!ok) return;
+    }
+    inputEl.value = SAMPLES[state.tab] || '';
+    run();
+    saveState();
+    inputEl.focus();
+  });
+
+  // Clear is low-stakes per-language input → no confirm (documented in DESIGN).
+  clearBtn.addEventListener('click', () => {
+    inputEl.value = '';
+    run();
+    saveState();
+    document.activeElement?.blur();
+    inputEl.focus();
+  });
+
+  // =====================================================================
+  // 7. Copy output
+  // =====================================================================
+  copyBtn.addEventListener('click', async () => {
+    const text = outputEl.value;
+    if (!text) return;
+    const ok = await copy(text);
+    if (!ok) return;
+    flash(copyBtn, { label: '✅', revertTo: '📋' });
+  });
+
+  copyInputBtn.addEventListener('click', async () => {
+    const text = inputEl.value;
+    if (!text) return;
+    const ok = await copy(text);
+    if (!ok) return;
+    flash(copyInputBtn, { label: '✅', revertTo: '📋' });
+  });
+
+  // =====================================================================
+  // 8. Help modal — the shared jbcModal primitive (src/lib/components/CtModal.mjs), built
+  // from the hidden #help-body template. Focus-trap / Esc + backdrop close /
+  // focus-return / reduced-motion / scroll-top live in that primitive.
+  // `testid: 'help'` keeps the help-overlay / help-modal / modal-close-x hooks;
+  // `titleId` pins aria-labelledby; `autoOpen` rides the shared onceFlag
+  // so it auto-shows once on a fresh visit and never again.
+  // =====================================================================
+  const help = createModal({
+    testid: 'help',
+    titleId: 'help-title',
+    title: 'Pretty-Printer & Minifier',
+    body: document.getElementById('help-body').content.cloneNode(true),
+    autoOpen: onceFlag(HELP_SEEN_KEY),
+  });
+  helpButtonEl.addEventListener('click', () => help.open());
+
+  // =====================================================================
+  // 9. Init — restore persisted state, wire the initial view
+  // =====================================================================
+  (function init() {
+    const loaded = loadState();
+    state.mode = loaded.mode;
+    state.indent = loaded.indent;
+    state.sqlKeywordCase = loaded.sqlKeywordCase;
+    state.inputs = loaded.inputs;
+    state.tab = loaded.tab;
+
+    indentSelect.value = state.indent;
+    sqlCaseSelect.value = state.sqlKeywordCase;
+    // Render-free reflect of the restored mode: aria only, so we do NOT fire the
+    // segmented onChange (which would run() before inputEl.value is set below).
+    modeFormatBtn.setAttribute('aria-pressed', String(state.mode === 'format'));
+    modeMinifyBtn.setAttribute('aria-pressed', String(state.mode === 'minify'));
+
+    // Reflect the active tab in the DOM and render.
+    tabEls.forEach((el) => {
+      const selected = el.dataset.lang === state.tab;
+      el.setAttribute('aria-selected', String(selected));
+      el.tabIndex = selected ? 0 : -1;
+    });
+    editorPanelEl.setAttribute('aria-labelledby', `tab-${state.tab}`);
+    sqlCaseFieldEl.hidden = state.tab !== 'sql';
+    inputEl.value = state.inputs[state.tab];
+    updateControlAvailability();
+    run();
+    // The Help modal auto-shows once on a fresh visit via jbcModal's autoOpen.
+  })();
+
+  // =====================================================================
+  // 10. Test hook — inert namespace for Playwright / unit-driven tests
+  // =====================================================================
+  window.__prettyPrinter = {
+    // pure engines
+    formatJSON, minifyJSON,
+    parseYAML, formatYAML, minifyYAML,
+    formatHTML, minifyHTML,
+    formatCSS, minifyCSS,
+    formatSQL, minifySQL,
+    tokenizeJS, formatJS, minifyJS,
+    byteLength, indentUnit, lineColFromOffset,
+    SAMPLES,
+    // deterministic entry points
+    setTab, setMode, run,
+    // live state
+    state,
+  };
+</script>
+</body>
+</html>

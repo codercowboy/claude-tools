@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Batch Watermark</title>
+<meta property="og:title"       content="Batch Watermark">
+<meta property="og:description" content="Stamp a text or logo watermark on many images at once, preview one, and export all as a zip. All local in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-alt: #f0f0f4;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --focus: #2f6fed;
+    --radius: 8px;
+
+    /* jbcModal (Help dialog) theming — reuse this tool's tokens (they redefine
+       per theme, so this one block covers light + dark). */
+    --jbcm-bg: var(--panel);
+    --jbcm-fg: var(--text);
+    --jbcm-border: var(--border);
+    --jbcm-radius: var(--radius);
+    --jbcm-focus: var(--focus);
+    --jbcm-max-width: 32rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* confirmDialog theming — highlighted "Yes" reads as a filled primary. */
+    --jbcc-accent: #2f6fed;
+    --jbcc-accent-fg: #ffffff;
+    --jbcc-bg: #ffffff;
+    --jbcc-fg: #1c1c1f;
+    --jbcc-cancel-border: #b6b6bd;
+    --jbcc-focus: #2f6fed;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-alt: #2a2a30;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --focus: #6d9bff;
+
+      --jbcc-accent: #6d9bff;
+      --jbcc-accent-fg: #0b1220;
+      --jbcc-bg: #202024;
+      --jbcc-fg: #eceef1;
+      --jbcc-cancel-border: #46464d;
+      --jbcc-focus: #6d9bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Batch Watermark</h1>
+        <p class="subtitle">Stamp a text or logo watermark on many images at once, preview one, then export them all as a zip. Everything stays in your browser.</p>
+      </div>
+      <button id="help-button" type="button" class="help-button" data-testid="help-button" title="How it works" aria-label="How it works">?</button>
+    </div>
+  </header>
+
+  <label class="dropzone" for="file-input" data-testid="dropzone">
+    <input type="file" id="file-input" data-testid="file-input" accept="image/*" multiple class="visually-hidden">
+    <span>Drop images here, or click to choose some</span>
+    <span class="dropzone-hint">PNG, JPEG, WebP, GIF, BMP or SVG in</span>
+  </label>
+  <div class="banner banner-error" data-testid="error-message" role="alert" hidden></div>
+  <div class="banner banner-warning" data-testid="warning-message" role="status" hidden></div>
+
+  <section class="card" data-testid="card-images" aria-labelledby="images-heading" hidden id="images-card">
+    <div class="card-head row-head">
+      <h2 id="images-heading">Images <span class="cat-count" data-testid="image-count"></span></h2>
+      <button type="button" id="clear-all" data-testid="clear-btn">Clear all</button>
+    </div>
+    <ul class="item-list" id="item-list" data-testid="item-list"></ul>
+  </section>
+
+  <section class="card" data-testid="card-watermark" aria-labelledby="wm-heading">
+    <div class="card-head"><h2 id="wm-heading">Watermark</h2></div>
+    <div class="field">
+      <span class="field-label" id="mode-label">Type</span>
+      <div class="segmented" role="group" aria-labelledby="mode-label" data-testid="mode-seg">
+        <button type="button" data-value="text" data-testid="mode-text" aria-pressed="true">Text</button>
+        <button type="button" data-value="image" data-testid="mode-image" aria-pressed="false">Logo image</button>
+      </div>
+    </div>
+    <div id="text-opts" class="opts">
+      <div class="field"><label for="text-input">Text (one line per row)</label><textarea id="text-input" data-testid="text-input" rows="2" maxlength="500"></textarea></div>
+      <div class="settings-row">
+        <div class="field"><label for="font-select">Font</label><select id="font-select" data-testid="font-select"></select></div>
+        <div class="field"><label for="custom-font">Custom font family</label><input type="text" id="custom-font" data-testid="custom-font" placeholder="optional" autocomplete="off"></div>
+        <div class="field color-field"><label for="fill-color">Fill</label><input type="color" id="fill-color" data-testid="fill-color" value="#ffffff"></div>
+        <div class="field color-field"><label for="stroke-color">Stroke color</label><input type="color" id="stroke-color" data-testid="stroke-color" value="#000000"></div>
+        <div class="field"><label for="stroke-level">Stroke (0 = off)</label><input type="number" id="stroke-level" data-testid="stroke-level" min="0" max="20" step="1" inputmode="numeric"></div>
+        <label class="checkbox"><input type="checkbox" id="shadow-toggle" data-testid="shadow-toggle"><span>Drop shadow</span></label>
+        <button type="button" id="auto-contrast" data-testid="auto-contrast">Auto contrast</button>
+      </div>
+      <p class="hint">Fonts are your system's; a font missing on this machine falls back silently, so output depends on the exporting machine.</p>
+    </div>
+    <div id="image-opts" class="opts" hidden>
+      <div class="field">
+        <label for="logo-input">Logo image</label>
+        <input type="file" id="logo-input" data-testid="logo-input" accept="image/*">
+        <span class="hint" data-testid="logo-status">No logo chosen.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" data-testid="card-placement" aria-labelledby="place-heading">
+    <div class="card-head"><h2 id="place-heading">Placement</h2></div>
+    <div class="settings-row">
+      <div class="field">
+        <span class="field-label" id="anchor-label">Anchor</span>
+        <div class="anchor-grid" role="group" aria-labelledby="anchor-label" data-testid="anchor-grid">
+          <button type="button" data-value="tl" data-testid="anchor-tl" aria-label="Top left">&#8598;</button>
+          <button type="button" data-value="tc" data-testid="anchor-tc" aria-label="Top center">&#8593;</button>
+          <button type="button" data-value="tr" data-testid="anchor-tr" aria-label="Top right">&#8599;</button>
+          <button type="button" data-value="ml" data-testid="anchor-ml" aria-label="Middle left">&#8592;</button>
+          <button type="button" data-value="mc" data-testid="anchor-mc" aria-label="Center">&#9679;</button>
+          <button type="button" data-value="mr" data-testid="anchor-mr" aria-label="Middle right">&#8594;</button>
+          <button type="button" data-value="bl" data-testid="anchor-bl" aria-label="Bottom left">&#8601;</button>
+          <button type="button" data-value="bc" data-testid="anchor-bc" aria-label="Bottom center">&#8595;</button>
+          <button type="button" data-value="br" data-testid="anchor-br" aria-label="Bottom right">&#8600;</button>
+        </div>
+      </div>
+      <div class="num-grid">
+        <div class="field"><label for="scale-input">Size (% of short side)</label><input type="number" id="scale-input" data-testid="scale-input" min="1" max="100" step="1" inputmode="numeric"></div>
+        <div class="field"><label for="opacity-input">Opacity (%)</label><input type="number" id="opacity-input" data-testid="opacity-input" min="0" max="100" step="1" inputmode="numeric"></div>
+        <div class="field"><label for="rotation-input">Rotation (deg)</label><input type="number" id="rotation-input" data-testid="rotation-input" min="-180" max="180" step="1" inputmode="numeric"></div>
+        <div class="field"><label for="margin-input">Margin (%)</label><input type="number" id="margin-input" data-testid="margin-input" min="0" max="50" step="0.5" inputmode="decimal"></div>
+        <div class="field"><label for="offx-input">Offset X (%)</label><input type="number" id="offx-input" data-testid="offx-input" min="-100" max="100" step="0.5" inputmode="decimal"></div>
+        <div class="field"><label for="offy-input">Offset Y (%)</label><input type="number" id="offy-input" data-testid="offy-input" min="-100" max="100" step="0.5" inputmode="decimal"></div>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label class="checkbox"><input type="checkbox" id="tile-toggle" data-testid="tile-toggle"><span>Tile across the image</span></label>
+      <div class="field" id="gap-field" hidden><label for="gap-input">Tile spacing (%)</label><input type="number" id="gap-input" data-testid="gap-input" min="0" max="200" step="1" inputmode="numeric"></div>
+    </div>
+    <p class="hint">Every size, margin and offset is a percentage of each image's short side, so the look is the same on small and large photos.</p>
+  </section>
+
+  <section class="card" data-testid="card-preview" aria-labelledby="preview-heading">
+    <div class="card-head">
+      <h2 id="preview-heading">Preview</h2>
+      <p class="stats" data-testid="stats" aria-live="polite">Add images to begin.</p>
+    </div>
+    <div class="preview" data-testid="preview"><canvas id="preview-canvas" data-testid="preview-canvas" aria-label="Preview of the watermark on the selected image"></canvas></div>
+  </section>
+
+  <section class="card" data-testid="card-output" aria-labelledby="output-heading">
+    <div class="card-head"><h2 id="output-heading">Output</h2></div>
+    <div class="settings-row">
+      <div class="field">
+        <span class="field-label" id="format-label">Format</span>
+        <div class="segmented" role="group" aria-labelledby="format-label" data-testid="format-seg">
+          <button type="button" data-value="source" data-testid="format-source" aria-pressed="true">Same as source</button>
+          <button type="button" data-value="png" data-testid="format-png" aria-pressed="false">PNG</button>
+          <button type="button" data-value="jpeg" data-testid="format-jpeg" aria-pressed="false">JPEG</button>
+          <button type="button" data-value="webp" data-testid="format-webp" aria-pressed="false">WebP</button>
+        </div>
+      </div>
+      <div class="field" id="quality-field" hidden>
+        <label for="quality-input">Quality (<span data-testid="quality-value">92</span>)</label>
+        <input type="range" id="quality-input" data-testid="quality-input" min="10" max="100" step="1" value="92">
+      </div>
+    </div>
+    <p class="hint" data-testid="format-hint"></p>
+    <div class="actions-row">
+      <button type="button" id="apply-btn" class="primary" data-testid="apply-btn" disabled>Apply to all &amp; download</button>
+      <button type="button" id="each-btn" data-testid="each-btn" hidden disabled>Download each separately</button>
+      <button type="button" id="cancel-btn" data-testid="cancel-btn" hidden>Cancel</button>
+      <progress id="progress" data-testid="progress" max="1" value="0" hidden></progress>
+      <span class="stats" data-testid="export-status" role="status"></span>
+    </div>
+    <p class="hint" id="each-hint" hidden>Separate downloads may make your browser ask permission for multiple files.</p>
+  </section>
+</div>
+
+<template id="help-body">
+    <p>Add as many images as you like, set one watermark, check it on the preview, then export everything with the watermark baked into the pixels.</p>
+    <ul>
+      <li><strong>Text or logo.</strong> Text supports several lines, system fonts, a stroke and a drop shadow. A logo is any image you choose.</li>
+      <li><strong>Placement.</strong> Pick one of nine anchors, then nudge with offset and margin. Tick tiling to repeat the mark across the whole image (staggered rows, rotated as a grid).</li>
+      <li><strong>Relative sizes.</strong> Size, margin, offset and spacing are percentages of each image's short side, so one setting looks the same on every image.</li>
+      <li><strong>Export.</strong> Several images download as one zip (files named <code>name-watermarked.png</code>); a single image downloads directly. Format defaults to each image's own; forcing JPEG flattens transparency onto white.</li>
+      <li><strong>Errors.</strong> A file that cannot be read or is too large gets an error row and is skipped; the rest still export.</li>
+      <li><strong>Metadata.</strong> Re-encoding strips EXIF and color profiles.</li>
+    </ul>
+    <p class="help-note">Everything runs locally; your images never leave this page and are never saved. Only your watermark settings are remembered in this browser.</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

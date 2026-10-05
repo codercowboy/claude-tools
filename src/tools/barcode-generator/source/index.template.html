@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Barcode Generator</title>
+<meta property="og:title"       content="Barcode Generator">
+<meta property="og:description" content="Generate Code 128, EAN-13, UPC-A and Code 39 barcodes with a live preview and crisp SVG or PNG export. All local in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-alt: #f0f0f4;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --focus: #2f6fed;
+    --radius: 8px;
+
+    /* jbcModal (Help dialog) theming — reuse this tool's tokens (they redefine
+       per theme, so this one block covers light + dark). */
+    --jbcm-bg: var(--panel);
+    --jbcm-fg: var(--text);
+    --jbcm-border: var(--border);
+    --jbcm-radius: var(--radius);
+    --jbcm-focus: var(--focus);
+    --jbcm-max-width: 32rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* confirmDialog theming — highlighted "Yes" reads as a filled primary. */
+    --jbcc-accent: #2f6fed;
+    --jbcc-accent-fg: #ffffff;
+    --jbcc-bg: #ffffff;
+    --jbcc-fg: #1c1c1f;
+    --jbcc-cancel-border: #b6b6bd;
+    --jbcc-focus: #2f6fed;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-alt: #2a2a30;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --focus: #6d9bff;
+
+      --jbcc-accent: #6d9bff;
+      --jbcc-accent-fg: #0b1220;
+      --jbcc-bg: #202024;
+      --jbcc-fg: #eceef1;
+      --jbcc-cancel-border: #46464d;
+      --jbcc-focus: #6d9bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Barcode Generator</h1>
+        <p class="subtitle">Type some data, pick a symbology, and get a crisp barcode with human-readable text and quiet zones. Export SVG or PNG. Everything stays in your browser.</p>
+      </div>
+      <button id="help-button" type="button" class="help-button" data-testid="help-button" title="How it works" aria-label="How it works">?</button>
+    </div>
+  </header>
+
+  <section class="card" data-testid="card-input" aria-labelledby="input-heading">
+    <div class="card-head">
+      <h2 id="input-heading">Data</h2>
+    </div>
+    <div class="field">
+      <span class="field-label" id="sym-label">Symbology</span>
+      <div class="segmented" role="group" aria-labelledby="sym-label" data-testid="symbology-seg">
+        <button type="button" data-value="code128" data-testid="sym-code128" aria-pressed="true">Code 128</button>
+        <button type="button" data-value="ean13" data-testid="sym-ean13" aria-pressed="false">EAN-13</button>
+        <button type="button" data-value="upca" data-testid="sym-upca" aria-pressed="false">UPC-A</button>
+        <button type="button" data-value="code39" data-testid="sym-code39" aria-pressed="false">Code 39</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="barcode-input">Text to encode</label>
+      <input type="text" id="barcode-input" data-testid="barcode-input" spellcheck="false" autocomplete="off" autocapitalize="off">
+      <p class="hint" data-testid="input-hint"></p>
+    </div>
+    <div class="settings-row" id="code39-opts" hidden>
+      <label class="checkbox"><input type="checkbox" id="c39-check" data-testid="c39-check-toggle"><span>Add mod-43 check character</span></label>
+      <label class="checkbox"><input type="checkbox" id="c39-star" data-testid="c39-star-toggle"><span>Show <code>*</code> start/stop in text</span></label>
+    </div>
+    <p class="check-line">Check digit: <strong data-testid="check-digit" aria-live="polite">-</strong></p>
+    <div class="banner banner-error" data-testid="error-message" role="alert" hidden></div>
+  </section>
+
+  <section class="card" data-testid="card-options" aria-labelledby="options-heading">
+    <div class="card-head">
+      <h2 id="options-heading">Options</h2>
+    </div>
+    <div class="settings-row">
+      <div class="field">
+        <label for="scale-input">Module width (px, 1-20)</label>
+        <input type="number" id="scale-input" data-testid="scale-input" min="1" max="20" step="1" value="2" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="height-input">Bar height (modules, 10-300)</label>
+        <input type="number" id="height-input" data-testid="height-input" min="10" max="300" step="1" value="60" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="quiet-zone-input">Quiet zone (modules)</label>
+        <input type="number" id="quiet-zone-input" data-testid="quiet-zone-input" min="0" max="100" step="1" inputmode="numeric" placeholder="auto">
+      </div>
+    </div>
+    <div class="settings-row">
+      <label class="checkbox"><input type="checkbox" id="show-text" data-testid="show-text-toggle" checked><span>Show human-readable text</span></label>
+      <div class="field color-field">
+        <label for="fg-color">Bars</label>
+        <input type="color" id="fg-color" data-testid="fg-color-input" value="#000000">
+      </div>
+      <div class="field color-field">
+        <label for="bg-color">Background</label>
+        <input type="color" id="bg-color" data-testid="bg-color-input" value="#ffffff">
+      </div>
+    </div>
+    <div class="banner banner-warning" data-testid="contrast-warning" role="status" hidden></div>
+  </section>
+
+  <section class="card" data-testid="card-preview" aria-labelledby="preview-heading">
+    <div class="card-head">
+      <h2 id="preview-heading">Preview</h2>
+      <p class="stats" data-testid="stats" aria-live="polite"></p>
+    </div>
+    <div class="preview" data-testid="preview" aria-label="Barcode preview"></div>
+    <div class="actions-row">
+      <button type="button" id="download-png" class="primary" data-testid="download-png-btn" disabled>Download PNG</button>
+      <button type="button" id="download-svg" data-testid="download-svg-btn" disabled>Download SVG</button>
+      <button type="button" id="copy-svg" data-testid="copy-svg-btn" disabled>Copy SVG</button>
+    </div>
+  </section>
+</div>
+
+<template id="help-body">
+    <p>Pick a symbology, type your data, and the barcode updates live. The preview and the SVG download are the same markup; the PNG is drawn on a canvas at a whole number of pixels per module, so every bar edge is sharp.</p>
+    <ul>
+      <li><strong>Code 128.</strong> Full ASCII (0-127). Code sets A, B and C are chosen automatically; runs of digits are packed in pairs. The mod-103 check value is added for you.</li>
+      <li><strong>EAN-13 / UPC-A.</strong> Digits only. Enter 12 (EAN-13) or 11 (UPC-A) digits and the check digit is calculated, or enter the full number and the check digit is verified.</li>
+      <li><strong>Code 39.</strong> 0-9, A-Z, space and <code>- . $ / + %</code>; lowercase is upper-cased. Start/stop <code>*</code> is added automatically. An optional mod-43 check character is available.</li>
+      <li><strong>Quiet zone.</strong> Blank margin around the bars, in modules. Leave it empty for the standard default (10, or 11 left / 7 right for EAN/UPC).</li>
+      <li><strong>Text.</strong> The human-readable line is SVG text in an OCR-B / Courier-style font stack and is not outlined, so its look depends on the viewer's fonts.</li>
+      <li><strong>Scanning.</strong> Use dark bars on a light background; a warning appears when contrast is low.</li>
+    </ul>
+    <p class="help-note">Everything runs locally. Your symbology, size and color choices are saved in this browser; the data you type is never stored.</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

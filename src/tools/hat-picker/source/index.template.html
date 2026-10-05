@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hat Picker</title>
+<meta property="og:title"       content="Hat Picker">
+<meta property="og:description" content="Add entries and pull a random winner from the hat with a slot-machine animation and confetti. Built for game night.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+<<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="app-header-row">
+        <span class="header-spacer" aria-hidden="true"></span>
+        <div class="header-titles">
+          <h1>🎩 Hat Picker</h1>
+          <p>Add some ideas, pull one from the hat!</p>
+        </div>
+        <button
+          id="help-button"
+          type="button"
+          class="help-button"
+          data-testid="help-button"
+          title="How it works"
+          aria-label="How it works"
+        >?</button>
+      </div>
+    </header>
+
+    <section class="add-row card">
+      <form id="add-form">
+        <div class="field-wrap">
+          <label class="visually-hidden" for="entry-input">Add a suggestion</label>
+          <input
+            id="entry-input"
+            type="text"
+            data-testid="entry-input"
+            maxlength="80"
+            placeholder="Type a game, activity, or idea…"
+            aria-describedby="char-counter"
+            autocomplete="off"
+          />
+        </div>
+        <button id="add-button" type="submit" data-testid="add-button">Add</button>
+      </form>
+      <div class="add-row-meta">
+        <span id="char-counter" data-testid="char-counter">0 / 80</span>
+      </div>
+    </section>
+
+    <section class="entries card">
+      <div class="entries-head">
+        <h2>In the hat</h2>
+        <span id="entry-count" data-testid="entry-count">0 in the hat</span>
+      </div>
+      <ul id="entry-list" data-testid="entry-list"></ul>
+      <p id="empty-state" data-testid="empty-state">
+        Nothing in the hat yet — add a few suggestions above!
+      </p>
+    </section>
+
+    <section class="draw-area card">
+      <button id="pull-button" data-testid="pull-button" type="button" disabled>
+        Pull from the hat! 🎩
+      </button>
+      <button id="draw-again-button" data-testid="draw-again-button" type="button" hidden>
+        Draw again 🎲
+      </button>
+      <div class="draw-controls-row">
+        <span class="toggle-row">
+          <input
+            id="remove-winner-toggle"
+            type="checkbox"
+            data-testid="remove-winner-toggle"
+          />
+          <label for="remove-winner-toggle">Remove winner after draw</label>
+        </span>
+        <button id="clear-all" data-testid="clear-all" type="button">Clear all</button>
+      </div>
+    </section>
+
+    <section class="winner">
+      <div class="ct-field ct-field--multiline winner-field">
+        <div id="winner-reveal" class="winner-card" data-testid="winner-reveal" aria-hidden="true">
+          Ready when you are!
+        </div>
+        <button
+          type="button"
+          id="winner-copy"
+          class="ct-copy-btn"
+          data-testid="winner-copy"
+          title="Copy winner"
+          aria-label="Copy winner"
+          hidden
+        >📋</button>
+      </div>
+      <p class="winner-hint">The winner will appear here.</p>
+      <div id="winner-announce" data-testid="winner-announce" aria-live="polite" class="visually-hidden"></div>
+    </section>
+  </div>
+
+  <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+
+  <!-- Help modal is built at runtime by the shared jbcModal primitive
+       (CtModal.mjs) from this hidden template. The <h2> title is
+       supplied via jbcModal's `title` option, so it is not repeated here. -->
+  <template id="help-body">
+    <p>Type a name, activity, or idea into the box and tap <strong>Add</strong> to drop it in the hat. Add as many entries as you like — blank and duplicate entries are rejected (the box shakes to let you know).</p>
+    <ul>
+      <li><strong>Pull from the hat!</strong> Once there are at least two entries, this runs a slot-machine-style animation that lands on a random winner, with a confetti burst to celebrate. (If your device prefers reduced motion, the winner appears instantly instead.)</li>
+      <li><strong>Draw again.</strong> After a winner is revealed, the button becomes "Draw again" so you can keep pulling from the same hat.</li>
+      <li><strong>Remove winner after draw.</strong> Turn this on to automatically take the winning entry out of the hat once it's picked — handy for making sure everyone gets picked exactly once.</li>
+      <li><strong>Remove an entry (×).</strong> Takes a single entry out of the hat. Asks you to confirm first, since it can't be undone.</li>
+      <li><strong>Clear all.</strong> Empties the whole hat at once. Also asks you to confirm first.</li>
+    </ul>
+    <p class="help-note">Your entries and the "Remove winner after draw" setting are saved on this device, so they're still here next time you open Hat Picker.</p>
+  </template>
+
+<<ct:lib components/footer.html>>
+
+
+
+
+
+  <script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

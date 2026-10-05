@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual Diff</title>
+<meta property="og:title"       content="Visual Diff">
+<meta property="og:description" content="Compare two blocks of text with a hand-rolled Myers diff — side-by-side or inline, with word-level highlighting and a copyable unified diff.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --focus: #2f6fed;
+    --radius: 8px;
+
+    /* diff colors — light */
+    --add-bg: #e6f6ec;
+    --add-gutter: #cdeed7;
+    --add-text: #16733a;
+    --del-bg: #fdecec;
+    --del-gutter: #f7d5d5;
+    --del-text: #b3261e;
+    --chg-bg: #fff6e0;
+    --gutter-bg: #f0f0f3;
+    --gutter-text: #9a9aa2;
+    --wd-add-bg: #a8e6bf;
+    --wd-del-bg: #f5b7b3;
+
+    /* confirmDialog accent (docs/conventions.md § confirm component) */
+    --ctc-accent: #2f6fed;
+    --ctc-accent-fg: #ffffff;
+
+    /* jbcModal (Help dialog) theming — reuse this tool's tokens (they redefine
+       per theme, so this one block covers light + dark). */
+    --jbcm-bg: var(--panel);
+    --jbcm-fg: var(--text);
+    --jbcm-border: var(--border);
+    --jbcm-radius: var(--radius);
+    --jbcm-focus: var(--focus);
+    --jbcm-max-width: 34rem;
+
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --focus: #6d9bff;
+
+      --add-bg: #16311f;
+      --add-gutter: #1f4a2e;
+      --add-text: #6ee39a;
+      --del-bg: #3a1815;
+      --del-gutter: #572420;
+      --del-text: #ff8b80;
+      --chg-bg: #3a2c0d;
+      --gutter-bg: #1a1a1e;
+      --gutter-text: #7c7c85;
+      --wd-add-bg: #1f6b3c;
+      --wd-del-bg: #7a2b25;
+
+      --ctc-accent: #6d9bff;
+      --ctc-accent-fg: #0b1220;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Visual Diff</h1>
+        <p class="subtitle">Compare two blocks of text — line and word diff, side-by-side or inline. All local, nothing leaves your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <section class="inputs" data-testid="inputs">
+    <div class="field">
+      <div class="field-head">
+        <label for="inputA">A — original</label>
+        <button type="button" id="clearABtn" data-testid="clear-a-btn" class="link-btn" title="Clear A" aria-label="Clear A">Clear</button>
+      </div>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="inputA" data-testid="input-a" rows="10" spellcheck="false"
+          placeholder="Paste or type the original text..."></textarea>
+        <button type="button" id="copyABtn" data-testid="copy-a-btn" class="ct-copy-btn"
+          title="Copy A" aria-label="Copy A" hidden>📋</button>
+      </div>
+    </div>
+
+    <div class="swap-wrap">
+      <button type="button" id="swapBtn" data-testid="swap-btn" class="swap-btn" title="Swap A and B" aria-label="Swap A and B">⇄</button>
+    </div>
+
+    <div class="field">
+      <div class="field-head">
+        <label for="inputB">B — changed</label>
+        <button type="button" id="clearBBtn" data-testid="clear-b-btn" class="link-btn" title="Clear B" aria-label="Clear B">Clear</button>
+      </div>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="inputB" data-testid="input-b" rows="10" spellcheck="false"
+          placeholder="Paste or type the changed text..."></textarea>
+        <button type="button" id="copyBBtn" data-testid="copy-b-btn" class="ct-copy-btn"
+          title="Copy B" aria-label="Copy B" hidden>📋</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="controls" data-testid="controls">
+    <div class="options" role="group" aria-label="Diff options">
+      <label class="opt"><input type="checkbox" id="optTrim" data-testid="opt-trim"> Ignore leading/trailing whitespace</label>
+      <label class="opt"><input type="checkbox" id="optAllWs" data-testid="opt-all-ws"> Ignore all whitespace</label>
+      <label class="opt"><input type="checkbox" id="optCase" data-testid="opt-case"> Ignore case</label>
+    </div>
+
+    <div class="controls-right">
+      <button type="button" id="loadSampleBtn" data-testid="load-sample" class="sample-btn"
+        title="Load a sample before/after into A and B" aria-label="Load a sample before/after into A and B">Load sample</button>
+      <div class="view-toggle" data-testid="view-toggle" role="group" aria-label="View">
+        <button type="button" id="viewSplitBtn" data-testid="view-split-btn" data-value="split" aria-pressed="true">Side-by-side</button>
+        <button type="button" id="viewInlineBtn" data-testid="view-inline-btn" data-value="inline" aria-pressed="false">Inline</button>
+      </div>
+      <button type="button" id="copyUnifiedBtn" data-testid="copy-unified-btn"
+        title="Copy unified diff" aria-label="Copy unified diff" disabled>📋 Copy unified diff</button>
+    </div>
+  </section>
+
+  <p class="stats" data-testid="stats" role="status" aria-live="polite"></p>
+  <p class="warning" data-testid="size-warning" role="status" aria-live="polite" hidden></p>
+
+  <div class="diff-legend" data-testid="diff-legend" role="group" aria-label="Diff color legend">
+    <span class="lg-item">
+      <span class="lg-swatch lg-swatch--add" aria-hidden="true"></span>green = added line
+    </span>
+    <span class="lg-item">
+      <span class="lg-swatch lg-swatch--del" aria-hidden="true"></span>red = removed line
+    </span>
+    <span class="lg-item">
+      <span class="lg-swatch lg-swatch--chg" aria-hidden="true"></span>yellow = changed line
+    </span>
+  </div>
+
+  <section class="diff-output" data-testid="diff-output">
+    <div class="diff-split" data-testid="diff-split"></div>
+    <div class="diff-inline" data-testid="diff-inline" hidden></div>
+  </section>
+</div>
+
+<!-- Help modal is built at runtime by the shared jbcModal primitive
+     (lib/modal.js) from this hidden template. The <h2> title is
+     supplied via jbcModal's `title` option, so it is not repeated here. -->
+<template id="help-body">
+    <p>Everything runs locally in your browser — nothing you type or paste here is ever sent anywhere.</p>
+    <ul>
+      <li><strong>Paste two texts.</strong> Put the original in <strong>A</strong> and the changed version in <strong>B</strong>. The diff updates live as you type. <strong>⇄</strong> swaps the two sides.</li>
+      <li><strong>Line diff.</strong> A hand-rolled Myers diff aligns the two texts line by line and marks each line <span class="lg lg-add">added</span>, <span class="lg lg-del">removed</span>, or <span class="lg lg-chg">changed</span>. Changed lines also get a <strong>word-level</strong> highlight showing exactly what differs within the line.</li>
+      <li><strong>Views.</strong> <strong>Side-by-side</strong> shows A and B in two aligned columns; <strong>Inline</strong> shows one column of <code>+</code>/<code>−</code> lines (a unified view). Toggle between them any time.</li>
+      <li><strong>Options.</strong> <em>Ignore leading/trailing whitespace</em>, <em>ignore all whitespace</em>, and <em>ignore case</em> change what counts as equal — the text shown always stays exactly as you entered it.</li>
+      <li><strong>Stats.</strong> The line above the diff summarizes how many lines were added, removed, and changed.</li>
+      <li><strong>Copy unified diff (📋).</strong> Copies a standard <code>--- / +++ / @@</code> unified diff with 3 lines of context — ready to paste into a patch, a review, or a commit.</li>
+    </ul>
+    <p class="help-note">Your two texts, the view mode, and the options are remembered on this device, so reopening the tool picks up where you left off.</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invisible Chars</title>
+<meta property="og:title"       content="Invisible Chars">
+<meta property="og:description" content="Find, reveal, and strip invisible, zero-width, bidi, and look-alike Unicode in pasted text — all local in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-alt: #f0f0f4;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --focus: #2f6fed;
+    --radius: 8px;
+
+    /* jbcModal (Help dialog) theming — reuse this tool's tokens (they redefine
+       per theme, so this one block covers light + dark). */
+    --jbcm-bg: var(--panel);
+    --jbcm-fg: var(--text);
+    --jbcm-border: var(--border);
+    --jbcm-radius: var(--radius);
+    --jbcm-focus: var(--focus);
+    --jbcm-max-width: 32rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* confirmDialog theming — highlighted "Yes" reads as a filled primary. */
+    --ctc-accent: #2f6fed;
+    --ctc-accent-fg: #ffffff;
+    --ctc-bg: #ffffff;
+    --ctc-fg: #1c1c1f;
+    --ctc-cancel-border: #b6b6bd;
+    --ctc-focus: #2f6fed;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-alt: #2a2a30;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --focus: #6d9bff;
+
+      --ctc-accent: #6d9bff;
+      --ctc-accent-fg: #0b1220;
+      --ctc-bg: #202024;
+      --ctc-fg: #eceef1;
+      --ctc-cancel-border: #46464d;
+      --ctc-focus: #6d9bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Invisible Chars</h1>
+        <p class="subtitle">Find, reveal, and strip invisible, zero-width, bidi, and look-alike Unicode in pasted text. Everything stays in your browser.</p>
+      </div>
+      <button id="help-button" type="button" class="help-button" data-testid="help-button" title="How it works" aria-label="How it works">?</button>
+    </div>
+  </header>
+
+  <!-- ==================== Input ======================================== -->
+  <section class="card" data-testid="card-input" aria-labelledby="input-heading">
+    <div class="card-head">
+      <h2 id="input-heading">Input</h2>
+      <p class="card-blurb">Paste suspect text. Your text is analysed here only and is never saved or sent anywhere.</p>
+    </div>
+    <div class="field grow">
+      <label for="input" class="visually-hidden">Input text</label>
+      <textarea id="input" data-testid="input" spellcheck="false" autocomplete="off" placeholder="Paste text to inspect…"></textarea>
+    </div>
+    <div class="actions-row">
+      <button type="button" id="load-sample" data-testid="load-sample">Load sample</button>
+      <button type="button" id="input-clear" data-testid="input-clear">Clear</button>
+      <label class="checkbox"><input type="checkbox" id="show-confusables" data-testid="show-confusables"><span>Flag look-alike letters (confusables)</span></label>
+    </div>
+  </section>
+
+  <!-- ==================== Stats ======================================== -->
+  <section class="card" data-testid="card-stats" aria-labelledby="stats-heading">
+    <div class="card-head">
+      <h2 id="stats-heading">Summary</h2>
+    </div>
+    <p class="summary" data-testid="summary" role="status" aria-live="polite"></p>
+    <div class="stats-grid" data-testid="stats-grid"></div>
+    <div class="banner banner-warn" data-testid="mixed-banner" role="alert" hidden></div>
+    <div class="banner banner-info" data-testid="hidden-banner" hidden></div>
+  </section>
+
+  <!-- ==================== Reveal + inspector =========================== -->
+  <section class="card" data-testid="card-reveal" aria-labelledby="reveal-heading">
+    <div class="card-head">
+      <h2 id="reveal-heading">Reveal</h2>
+      <p class="card-blurb">Every flagged code point is shown as a chip: a short tag and its code point. Click a chip to inspect it.</p>
+    </div>
+    <div class="reveal" data-testid="reveal" tabindex="0" role="region" aria-label="Input with flagged characters revealed"></div>
+    <p class="hint" data-testid="reveal-note" hidden></p>
+    <div class="inspector" data-testid="inspector" aria-live="polite">
+      <h3 class="sub-heading">Inspector</h3>
+      <p class="hint" data-testid="inspector-empty">Click a chip or a row below to inspect that character.</p>
+      <dl class="inspector-grid" data-testid="inspector-grid" hidden></dl>
+    </div>
+    <details class="flag-list" data-testid="flag-list">
+      <summary>All flagged characters</summary>
+      <div class="flag-table-wrap">
+        <table class="flag-table">
+          <thead><tr><th scope="col">Pos</th><th scope="col">Code point</th><th scope="col">Tag</th><th scope="col">Name</th><th scope="col">Category</th></tr></thead>
+          <tbody data-testid="flag-body"></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <!-- ==================== Clean ======================================== -->
+  <section class="card" data-testid="card-clean" aria-labelledby="clean-heading">
+    <div class="card-head">
+      <h2 id="clean-heading">Clean</h2>
+      <p class="card-blurb">Applied in this order: normalize, convert spaces, replace confusables, remove by category, collapse/trim.</p>
+    </div>
+
+    <div class="field">
+      <span class="field-label" id="normalize-label">Normalize</span>
+      <div class="segmented" role="group" aria-labelledby="normalize-label" data-testid="normalize-seg">
+        <button type="button" data-value="none" data-testid="normalize-none" aria-pressed="true">None</button>
+        <button type="button" data-value="NFC" data-testid="normalize-nfc" aria-pressed="false">NFC</button>
+        <button type="button" data-value="NFKC" data-testid="normalize-nfkc" aria-pressed="false">NFKC</button>
+      </div>
+      <p class="hint">Normalization does not remove invisible characters and does not map Cyrillic/Greek look-alikes to Latin. NFKC is lossy (superscripts, ligatures, fullwidth); keep it for identifiers and search keys, not prose.</p>
+    </div>
+    <div class="banner banner-info" data-testid="normalize-banner" hidden></div>
+
+    <fieldset class="checks-group">
+      <legend>Convert</legend>
+      <div class="checks">
+        <label class="checkbox"><input type="checkbox" id="opt-spaces" data-testid="opt-spaces"><span>Non-ASCII spaces to a normal space <span class="cat-count" data-testid="count-space"></span></span></label>
+        <label class="checkbox"><input type="checkbox" id="opt-separators" data-testid="opt-separators"><span>Line / paragraph separators to newline <span class="cat-count" data-testid="count-separator"></span></span></label>
+        <label class="checkbox"><input type="checkbox" id="opt-confusables" data-testid="opt-confusables"><span>Replace confusables with Latin <span class="cat-count" data-testid="count-confusable"></span></span></label>
+      </div>
+    </fieldset>
+    <div class="banner banner-warn" data-testid="confusable-warning" hidden></div>
+
+    <fieldset class="checks-group">
+      <legend>Remove</legend>
+      <div class="checks">
+        <label class="checkbox"><input type="checkbox" data-testid="strip-zerowidth" data-strip="zerowidth"><span>Zero-width <span class="cat-count" data-testid="strip-count-zerowidth"></span></span></label>
+        <label class="checkbox"><input type="checkbox" data-testid="strip-bidi" data-strip="bidi"><span>Bidi controls <span class="cat-count" data-testid="strip-count-bidi"></span></span></label>
+        <label class="checkbox"><input type="checkbox" data-testid="strip-format" data-strip="format"><span>Format / misc <span class="cat-count" data-testid="strip-count-format"></span></span></label>
+        <label class="checkbox"><input type="checkbox" data-testid="strip-variation" data-strip="variation"><span>Variation selectors (VS17-256) <span class="cat-count" data-testid="strip-count-variation"></span></span></label>
+        <label class="checkbox"><input type="checkbox" data-testid="strip-tag" data-strip="tag"><span>Tag characters <span class="cat-count" data-testid="strip-count-tag"></span></span></label>
+        <label class="checkbox"><input type="checkbox" data-testid="strip-filler" data-strip="filler"><span>Fillers <span class="cat-count" data-testid="strip-count-filler"></span></span></label>
+        <label class="checkbox"><input type="checkbox" data-testid="strip-control" data-strip="control"><span>Control characters <span class="cat-count" data-testid="strip-count-control"></span></span></label>
+        <label class="checkbox"><input type="checkbox" data-testid="strip-vs1to16" data-strip="vs1to16"><span>Variation selectors 1-16 <span class="cat-count" data-testid="strip-count-vs1to16"></span></span></label>
+        <label class="checkbox"><input type="checkbox" id="opt-preserve-emoji" data-testid="opt-preserve-emoji"><span>Preserve emoji sequences (ZWJ, VS16)</span></label>
+      </div>
+      <p class="hint">ZWNJ matters in Persian and Indic scripts; removing it can change those words. Tag characters are always removable, even inside a flag emoji.</p>
+    </fieldset>
+
+    <fieldset class="checks-group">
+      <legend>Tidy</legend>
+      <div class="checks">
+        <label class="checkbox"><input type="checkbox" id="opt-collapse" data-testid="opt-collapse"><span>Collapse repeated spaces</span></label>
+        <label class="checkbox"><input type="checkbox" id="opt-trim" data-testid="opt-trim"><span>Trim ends</span></label>
+      </div>
+    </fieldset>
+
+    <div class="ct-field ct-field--multiline">
+      <label for="clean-output" class="visually-hidden">Cleaned text</label>
+      <textarea class="clean-output" id="clean-output" data-testid="clean-output" readonly spellcheck="false"></textarea>
+      <button type="button" class="ct-copy-btn" data-copy-target="clean-output" data-testid="clean-copy" aria-label="Copy cleaned text" title="Copy cleaned text">📋</button>
+    </div>
+    <p class="hint" data-testid="clean-stats"></p>
+    <div class="actions-row">
+      <button type="button" id="clean-and-copy" class="primary" data-testid="clean-and-copy">Clean &amp; copy</button>
+    </div>
+  </section>
+</div>
+
+<template id="help-body">
+    <p>Paste text and see exactly which code points are hiding in it. Everything runs locally in your browser; the text you paste is never sent anywhere and never saved (only your option choices are).</p>
+    <ul>
+      <li><strong>Reveal.</strong> Each flagged code point becomes a chip such as <code>ZWSP U+200B</code>. Chip colour shows the category. Look-alike letters show the Latin letter they imitate (<code>а U+0430 ~ a</code>). Words mixing Latin with Cyrillic or Greek are underlined.</li>
+      <li><strong>Inspector.</strong> Click a chip to see its name, code point, UTF-8 bytes, UTF-16 units, general category, and position. Hidden tag characters are decoded to the ASCII they smuggle.</li>
+      <li><strong>Clean.</strong> Choose what to remove or convert and copy the result. Spaces such as NBSP are converted, not deleted, so words are never glued together. Replacing confusables is off by default because it damages real Cyrillic or Greek text.</li>
+      <li><strong>Normalize.</strong> NFC and NFKC change how characters are composed. They do not remove zero-width or bidi characters and do not turn Cyrillic look-alikes into Latin, so they are not a substitute for cleaning.</li>
+      <li><strong>Emoji.</strong> A zero-width joiner between two emoji, and the variation selector after an emoji, are legitimate and kept by default.</li>
+    </ul>
+    <p class="help-note">The confusables table is a curated subset (about 70 common look-alikes), not the full Unicode list; it is a hint, not a guarantee. Names are bundled only for the characters this tool knows about.</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

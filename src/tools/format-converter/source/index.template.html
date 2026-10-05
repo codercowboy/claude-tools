@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Format Converter</title>
+<meta property="og:title"       content="Format Converter">
+<meta property="og:description" content="Convert between JSON, CSV, TSV, YAML, .properties, and XML — parse one, emit another, all local in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-alt: #f0f0f4;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --focus: #2f6fed;
+    --radius: 8px;
+    /* confirmDialog accent (docs/conventions.md "Destructive actions") */
+    --ctc-accent: #2f6fed;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-alt: #2a2a30;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --focus: #6d9bff;
+      --ctc-accent: #6d9bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Format Converter</h1>
+        <p class="subtitle">Convert between JSON, CSV, TSV, YAML, .properties, and XML — all local, nothing leaves your browser.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <!-- Formats + contextual options share one card. -->
+  <section class="setup-card" data-testid="setup-card" aria-label="Conversion setup">
+    <div class="format-bar">
+      <div class="field">
+        <label for="from-format">From</label>
+        <select id="from-format" data-testid="from-format" class="format-select">
+          <option value="auto">Auto-detect</option>
+          <option value="json">JSON</option>
+          <option value="csv">CSV</option>
+          <option value="tsv">TSV</option>
+          <option value="yaml">YAML</option>
+          <option value="properties">.properties</option>
+          <option value="xml">XML</option>
+        </select>
+      </div>
+      <button type="button" class="swap-btn" id="swap-btn" data-testid="swap-btn" title="Swap source and target" aria-label="Swap source and target">&#8646;</button>
+      <div class="field">
+        <label for="to-format">To</label>
+        <select id="to-format" data-testid="to-format" class="format-select">
+          <option value="json">JSON</option>
+          <option value="csv">CSV</option>
+          <option value="tsv">TSV</option>
+          <option value="yaml">YAML</option>
+          <option value="properties">.properties</option>
+          <option value="xml">XML</option>
+        </select>
+      </div>
+    </div>
+    <p class="detect-status" data-testid="detect-status" role="status" aria-live="polite"></p>
+
+    <div class="options-block" data-testid="options" aria-label="Conversion options">
+      <p class="options-title">Options</p>
+      <div class="options-groups">
+        <!-- CSV / TSV -->
+        <div class="opt-group" data-testid="opt-group-csv" hidden>
+          <div class="field">
+            <label for="opt-delimiter">Delimiter</label>
+            <input type="text" id="opt-delimiter" data-testid="opt-delimiter" class="opt-narrow" value="," maxlength="4" autocomplete="off" spellcheck="false">
+          </div>
+          <label class="opt-inline">
+            <input type="checkbox" id="opt-header" data-testid="opt-header" checked>
+            <span>Header row</span>
+          </label>
+        </div>
+
+        <!-- JSON / YAML indent -->
+        <div class="opt-group" data-testid="opt-group-indent" hidden>
+          <div class="field">
+            <label for="opt-indent">Indent</label>
+            <select id="opt-indent" data-testid="opt-indent" class="opt-select">
+              <option value="0">Minified</option>
+              <option value="2" selected>2 spaces</option>
+              <option value="4">4 spaces</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- XML -->
+        <div class="opt-group" data-testid="opt-group-xml" hidden>
+          <div class="field">
+            <label for="opt-xml-root">Root element</label>
+            <input type="text" id="opt-xml-root" data-testid="opt-xml-root" class="opt-narrow" value="root" autocomplete="off" spellcheck="false">
+          </div>
+          <label class="opt-inline">
+            <input type="checkbox" id="opt-xml-attrs" data-testid="opt-xml-attrs">
+            <span>Primitives as attributes</span>
+          </label>
+          <label class="opt-inline">
+            <input type="checkbox" id="opt-xml-decl" data-testid="opt-xml-decl" checked>
+            <span>XML declaration</span>
+          </label>
+        </div>
+
+        <!-- .properties -->
+        <div class="opt-group" data-testid="opt-group-properties" hidden>
+          <label class="opt-inline">
+            <input type="checkbox" id="opt-props-unicode" data-testid="opt-props-unicode">
+            <span>Escape non-ASCII as \uXXXX</span>
+          </label>
+        </div>
+
+        <p class="opt-empty" data-testid="opt-empty" hidden>No options for this conversion.</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="error" data-testid="error" role="alert" aria-live="assertive" hidden></p>
+
+  <div class="io-grid">
+    <div class="io-col">
+      <div class="io-head">
+        <h2>Input</h2>
+        <div class="io-actions">
+          <button type="button" id="sample-btn" data-testid="sample-btn" title="Load a sample document" aria-label="Load a sample document">Sample</button>
+          <button type="button" id="clear-btn" data-testid="clear-btn" title="Clear the input" aria-label="Clear the input">Clear</button>
+        </div>
+      </div>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="input" data-testid="input" spellcheck="false" placeholder="Paste or type your document here..." aria-label="Input document"></textarea>
+        <button type="button" class="ct-copy-btn" id="input-copy-btn" data-testid="input-copy-btn" title="Copy input" aria-label="Copy input" hidden>&#128203;</button>
+      </div>
+    </div>
+
+    <div class="io-col">
+      <div class="io-head">
+        <h2>Output</h2>
+      </div>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="output" data-testid="output" readonly spellcheck="false" placeholder="Converted output appears here." aria-label="Converted output"></textarea>
+        <button type="button" class="ct-copy-btn" id="copy-btn" data-testid="copy-btn" title="Copy output" aria-label="Copy output">&#128203;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Help modal is built at runtime by the shared jbcModal primitive
+     (lib/modal.js) from this hidden template. The <h2> title is
+     supplied via jbcModal's `title` option, so it is not repeated here. -->
+<template id="help-body">
+    <p>Convert a document between <strong>JSON</strong>, <strong>CSV</strong>, <strong>TSV</strong>, <strong>YAML</strong>, <strong>.properties</strong>, and <strong>XML</strong>. Everything runs locally in your browser — nothing you paste is ever sent anywhere.</p>
+    <ul>
+      <li><strong>Pick From &amp; To.</strong> Choose the source format (or <strong>Auto-detect</strong>) and the target format. The output updates live as you type. <strong>&#8646;</strong> swaps the two.</li>
+      <li><strong>How nesting maps.</strong> JSON, YAML, and XML represent nested trees natively. <strong>CSV/TSV</strong> are tabular — they map to/from an <em>array of row objects</em> (first row = headers). <strong>.properties</strong> is flat — nested objects map to/from <em>dotted keys</em> (<code>a.b.c=…</code>), and arrays use numeric segments (<code>list.0=…</code>).</li>
+      <li><strong>Options</strong> change to match the conversion: CSV/TSV <strong>delimiter</strong> and <strong>header row</strong>; JSON/YAML <strong>indent</strong>; XML <strong>root element</strong>, an attributes-vs-child-elements strategy, and a declaration toggle; and <strong>.properties</strong> unicode escaping.</li>
+      <li><strong>YAML support</strong> is a practical common subset (block maps/sequences, flow <code>[…]</code>/<code>{…}</code>, quoted &amp; typed scalars, <code>|</code>/<code>&gt;</code> block scalars, comments). Advanced YAML — anchors, aliases, tags, merge keys, multiple documents — is refused with a clear message rather than mis-parsed.</li>
+      <li><strong>Errors.</strong> Invalid input or an impossible mapping (e.g. a nested object into a single CSV table) shows a friendly message instead of crashing.</li>
+      <li><strong>Copy</strong> puts the output on your clipboard.</li>
+    </ul>
+    <p class="help-note">Your input, format choices, and options are remembered on this device, so reopening the tool picks up where you left off.</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

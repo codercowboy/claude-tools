@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASCII / Unicode Art Converter</title>
+<meta property="og:title"       content="ASCII / Unicode Art Converter">
+<meta property="og:description" content="Turn an image into ASCII, Unicode half-block, braille or colored ANSI text art — entirely in your browser. Export as TXT, HTML or ANSI.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-2: #f0f0f3;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --focus: #2f6fed;
+    --radius: 8px;
+    /* preview surface (independent of page theme; toggled by the tool) */
+    --preview-bg: #0b0b0e;
+    --preview-fg: #d6d6da;
+    --preview-font: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-2: #26262b;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --focus: #6d9bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>ASCII / Unicode Art Converter</h1>
+        <p class="subtitle">Turn an image into ASCII, Unicode half-block (▀), braille (⠿) or colored ANSI text — all local, nothing leaves your browser.</p>
+      </div>
+      <button id="help-button" type="button" class="help-button" data-testid="help-button" title="How it works" aria-label="How it works">?</button>
+    </div>
+  </header>
+
+  <label class="dropzone" for="fileInput" data-testid="dropzone">
+    <input type="file" id="fileInput" data-testid="file-input" accept="image/*" class="visually-hidden">
+    <span>Drop an image here, or click to choose one</span>
+    <span class="dropzone-hint">PNG · JPEG · WebP · GIF · BMP · SVG — rendered as text art</span>
+  </label>
+
+  <p class="error" data-testid="error" role="alert" hidden></p>
+
+  <section class="loaded" data-testid="loaded-section" hidden>
+    <div class="file-info" data-testid="original-info">
+      <span class="file-name" data-testid="original-name"></span>
+      <span aria-hidden="true">&middot;</span>
+      <span class="file-dims" data-testid="original-dims"></span>
+      <span aria-hidden="true">&middot;</span>
+      <span class="file-size" data-testid="original-size"></span>
+      <span aria-hidden="true">&middot;</span>
+      <span class="file-mime" data-testid="original-type"></span>
+      <button type="button" data-testid="remove-file-btn" aria-label="Remove image" title="Remove image">✕</button>
+    </div>
+
+    <div class="work">
+      <div class="controls" data-testid="controls">
+
+        <div class="field">
+          <span class="group-label">Mode</span>
+          <div class="seg" role="group" aria-label="Render mode" data-testid="mode-seg">
+            <button type="button" data-mode="ascii" data-value="ascii" data-testid="mode-ascii" aria-pressed="true">ASCII</button>
+            <button type="button" data-mode="halfblock" data-value="halfblock" data-testid="mode-halfblock" aria-pressed="false">Half-block</button>
+            <button type="button" data-mode="braille" data-value="braille" data-testid="mode-braille" aria-pressed="false">Braille</button>
+          </div>
+          <p class="hint" data-testid="mode-note"></p>
+        </div>
+
+        <div class="field ramp-field" data-testid="ramp-field">
+          <label for="rampPreset">Character ramp</label>
+          <div class="ramp-row">
+            <select id="rampPreset" data-testid="ramp-preset">
+              <option value="standard">Standard</option>
+              <option value="detailed">Detailed (70)</option>
+              <option value="blocks">Block shades</option>
+              <option value="simple">Simple</option>
+              <option value="binary">Binary</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <input type="text" id="rampText" data-testid="ramp-text" spellcheck="false" autocomplete="off" aria-label="Ramp characters (dark to light)">
+          </div>
+          <p class="hint">Dark&nbsp;→&nbsp;light. Edit freely; first char = darkest pixel.</p>
+        </div>
+
+        <div class="field braille-field" data-testid="braille-field" hidden>
+          <fieldset class="subgroup">
+            <legend>Braille dots</legend>
+            <div class="slider-field">
+              <label for="thresholdRange">Threshold <span class="val" data-testid="threshold-value">128</span></label>
+              <input type="range" id="thresholdRange" data-testid="threshold-range" min="0" max="255" value="128">
+            </div>
+            <div class="field">
+              <label for="ditherSelect">Dither</label>
+              <select id="ditherSelect" data-testid="dither-select">
+                <option value="none">None (threshold)</option>
+                <option value="bayer">Ordered (Bayer 4×4)</option>
+                <option value="floyd">Floyd–Steinberg</option>
+              </select>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="field">
+          <label class="checkbox-row">
+            <input type="checkbox" id="colorToggle" data-testid="color-toggle">
+            <span>Color (per-cell)</span>
+          </label>
+          <p class="hint" data-testid="color-note">Half-block is always colored. Color shows in the HTML and ANSI exports.</p>
+        </div>
+
+        <div class="field" data-testid="ansi-depth-field">
+          <label for="ansiDepth">ANSI color depth</label>
+          <select id="ansiDepth" data-testid="ansi-depth">
+            <option value="256">256-color (safe)</option>
+            <option value="truecolor">Truecolor (24-bit)</option>
+          </select>
+        </div>
+
+        <div class="field slider-field">
+          <label for="widthRange">Output width <span class="val"><span data-testid="width-value">100</span> chars</span></label>
+          <input type="range" id="widthRange" data-testid="width-range" min="16" max="300" value="100">
+        </div>
+
+        <fieldset class="subgroup">
+          <legend>Adjust</legend>
+          <div class="slider-field">
+            <label for="brightnessRange">Brightness <span class="val" data-testid="brightness-value">0</span></label>
+            <input type="range" id="brightnessRange" data-testid="brightness-range" min="-100" max="100" value="0">
+          </div>
+          <div class="slider-field">
+            <label for="contrastRange">Contrast <span class="val" data-testid="contrast-value">0</span></label>
+            <input type="range" id="contrastRange" data-testid="contrast-range" min="-100" max="100" value="0">
+          </div>
+          <div class="slider-field">
+            <label for="gammaRange">Gamma <span class="val" data-testid="gamma-value">1.0</span></label>
+            <input type="range" id="gammaRange" data-testid="gamma-range" min="0.2" max="3" step="0.1" value="1">
+          </div>
+          <div class="slider-field">
+            <label for="aspectRange">Char aspect <span class="val" data-testid="aspect-value">2.0</span></label>
+            <input type="range" id="aspectRange" data-testid="aspect-range" min="1" max="3" step="0.1" value="2">
+          </div>
+          <label class="checkbox-row">
+            <input type="checkbox" id="invertToggle" data-testid="invert-toggle">
+            <span>Invert</span>
+          </label>
+        </fieldset>
+
+        <div class="actions-row">
+          <button type="button" id="resetBtn" data-testid="reset-btn">Reset</button>
+        </div>
+      </div>
+
+      <div class="preview">
+        <div class="preview-toolbar">
+          <span data-testid="output-stats">—</span>
+          <label class="bg-toggle">
+            <input type="checkbox" id="lightPreview" data-testid="light-preview-toggle">
+            <span>Light background</span>
+          </label>
+        </div>
+
+        <div class="preview-box is-empty" data-testid="preview-box">
+          <span data-testid="preview-empty">Load an image to see the art.</span>
+        </div>
+
+        <div class="export-group" data-testid="export-group">
+          <div class="export-line">
+            <span class="export-label">Text</span>
+            <button type="button" data-testid="copy-txt-btn" disabled>Copy .txt</button>
+            <button type="button" data-testid="download-txt-btn" disabled>Download .txt</button>
+          </div>
+          <div class="export-line">
+            <span class="export-label">HTML</span>
+            <button type="button" data-testid="copy-html-btn" disabled>Copy HTML</button>
+            <button type="button" data-testid="download-html-btn" disabled>Download .html</button>
+          </div>
+          <div class="export-line">
+            <span class="export-label">ANSI</span>
+            <button type="button" data-testid="copy-ansi-btn" disabled>Copy ANSI</button>
+            <button type="button" data-testid="download-ansi-btn" disabled>Download .ans</button>
+          </div>
+          <p class="stat-note"><strong>Image only, for now.</strong> Video → text animation is a planned follow-up. ANSI pastes into a terminal; 256-color is the safe default, truecolor needs a capable terminal.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Help modal is built at runtime by the shared jbcModal primitive
+     (components/CtModal.mjs) from this hidden template. The <h2> title is
+     supplied via jbcModal's `title` option, so it is not repeated here. -->
+<template id="help-body">
+    <p>Everything runs locally in your browser — the image never leaves your device. It's sampled down with the browser's own <code>&lt;canvas&gt;</code> and turned into text.</p>
+    <ul>
+      <li><strong>Load an image.</strong> Drop a file on the dropzone or click to pick one. A live preview appears.</li>
+      <li><strong>ASCII (ramp).</strong> Each character comes from a brightness ramp (dense char = dark pixel). Choose a preset or edit the ramp — the first character maps to the darkest pixel.</li>
+      <li><strong>Half-block (▀).</strong> Each character stacks <strong>two</strong> vertical pixels as two colors, doubling vertical resolution. Always colored.</li>
+      <li><strong>Braille (⠿).</strong> Each character packs a <strong>2×4 dot</strong> cell — the highest resolution. Use the <strong>threshold</strong> and <strong>dither</strong> (ordered / Floyd–Steinberg) to decide which dots ink.</li>
+      <li><strong>Color &amp; ANSI.</strong> Turn on <strong>Color</strong> to carry per-cell color into the HTML and ANSI exports. Pick <strong>256-color</strong> (safe) or <strong>truecolor</strong> ANSI.</li>
+      <li><strong>Tune it.</strong> Output width, brightness, contrast, gamma, invert, and a char-aspect correction (characters are ~2:1) all update live.</li>
+      <li><strong>Export.</strong> Copy or download as <strong>.txt</strong>, self-contained <strong>.html</strong> (colored), or <strong>.ans</strong> (ANSI escapes for a terminal).</li>
+    </ul>
+    <p class="help-note"><strong>Notes.</strong> Image only for now (video → text animation is planned). Your settings are remembered on this device — never the images themselves.</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

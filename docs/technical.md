@@ -10,16 +10,16 @@ Claude (Anthropic) wrote nearly all of the code and docs. [Jason Baker](https://
 
 claude-tools is a portfolio of single-file, [vanilla-JS](https://developer.mozilla.org/en-US/docs/Web/JavaScript) web tools. The shipped artifact for every tool is one self-contained `index.html` that opens straight from `file://` with no build step, no server, no [CDN](https://developer.mozilla.org/en-US/docs/Glossary/CDN), and no runtime dependencies. Everything else in the repo exists only to author, assemble, and test those files.
 
-A tool that has outgrown comfortable hand-authoring is written under a `source/` folder and assembled back into one `index.html` by a shared, dependency-free build. The repo has a single [npm](https://www.npmjs.com/) `package.json`, at its root: the tools themselves carry no manifest, and the dev/test dependencies ([Playwright](https://playwright.dev) and a couple of test oracles) install once into one root `node_modules`. Two shared directories hold the common pieces: `jbc-include/` for HTML/CSS/JS the build inlines into the shipped files, and `test-support/` for test helpers the tools import. Testing runs in two layers: fast [`node --test`](https://nodejs.org/api/test.html) unit tests against each tool's pure engine, and Playwright end-to-end tests that drive the built `index.html` in a real browser.
+A tool that has outgrown comfortable hand-authoring is written under a `source/` folder and assembled back into one `index.html` by a shared, dependency-free build. The repo has a single [npm](https://www.npmjs.com/) `package.json`, at its root: the tools themselves carry no manifest, and the dev/test dependencies ([Playwright](https://playwright.dev) and a couple of test oracles) install once into one root `node_modules`. A shared library under `src/lib/` holds the common pieces: `Ct*`-prefixed ESM modules in `components/` and `utils/` that the build inlines into the shipped files, and test helpers in `src/lib/test-support/` that the tools import. Testing runs in two layers: fast [`node --test`](https://nodejs.org/api/test.html) unit tests against each tool's pure engine, and Playwright end-to-end tests that drive the built `index.html` in a real browser.
 
 ```mermaid
 flowchart TB
   subgraph Author["authoring (never ships)"]
     T["source/index.template.html<br/>+ source/*.mjs, *.css"]
-    Inc["src/tools/jbc-include/<br/>shared HTML · CSS · JS"]
+    Inc["src/lib/<br/>Ct* modules · styles · footer"]
   end
   T -->|"&lt;&lt;ct:inline NAME&gt;&gt;"| Build
-  Inc -->|"&lt;&lt;ct:include NAME&gt;&gt;"| Build
+  Inc -->|"&lt;&lt;ct:lib&gt;&gt; / &lt;&lt;ct:module&gt;&gt;"| Build
   Build["scripts/build-tool.mjs<br/>token expansion"] --> Out["index.html<br/>(committed, self-contained)"]
   Out -->|"file://"| Browser["a modern browser"]
   Out -->|"drives"| E2E["Playwright e2e<br/>tests/*.e2e.mjs"]
@@ -34,7 +34,7 @@ The rest of this doc walks each piece: the build pipeline, how the dependencies 
 
 ### The shipped `index.html`
 
-The product. One self-contained file per tool, plus a landing-gallery `index.html` at `src/tools/`. It carries its own HTML, CSS, and JavaScript inline, runs entirely client-side, and works from `file://` or any static host. The nine tools are `base64-tool`, `color-converter`, `color-designer`, `color-picker`, `cron-builder`, `inflation-calculator`, `network-toolkit`, `qr-generator`, and `uuid-generator`.
+The product. One self-contained file per tool, plus a landing-gallery `index.html` at `src/gallery/`. It carries its own HTML, CSS, and JavaScript inline, runs entirely client-side, and works from `file://` or any static host. The twenty-two tools are `ascii-art`, `barcode-generator`, `base64-tool`, `batch-watermark`, `color-converter`, `color-designer`, `color-picker`, `cron-builder`, `diff-viewer`, `dither-studio`, `format-converter`, `hasher`, `hat-picker`, `http-headers`, `inflation-calculator`, `invisible-chars`, `markdown-previewer`, `network-toolkit`, `pretty-printer`, `qr-generator`, `social-card-maker`, and `uuid-generator`.
 
 ### `source/` — the authoring form
 
@@ -51,28 +51,29 @@ A handful of small Node scripts, all dependency-free, run from the repo root. `c
 | `test-all.mjs` | `ct test` / root `npm run test:all` | runs the `src/lib` unit tests + every tool's e2e suite, or one tool's unit + e2e |
 | `serve.mjs` | `ct serve` / root `npm run serve` | a tiny static server for a tool (or any dir) over `http://` |
 
-### `jbc-include/` and `test-support/` — the shared pieces
+### `src/lib/` — the shared library
 
-`src/tools/jbc-include/` holds shared HTML/CSS/JS the build inlines into the shipped files. `src/tools/test-support/` holds dev-only test helpers the tools import. Neither is special-cased anywhere: the build resolves include tokens against `jbc-include/`, and the tools reach `test-support/` by a relative path. Both get their own sections below.
+`src/lib/` holds the shared library. Its `components/` and `utils/` subdirectories hold the `Ct*`-prefixed ESM modules and the CSS/HTML the build inlines into the shipped files, and `src/lib/test-support/` holds dev-only test helpers the tools import. The build resolves `<<ct:lib>>` and `<<ct:module>>` tokens against `src/lib/`, and the tools reach `test-support/` by a relative path. Both get their own sections below.
 
-The design principle under all of it: the shipped `index.html` is the only thing that ships. `source/`, `scripts/`, `jbc-include/`, `test-support/`, `tests/`, and `node_modules/` are authoring and dev scaffolding, not part of what a tool ships.
+The design principle under all of it: the shipped `index.html` is the only thing that ships. `source/`, `scripts/`, `src/lib/`, `tests/`, and `node_modules/` are authoring and dev scaffolding, not part of what a tool ships.
 
 ---
 
 ## The build pipeline
 
-The build is one shared, dependency-free script (`scripts/build-tool.mjs`) that expands tokens in a template into a single file. A template, and any source file it pulls in, may contain two tokens:
+The build is one shared, dependency-free script (`scripts/build-tool.mjs`) that expands tokens in a template into a single file. A template, and any source file it pulls in, may contain these tokens:
 
-- `<<ct:include NAME>>` inlines a shared include from `src/tools/jbc-include/NAME` (for example `base.css`, `footer.html`, `copy.js`).
-- `<<ct:inline NAME>>` inlines the tool's own source file `source/NAME` (for example `styles.css`, `app.mjs`, `logic.mjs`).
+- `<<ct:lib PATH>>` pastes a library file verbatim, PATH relative to `src/lib/` (for example `components/styles/base.css`, `components/footer.html`).
+- `<<ct:module PATH>>` ESM-inlines a library module and its relative imports, PATH relative to `src/lib/` (for example `utils/CtUtil.mjs`, `components/CtLicense.mjs`). Each module becomes its own IIFE scope so top-level names never collide, and shared dependencies are inlined once.
+- `<<ct:inline NAME>>` inlines the tool's own source file `source/NAME` (for example `styles.css`, `app.mjs`, `logic.mjs`), flattening any bare relative library imports it carries.
 
 Expansion runs in repeated passes (capped at 20, which guards against a file that includes itself), so an inlined file may itself contain tokens. In `qr-generator`, for instance, the template inlines `app.mjs`, and `app.mjs` in turn holds `<<ct:inline logic.mjs>>` where the pure engine slots in. If any token is still unresolved after the cap, the build throws rather than emitting a half-built file.
 
 ```
   source/index.template.html
-        │   <<ct:include base.css>>   ── from src/tools/jbc-include/
-        │   <<ct:inline  styles.css>> ── from this tool's source/
-        │   <<ct:inline  app.mjs>>    ── which itself holds <<ct:inline logic.mjs>>
+        │   <<ct:lib    components/styles/base.css>> ── from src/lib/
+        │   <<ct:inline styles.css>>                 ── from this tool's source/
+        │   <<ct:inline app.mjs>>                    ── which itself holds <<ct:inline logic.mjs>>
         ▼   (expanded repeatedly, up to 20 passes)
      index.html   (banner inserted right after the doctype)
 ```
@@ -84,9 +85,9 @@ Every generated file gets a banner inserted immediately after the doctype, so it
 <!-- GENERATED FILE — do not edit directly. Author in source/, then run: npm run build (see docs/conventions.md § Build-assembled tools) -->
 ```
 
-`scripts/build-all.mjs` discovers what to build: it walks `src/tools/`, treats any directory that has `source/index.template.html` as a build target, and also builds the landing gallery at `src/tools/source/index.template.html`. All nine tools plus the gallery are build-assembled today. `npm run build` writes every `index.html`; `npm run build:check` (which passes `--check`) rebuilds in memory and exits non-zero if any committed `index.html` differs from what the current source produces. That check is how the repo keeps a committed file from drifting away from its source.
+`scripts/build-all.mjs` discovers what to build: it walks `src/tools/`, treats any directory that has `source/index.template.html` as a build target, and also builds the landing gallery at `src/gallery/source/index.template.html`. All twenty-two tools plus the gallery are build-assembled today. `npm run build` writes every `index.html`; `npm run build:check` (which passes `--check`) rebuilds in memory and exits non-zero if any committed `index.html` differs from what the current source produces. That check is how the repo keeps a committed file from drifting away from its source.
 
-Include tokens resolve against `src/tools/jbc-include/`, the builder's `INCLUDE_DIR`. There's also a sibling `src/tools/include/` reserved for shared assets specific to claude-tools, but it's currently empty (a README only): every shared asset in use today came from [jason-code](https://github.com/codercowboy) and lives vendored in `jbc-include/`.
+Library tokens resolve against `src/lib/`, the builder's lib dir (overridable with `$JC_LIB_DIR`, so a consuming repo can pull the library from a different location than its tools). The legacy flat-include token `<<ct:include>>` is retired: the old include directory is gone, and tools use `<<ct:lib>>` / `<<ct:module>>` instead.
 
 ---
 
@@ -128,20 +129,22 @@ The single install has one consequence worth naming: Playwright runs one instanc
 
 ---
 
-## Shared assets — `jbc-include` and `test-support`
+## Shared assets — `src/lib`
 
-### `jbc-include/` — inlined shared HTML/CSS/JS
+### `components/` and `utils/` — the inlined library
 
-These are the shared pieces the build pastes into shipped files. The current set: `base.css`, `controls.css`, `gallery.css`, `footer.html`, `confirm.js`, `copy.js`, `crc32.js`, `license.js`, `util.js`, and `readme-footer.md`. A tool pulls what it needs with `<<ct:include NAME>>`, and the build always inlines the current canonical file, so there's no manual paste-and-hash step to keep in sync.
+These are the shared pieces the build pastes into shipped files. `components/` carries the UI library: `Ct*` ESM modules (`CtClipboardUtil`, `CtComponents`, `CtConfirm`, `CtLicense`, `CtModal`), the `footer.html` partial, and the `styles/` CSS (`base.css`, `controls.css`, `gallery.css`, `widgets.css`). `utils/` carries the logic library: `CtByteUtil`, `CtDateTimeUtil`, `CtUtil`, `CtZipUtil`, plus the `formats/` and `image/` submodules. A tool pulls what it needs with `<<ct:lib>>` for a verbatim CSS/HTML file or `<<ct:module>>` for an ESM module, and the build always inlines the current canonical file, so there's no manual paste-and-hash step to keep in sync.
 
 ### `test-support/` — imported dev-only test helpers
 
-These are dev/test-only [ESM](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) helpers a tool's tests *import*. They're never inlined into a shipped `index.html` and never ship. `test-support/` sits one level above the tool directories, so a tool reaches it by a relative path from its `tests/` folder. What's there:
+These are dev/test-only [ESM](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) helpers a tool's tests *import*. They're never inlined into a shipped `index.html` and never ship. `test-support/` lives under `src/lib/`, so a tool reaches it by a relative path from its `tests/` folder (for example `../../../lib/test-support/setup.mjs`). The core ones:
 
 - `setup.mjs` — e2e navigation and first-load setup: `toolUrl()` resolves the built `index.html` as a `file://` URL, and `seedHelpSeen()` sets the help-seen flag before the page's own script runs so the Help popup doesn't open over assertions.
 - `unit.mjs` — `loadLogic()`, a memoized dynamic import of the tool's `source/logic.mjs`, so unit tests import the pure engine directly.
 - `shared-ui.mjs` — `assertLicenseModal()`, the shared footer License-modal contract every tool's e2e suite reuses.
 - `playwright.base.config.mjs` — the base Playwright config, exported as a plain object (no `@playwright/test` import), so the shared dir needs no imports of its own. A tool spreads it into its own `defineConfig`, which imports `@playwright/test` (resolved from the root `node_modules`) and overrides only where it differs.
+
+Alongside these sit focused assertion helpers the e2e suites share where they need them: `storage.mjs` (localStorage), `clipboard.mjs` (copy-button stubs and reads), `layout.mjs` (overflow checks), `interaction.mjs` (modal a11y, drop dispatch), `files.mjs` (file upload), and `binary.mjs`.
 
 ---
 

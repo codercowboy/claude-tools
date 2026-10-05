@@ -1,0 +1,309 @@
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  h1 { font-size: 1.35rem; margin: 0 0 0.3rem; }
+  .subtitle { color: var(--text-muted); font-size: 0.9rem; margin: 0; line-height: 1.45; }
+  .subtitle code, .hint code, .help-note code, .jbcm-body code {
+    font-family: "Courier New", monospace;
+    font-size: 0.85em;
+    background: var(--panel-2);
+    padding: 0.05em 0.3em;
+    border-radius: 4px;
+  }
+  .muted { color: var(--text-muted); font-weight: 400; font-size: 0.85em; }
+
+  label { font-size: 0.9rem; font-weight: 600; }
+
+  .hint, .group-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin: 0.15rem 0 0;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+  .group-label { font-weight: 600; color: var(--text); display: block; margin: 0 0 0.4rem; }
+
+  input[type="text"],
+  input[type="number"],
+  textarea,
+  select {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding-block: 0.5rem;
+    padding-inline: 0.7rem;
+    width: 100%;
+  }
+  textarea { resize: vertical; line-height: 1.4; min-height: 3rem; }
+  /* select keeps its chevron room (base.css) — set with longhands, not shorthand */
+  select {
+    background-color: var(--panel);
+    padding-right: 2rem;
+  }
+
+  input:disabled, select:disabled, textarea:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+  /* Exclude confirm dialog buttons (.ctc-btn) and in-field copy (.ct-copy-btn)
+     so their own hover fills win — docs/conventions.md hover-specificity trap. */
+  button:hover:not(:disabled):not(.ctc-btn):not(.ct-copy-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+    font-weight: 600;
+  }
+  button.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  .dropzone:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header { display: flex; flex-direction: column; gap: 0.2rem; }
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .header-titles { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; line-height: 1;
+  }
+
+  /* ---------- Error ---------- */
+  .error {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Work grid ---------- */
+  .work {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (min-width: 960px) {
+    .work { grid-template-columns: minmax(340px, 420px) 1fr; }
+    .preview { position: sticky; top: 1rem; }
+  }
+
+  .controls { display: flex; flex-direction: column; gap: 1.1rem; min-width: 0; }
+
+  .field-group {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.9rem;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    background: var(--panel);
+  }
+  .field-group > legend {
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 0 0.4rem;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+  @media (max-width: 420px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  /* ---------- Color rows ---------- */
+  .color-row { display: flex; gap: 0.5rem; align-items: center; }
+  .color-row input[type="color"] {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--panel);
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .hex-text { font-family: "Courier New", monospace; text-transform: lowercase; flex: 1 1 auto; min-width: 0; }
+
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+  /* ---------- Segmented align controls ---------- */
+  .seg { display: flex; gap: 0.35rem; }
+  .seg button { flex: 1 1 0; font-weight: 600; padding: 0.45rem 0.3rem; }
+  .seg button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+  .seg button[aria-pressed="true"]:hover { background: var(--accent); }
+
+  /* ---------- Tune (details) ---------- */
+  details.tune {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.7rem;
+    background: var(--panel-2);
+  }
+  details.tune > summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.88rem;
+    list-style-position: inside;
+  }
+  details.tune[open] > summary { margin-bottom: 0.7rem; }
+
+  /* ---------- Dropzone ---------- */
+  .dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    text-align: center;
+    padding: 1.1rem 1rem;
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--panel-2);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+  .dropzone:hover { border-color: var(--accent); }
+  .dropzone.drag-over {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+    color: var(--text);
+  }
+  .dropzone > span:first-of-type { font-weight: 600; color: var(--text); font-size: 0.85rem; }
+  .dropzone-hint { font-size: 0.78rem; }
+  .remove-img { align-self: flex-start; font-size: 0.82rem; padding: 0.35rem 0.6rem; }
+
+  /* ---------- Custom size ---------- */
+  .dim-inputs { display: flex; align-items: flex-end; gap: 0.5rem; }
+  .dim { display: flex; flex-direction: column; gap: 0.3rem; flex: 1 1 0; min-width: 0; }
+  .dim label { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+  .dim-x { padding-bottom: 0.6rem; color: var(--text-muted); }
+
+  /* ---------- Output info / actions ---------- */
+  .output-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    padding: 0.6rem 0.7rem;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .output-info-label { font-weight: 600; color: var(--text); }
+
+  .actions-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+  .actions-row button { flex: 1 1 auto; }
+
+  /* ---------- Meta output ---------- */
+  #metaOutput {
+    font-family: "Courier New", monospace;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+    background: var(--panel-2);
+  }
+
+  /* ---------- Preview ---------- */
+  .preview { min-width: 0; }
+  .canvas-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    --ct-checker: var(--checker);
+    --ct-checker-size: 24px;
+    background-color: var(--panel);
+    padding: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 240px;
+    overflow: auto;
+  }
+  .canvas-wrap canvas {
+    max-width: 100%;
+    max-height: 78vh;
+    height: auto;
+    width: auto;
+    display: block;
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.22);
+  }
+
+  /* ---------- Help modal content ----------
+     The dialog chrome (overlay, surface, ✕, fade, focus-trap) is the shared
+     jbcModal primitive (shared lib components/CtModal.mjs), themed via the --jbcm-* tokens
+     in :root. Only the Help body's own typography is styled here. */
+  .jbcm-body p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .jbcm-body ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .jbcm-body li { margin-bottom: 0.4rem; }
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dropzone { transition: none; }
+  }
+
+  /* ---------- confirmDialog theming ---------- */
+  :root {
+    --ctc-accent: var(--accent);
+    --ctc-accent-fg: var(--accent-contrast);
+    --ctc-focus: var(--focus);
+  }

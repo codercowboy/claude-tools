@@ -1,0 +1,304 @@
+
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 1700px;
+    margin: 0 auto;
+    padding: 1.25rem 1.1rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-height: 100%;
+  }
+
+  h1 { font-size: 1.35rem; margin: 0 0 0.3rem; }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  /* ---------- Base controls ---------- */
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+
+  /* Exclude .ctc-btn so the confirm dialog's highlighted "Yes" keeps its fill
+     on hover (docs/conventions.md § hover specificity trap). */
+  button:hover:not(:disabled):not(.ctc-btn) {
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  }
+
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  button:focus-visible,
+  textarea:focus-visible,
+  #preview:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .toggle[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+  .toggle[aria-pressed="true"]:hover:not(:disabled):not(.ctc-btn) {
+    background: var(--accent);
+  }
+
+  /* ---------- Header ---------- */
+
+  .app-header { display: flex; flex-direction: column; gap: 0.2rem; }
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .header-titles { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; line-height: 1;
+  }
+
+  /* ---------- Toolbar ---------- */
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .toolbar button { font-weight: 600; }
+
+  /* ---------- Split pane ---------- */
+
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    flex: 1 1 auto;
+    min-height: 60vh;
+  }
+
+  /* Top/bottom (stacked) view: one column, two rows. The editor gets LESS
+     height (a smaller pane on top) and the preview MORE (the taller pane
+     below) via the 1fr / 2fr row split. */
+  .split.split--stacked {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 2fr;
+  }
+  .split.split--stacked #editor,
+  .split.split--stacked .editor-field { min-height: 140px; }
+  .split.split--stacked #preview { min-height: 260px; }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* The editor lives inside a .ct-field wrapper (for the in-field copy button);
+     make the wrapper the flexing child so the textarea still fills the pane. */
+  .editor-field {
+    flex: 1 1 auto;
+    display: flex;
+    min-height: 300px;
+  }
+  .editor-field > #editor { flex: 1 1 auto; min-height: 0; }
+
+  .pane-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  #editor {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 300px;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 0.85rem;
+    tab-size: 4;
+    overflow: auto;
+  }
+
+  #preview {
+    flex: 1 1 auto;
+    min-height: 300px;
+    overflow: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+  }
+
+  /* ---------- Rendered Markdown (both themes) ---------- */
+
+  .markdown-body { line-height: 1.6; font-size: 0.95rem; word-wrap: break-word; }
+  .markdown-body > *:first-child { margin-top: 0; }
+  .markdown-body > *:last-child { margin-bottom: 0; }
+
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    margin: 1.3em 0 0.6em;
+    line-height: 1.25;
+    font-weight: 700;
+  }
+  .markdown-body h1 { font-size: 1.7em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  .markdown-body h2 { font-size: 1.4em; padding-bottom: 0.25em; border-bottom: 1px solid var(--border); }
+  .markdown-body h3 { font-size: 1.2em; }
+  .markdown-body h4 { font-size: 1.05em; }
+  .markdown-body h5 { font-size: 0.95em; }
+  .markdown-body h6 { font-size: 0.9em; color: var(--text-muted); }
+
+  .markdown-body p { margin: 0 0 0.9em; }
+
+  .markdown-body a { color: var(--accent); text-decoration: underline; }
+  .markdown-body a:hover { text-decoration: none; }
+
+  .markdown-body strong { font-weight: 700; }
+  .markdown-body em { font-style: italic; }
+  .markdown-body del { opacity: 0.75; }
+
+  .markdown-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 0.15em 0.4em;
+    border-radius: 5px;
+  }
+
+  .markdown-body pre {
+    margin: 0 0 1em;
+    padding: 0.85rem 1rem;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-x: auto;               /* long code scrolls in its own container */
+  }
+  .markdown-body pre code {
+    display: block;
+    background: none;
+    color: var(--code-text);
+    padding: 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    white-space: pre;
+  }
+
+  .markdown-body blockquote {
+    margin: 0 0 1em;
+    padding: 0.2em 1em;
+    color: var(--text-muted);
+    border-left: 4px solid var(--quote-bar);
+  }
+  .markdown-body blockquote > *:last-child { margin-bottom: 0; }
+
+  .markdown-body ul,
+  .markdown-body ol { margin: 0 0 0.9em; padding-left: 1.6em; }
+  .markdown-body li { margin: 0.2em 0; }
+  .markdown-body li > ul,
+  .markdown-body li > ol { margin: 0.2em 0; }
+
+  .markdown-body ul.contains-task-list { list-style: none; padding-left: 0.4em; }
+  .markdown-body .task-list-item { list-style: none; }
+  .markdown-body .task-list-item input[type="checkbox"] {
+    margin: 0 0.5em 0 0;
+    vertical-align: middle;
+  }
+
+  .markdown-body hr {
+    border: none;
+    border-top: 2px solid var(--border);
+    margin: 1.4em 0;
+  }
+
+  .markdown-body img { max-width: 100%; height: auto; border-radius: 4px; }
+
+  .markdown-body table {
+    border-collapse: collapse;
+    margin: 0 0 1em;
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;               /* wide tables scroll in their own box */
+  }
+  .markdown-body th,
+  .markdown-body td {
+    border: 1px solid var(--border-strong);
+    padding: 0.4em 0.7em;
+  }
+  .markdown-body th { background: var(--panel-2); font-weight: 700; }
+  .markdown-body tbody tr:nth-child(even) { background: color-mix(in srgb, var(--text) 4%, var(--panel)); }
+
+  /* ---------- Help modal content ----------
+     The dialog chrome (overlay, surface, ✕, fade, focus-trap) is the shared
+     jbcModal primitive (CtModal in the shared lib), themed via the --jbcm-* tokens
+     in :root. Only the Help body's own typography is styled here. */
+  .jbcm-body p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .jbcm-body ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .jbcm-body li { margin-bottom: 0.4rem; }
+  .jbcm-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Responsive / mobile ---------- */
+
+  @media (max-width: 760px) {
+    .split {
+      grid-template-columns: 1fr;   /* stack the panes vertically */
+      min-height: 0;
+    }
+    #editor, #preview { min-height: 260px; }
+    .toolbar button { min-height: 44px; }
+  }

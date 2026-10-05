@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dither &amp; Retro-Palette Studio</title>
+<meta property="og:title"       content="Dither &amp; Retro-Palette Studio">
+<meta property="og:description" content="Reduce any image to a retro color palette with Floyd–Steinberg, Atkinson or ordered dithering and chunky pixels — export true-color or tiny indexed PNG, all in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f3f7;
+    --panel: #ffffff;
+    --panel-2: #efeef4;
+    --border: #d9d7e2;
+    --border-strong: #b8b5c6;
+    --text: #1d1b26;
+    --text-muted: #6c6880;
+    --accent: #6b4bff;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --warning: #8a6300;
+    --warning-bg: #fff6e0;
+    --focus: #6b4bff;
+    --radius: 8px;
+    --checker: #e4e2ec;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #16151c;
+      --panel: #201e29;
+      --panel-2: #272530;
+      --border: #35323f;
+      --border-strong: #494455;
+      --text: #ecebf1;
+      --text-muted: #9a95a8;
+      --accent: #9d86ff;
+      --accent-contrast: #16121f;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --warning: #ffce6b;
+      --warning-bg: #3a2c0d;
+      --focus: #9d86ff;
+      --checker: #2c2a35;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:lib components/styles/widgets.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Dither &amp; Retro-Palette Studio</h1>
+        <p class="subtitle">Reduce an image to a retro palette with dithering &amp; chunky pixels — all local, nothing leaves your browser.</p>
+      </div>
+      <button id="help-button" type="button" class="help-button" data-testid="help-button" title="How it works" aria-label="How it works">?</button>
+    </div>
+  </header>
+
+  <label class="dropzone" for="fileInput" data-testid="dropzone">
+    <input type="file" id="fileInput" data-testid="file-input" accept="image/*" class="visually-hidden">
+    <span>Drop an image here, or click to choose one</span>
+    <span class="dropzone-hint">PNG · JPEG · WebP · GIF · BMP in — dithered PNG / indexed PNG-8 out</span>
+  </label>
+
+  <p class="error" data-testid="error" role="alert" hidden></p>
+
+  <section class="loaded" data-testid="loaded-section" hidden>
+    <div class="file-info" data-testid="original-info">
+      <span class="file-name" data-testid="original-name"></span>
+      <span aria-hidden="true">&middot;</span>
+      <span class="file-dims" data-testid="original-dims"></span>
+      <button type="button" data-testid="remove-file-btn" aria-label="Remove image" title="Remove image">✕</button>
+    </div>
+
+    <p class="warning" data-testid="warning" role="status" aria-live="polite" hidden></p>
+
+    <div class="work">
+      <div class="controls" data-testid="controls">
+
+        <div class="field">
+          <label for="paletteMode">Palette source</label>
+          <select id="paletteMode" data-testid="palette-mode">
+            <option value="preset">Fixed preset</option>
+            <option value="auto">Auto (median-cut to N colors)</option>
+            <option value="custom">Custom palette</option>
+          </select>
+        </div>
+
+        <div class="field" data-testid="preset-field">
+          <label for="presetSelect">Preset</label>
+          <select id="presetSelect" data-testid="preset-select"></select>
+        </div>
+
+        <div class="field" data-testid="grayscale-field" hidden>
+          <label for="grayscaleRange">Grayscale levels: <span data-testid="grayscale-value">4</span></label>
+          <input type="range" id="grayscaleRange" data-testid="grayscale-range" min="2" max="64" value="4">
+        </div>
+
+        <div class="field" data-testid="auto-field" hidden>
+          <label for="autoRange">Colors: <span data-testid="auto-value">16</span></label>
+          <input type="range" id="autoRange" data-testid="auto-range" min="2" max="256" value="16">
+        </div>
+
+        <fieldset class="field custom-field" data-testid="custom-field" hidden>
+          <legend>Custom palette</legend>
+          <div class="swatch-table" data-testid="swatch-table"></div>
+          <div class="custom-actions">
+            <button type="button" data-testid="add-swatch-btn">+ Add color</button>
+            <button type="button" data-testid="load-current-btn" title="Fill from the currently active palette">Load current</button>
+            <button type="button" data-testid="remove-all-btn">Remove all</button>
+          </div>
+        </fieldset>
+
+        <div class="field">
+          <label for="ditherSelect">Dithering</label>
+          <select id="ditherSelect" data-testid="dither-select">
+            <option value="none">None (nearest color)</option>
+            <option value="fs">Floyd–Steinberg</option>
+            <option value="atkinson">Atkinson</option>
+            <option value="bayer4">Ordered — Bayer 4×4</option>
+            <option value="bayer8">Ordered — Bayer 8×8</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="pixelRange">Pixel scale: <span data-testid="pixel-value">1</span>×</label>
+          <input type="range" id="pixelRange" data-testid="pixel-range" min="1" max="16" value="1">
+          <p class="hint">Downscale into chunky pixels before dithering.</p>
+        </div>
+
+        <div class="field">
+          <label for="brightnessRange">Brightness: <span data-testid="brightness-value">0</span></label>
+          <input type="range" id="brightnessRange" data-testid="brightness-range" min="-100" max="100" value="0">
+        </div>
+
+        <div class="field">
+          <label for="contrastRange">Contrast: <span data-testid="contrast-value">0</span></label>
+          <input type="range" id="contrastRange" data-testid="contrast-range" min="-100" max="100" value="0">
+        </div>
+
+        <div class="output-info" data-testid="output-info" aria-live="polite">
+          <span class="output-info-label">Output:</span>
+          <span data-testid="output-dims">—</span>
+          <span aria-hidden="true">&middot;</span>
+          <span data-testid="output-colors">—</span>
+        </div>
+
+        <div class="actions-row">
+          <button type="button" id="exportPngBtn" data-testid="export-png-btn" class="primary" disabled>Export PNG</button>
+          <button type="button" id="exportIndexedBtn" data-testid="export-indexed-btn" disabled>Export PNG-8</button>
+        </div>
+        <div class="actions-row">
+          <button type="button" id="copyPaletteBtn" data-testid="copy-palette-btn" disabled>Copy palette</button>
+          <button type="button" id="downloadGplBtn" data-testid="download-gpl-btn" disabled>Download .gpl</button>
+          <button type="button" id="resetBtn" data-testid="reset-btn">Reset</button>
+        </div>
+        <p class="hint" data-testid="indexed-note"></p>
+      </div>
+
+      <div class="preview" data-testid="preview">
+        <div class="compare ct-checkerboard" data-testid="compare">
+          <canvas class="compare-after" data-testid="after-canvas" aria-label="Dithered result"></canvas>
+          <div class="compare-before-wrap" data-testid="before-wrap">
+            <canvas class="compare-before" data-testid="before-canvas" aria-label="Original image"></canvas>
+          </div>
+          <div class="compare-divider" data-testid="compare-divider" aria-hidden="true"></div>
+        </div>
+        <label class="split-label" for="splitRange">Before / after split</label>
+        <input type="range" id="splitRange" data-testid="split-range" min="0" max="100" value="50" aria-label="Before / after split position">
+        <div class="palette-strip" data-testid="palette-strip" aria-label="Active palette"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Help modal is built at runtime by the shared jbcModal primitive
+     (lib/modal.js) from this hidden template. The <h2> title is
+     supplied via jbcModal's `title` option, so it is not repeated here. -->
+<template id="help-body">
+    <p>Everything runs locally in your browser — the image never leaves your device. Pixels are read and re-drawn with the native <code>&lt;canvas&gt;</code>.</p>
+    <ul>
+      <li><strong>Load an image.</strong> Drop a file on the dropzone or click to pick one.</li>
+      <li><strong>Pick a palette.</strong> Choose a <strong>fixed preset</strong> (1-bit, Game Boy, NES, CGA, EGA, C64, PICO-8, e-ink, grayscale), let <strong>Auto</strong> median-cut the image to N colors, or build a <strong>custom</strong> palette of hex swatches.</li>
+      <li><strong>Dither.</strong> None, <strong>Floyd–Steinberg</strong>, <strong>Atkinson</strong>, or ordered <strong>Bayer 4×4 / 8×8</strong> — trade banding for texture.</li>
+      <li><strong>Pixel scale.</strong> Shrink into chunky pixels before dithering for a true retro look.</li>
+      <li><strong>Adjust.</strong> Brightness and contrast are applied before quantization.</li>
+      <li><strong>Compare.</strong> Drag the divider (or the slider) to wipe between the original and the result.</li>
+      <li><strong>Export.</strong> A true-color <strong>PNG</strong>, a tiny <strong>indexed PNG-8</strong>, or the palette as a hex list / GIMP <code>.gpl</code>.</li>
+    </ul>
+    <p class="help-note"><strong>Notes.</strong> Indexed PNG-8 uses the browser's built-in DEFLATE (<code>CompressionStream</code>); where that's unavailable the tool falls back to true-color PNG. Your options are remembered on this device — never the images themselves.</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

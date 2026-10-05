@@ -1,0 +1,221 @@
+
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  h1 { font-size: 1.35rem; margin: 0 0 0.3rem; }
+  h2 { margin: 0; font-size: 1.15rem; }
+  h3 { margin: 0; }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  input[type="text"],
+  textarea {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.55rem 0.7rem;
+    width: 100%;
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 7rem;
+    line-height: 1.45;
+  }
+
+  /* Selects keep base.css's chevron: fill with background-COLOR (never the
+     `background` shorthand, which wipes background-image) and keep padding-right
+     2rem for chevron room. */
+  select {
+    font: inherit;
+    color: var(--text);
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.55rem 2rem 0.55rem 0.7rem;
+    width: 100%;
+  }
+
+  input:disabled,
+  textarea:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.85rem;
+    touch-action: manipulation;
+  }
+
+  button:hover:not(:disabled):not(.ctc-btn) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  }
+
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  output:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header { display: flex; flex-direction: column; gap: 0.2rem; }
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .header-titles { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+
+  .help-button {
+    flex: 0 0 auto;
+    width: 44px; height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; line-height: 1;
+  }
+
+  /* ---------- Card panels ---------- */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.15rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .card-head { display: flex; flex-direction: column; gap: 0.25rem; }
+  .card-blurb { margin: 0; color: var(--text-muted); font-size: 0.85rem; }
+  .sub-heading { font-size: 0.95rem; margin-top: 0.3rem; }
+  .hint { margin: 0; color: var(--text-muted); font-size: 0.8rem; line-height: 1.4; }
+
+  .field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .field.grow { flex: 1 1 auto; min-width: 0; }
+
+  .actions-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+
+  .primary { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); font-weight: 600; }
+  .primary:hover:not(:disabled):not(.ctc-btn) { background: color-mix(in srgb, var(--accent) 85%, var(--text)); color: var(--accent-contrast); }
+
+  .checkbox { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; cursor: pointer; }
+  .checkbox input { width: auto; min-height: 0; }
+  .checks { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+  .checks-group { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.9rem 0.8rem; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+  .checks-group legend { font-size: 0.85rem; font-weight: 700; padding: 0 0.35rem; }
+  .field-label { font-size: 0.9rem; font-weight: 600; }
+  .cat-count { color: var(--text-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+  textarea { min-height: 9rem; }
+  textarea.clean-output { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; background: var(--panel-alt); }
+
+  /* ---------- Segmented control ---------- */
+  .segmented { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; align-self: flex-start; }
+  .segmented button { border: 0; border-radius: 0; background: var(--panel); min-width: 4.5rem; }
+  .segmented button + button { border-left: 1px solid var(--border-strong); }
+  .segmented button[aria-pressed="true"] { background: var(--accent); color: var(--accent-contrast); }
+  .segmented button[aria-pressed="true"]:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, var(--text)); }
+
+  /* ---------- Summary / stats ---------- */
+  .summary { margin: 0; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .badge { display: inline-block; padding: 0.1rem 0.6rem; border-radius: 999px; font-size: 0.85rem; background: color-mix(in srgb, #c0392b 18%, var(--panel)); border: 1px solid #c0392b; }
+  .badge.clean { background: color-mix(in srgb, #2e8b57 18%, var(--panel)); border-color: #2e8b57; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.6rem; }
+  .stat-tile { background: var(--panel-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.55rem 0.75rem; display: flex; flex-direction: column; gap: 0.1rem; border-left: 4px solid var(--c, var(--border-strong)); }
+  .stat-value { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-label { font-size: 0.78rem; color: var(--text-muted); }
+
+  .banner { border-radius: var(--radius); padding: 0.55rem 0.8rem; font-size: 0.88rem; border: 1px solid var(--border-strong); background: var(--panel-alt); overflow-wrap: anywhere; }
+  .banner[hidden] { display: none; }
+  .banner-warn { border-color: #c98a00; background: color-mix(in srgb, #c98a00 14%, var(--panel)); }
+
+  /* ---------- Category colours + chips ---------- */
+  .cat-zerowidth { --c: #d9534f; } .cat-bidi { --c: #8e44ad; } .cat-format { --c: #2980b9; }
+  .cat-variation { --c: #16a085; } .cat-tag { --c: #c0392b; } .cat-filler { --c: #d35400; }
+  .cat-control { --c: #7f8c8d; } .cat-space { --c: #c98a00; } .cat-separator { --c: #b8860b; }
+  .cat-confusable { --c: #e84393; }
+
+  .reveal { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 2.1; padding: 0.7rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-alt); min-height: 4rem; max-height: 28rem; overflow: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9rem; }
+  .reveal:empty::before { content: "Nothing to show yet."; color: var(--text-muted); }
+  .chip { display: inline; font: inherit; font-size: 0.75rem; line-height: 1.2; padding: 0.1rem 0.4rem; margin: 0 0.1rem; border-radius: 6px; border: 1px solid var(--c, var(--border-strong)); background: color-mix(in srgb, var(--c, gray) 16%, var(--panel)); color: var(--text); white-space: nowrap; cursor: pointer; vertical-align: baseline; }
+  .chip:hover:not(:disabled) { background: color-mix(in srgb, var(--c, gray) 30%, var(--panel)); }
+  .chip[aria-pressed="true"] { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .chip.legit { border-style: dashed; opacity: 0.75; }
+  .mixed { text-decoration: underline wavy #e84393; text-underline-offset: 4px; }
+
+  .inspector-grid { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1rem; margin: 0.4rem 0 0; font-size: 0.88rem; }
+  .inspector-grid dt { color: var(--text-muted); font-weight: 600; }
+  .inspector-grid dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+
+  .flag-list summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+  .flag-table-wrap { max-height: 18rem; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); margin-top: 0.5rem; }
+  table.flag-table { border-collapse: collapse; width: 100%; font-size: 0.8rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  table.flag-table th, table.flag-table td { text-align: left; padding: 0.3rem 0.55rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.flag-table th { position: sticky; top: 0; background: var(--panel-alt); }
+  table.flag-table tbody tr { cursor: pointer; }
+  table.flag-table tbody tr:hover, table.flag-table tbody tr:focus-visible { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+
+  /* ---------- Help modal content ----------
+     The dialog chrome (overlay, surface, ✕, fade, focus-trap) is the shared
+     jbcModal primitive (shared lib modal), themed via the --jbcm-* tokens
+     in :root. Only the Help body's own typography is styled here. */
+  .jbcm-body p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .jbcm-body ul { margin: 0 0 0.7rem; padding-left: 1.2rem; line-height: 1.5; }
+  .jbcm-body li { margin-bottom: 0.4rem; }
+  .jbcm-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: var(--panel-alt);
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+  }
+  .help-note {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 640px) {
+    .app { padding: 1rem 0.75rem 2rem; }
+    .card { padding: 0.9rem 0.8rem 1rem; }
+    .actions-row button, .segmented button { min-height: 44px; }
+    .inspector-grid { grid-template-columns: 1fr; }
+    .inspector-grid dt { margin-top: 0.3rem; }
+  }

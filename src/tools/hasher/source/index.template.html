@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hasher</title>
+<meta property="og:title"       content="Hasher">
+<meta property="og:description" content="MD5, SHA-1, SHA-256, SHA-512, CRC32 and HMAC of text or a file — hand-rolled, entirely in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #2f6fed;
+    --accent-contrast: #ffffff;
+    --danger: #c4362a;
+    --danger-bg: #fdeceb;
+    --warning: #8a6300;
+    --warning-bg: #fff6e0;
+    --focus: #2f6fed;
+    --radius: 8px;
+    /* confirmDialog accent (shared JbcConfirm.mjs) — matches the tool's primary. */
+    --jbcc-accent: #2f6fed;
+
+    /* jbcModal (Help dialog) theming — reuse this tool's tokens (they redefine
+       per theme, so this one block covers light + dark). */
+    --jbcm-bg: var(--panel);
+    --jbcm-fg: var(--text);
+    --jbcm-border: var(--border);
+    --jbcm-radius: 12px;
+    --jbcm-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    --jbcm-focus: var(--focus);
+    --jbcm-max-width: 560px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #6d9bff;
+      --accent-contrast: #0b1220;
+      --danger: #ff6b60;
+      --danger-bg: #3a1815;
+      --warning: #ffce6b;
+      --warning-bg: #3a2c0d;
+      --focus: #6d9bff;
+      --jbcc-accent: #6d9bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Hasher</h1>
+        <p class="subtitle">MD5, SHA-1, SHA-256, SHA-512, CRC32 &amp; HMAC of text or a file — all local, nothing leaves your browser.</p>
+      </div>
+      <button id="help-button" type="button" class="help-button" data-testid="help-button" title="How it works" aria-label="How it works">?</button>
+    </div>
+  </header>
+
+  <div class="mode-toggle" data-testid="mode-toggle" role="group" aria-label="Input mode">
+    <button type="button" id="modeTextBtn" data-testid="mode-text-btn" data-value="text" aria-pressed="true">Text</button>
+    <button type="button" id="modeFileBtn" data-testid="mode-file-btn" data-value="file" aria-pressed="false">File</button>
+  </div>
+
+  <section class="text-section" data-testid="text-section">
+    <div class="field">
+      <label for="textInput">Text to hash (UTF-8)</label>
+      <div class="ct-field ct-field--multiline">
+        <textarea id="textInput" data-testid="text-input" placeholder="Type or paste text..."></textarea>
+        <button type="button" class="ct-copy-btn" data-copy-target="text-input" data-testid="text-input-copy" title="Copy text" aria-label="Copy text" hidden>📋</button>
+      </div>
+    </div>
+    <div class="actions-row">
+      <button type="button" class="btn" id="clearTextBtn" data-testid="clear-text-btn">Clear</button>
+    </div>
+  </section>
+
+  <section class="file-section" data-testid="file-section" hidden>
+    <label class="dropzone" for="fileInput" data-testid="dropzone">
+      <input type="file" id="fileInput" data-testid="file-input" class="visually-hidden">
+      <span>Drop a file here, or click to choose one</span>
+    </label>
+    <div class="file-info" data-testid="file-info" hidden>
+      <span class="file-name"></span>
+      <span>&middot;</span>
+      <span class="file-size"></span>
+      <button type="button" data-testid="remove-file-btn" aria-label="Remove file" title="Remove file">&times;</button>
+    </div>
+    <p class="warning" data-testid="file-warning" role="status" aria-live="polite" hidden></p>
+    <p class="error" data-testid="file-error" role="alert" hidden></p>
+  </section>
+
+  <section class="options" data-testid="options" aria-label="Options">
+    <label class="check"><input type="checkbox" id="base64Toggle" data-testid="base64-toggle"> Also show Base64 (SHA family)</label>
+  </section>
+
+  <section class="results" data-testid="results" aria-label="Results">
+    <div class="results-header">
+      <h2>Digests</h2>
+      <button type="button" class="btn" id="copyAllBtn" data-testid="copy-all-btn" title="Copy all results" aria-label="Copy all results">Copy all</button>
+    </div>
+    <p class="visually-hidden" data-testid="results-status" role="status" aria-live="polite"></p>
+    <div id="plainResults" data-testid="plain-results"></div>
+  </section>
+
+  <section class="results hmac-section" data-testid="hmac-section" aria-label="HMAC">
+    <div class="results-header">
+      <h2>HMAC</h2>
+    </div>
+    <div class="hmac-key-field" data-testid="hmac-key-field">
+      <label for="hmacKey">HMAC key (UTF-8) — kept in memory only, never saved</label>
+      <input type="text" id="hmacKey" data-testid="hmac-key" autocomplete="off" spellcheck="false" placeholder="Type a key to compute HMACs...">
+      <p class="field-note">Enter a key and the HMAC digests fill in live. CRC32 has no HMAC. The key is never written to your device.</p>
+    </div>
+    <div id="hmacResults" data-testid="hmac-results"></div>
+  </section>
+</div>
+
+<!-- Help modal is built at runtime by the shared jbcModal primitive
+     (../claude-tools/src/lib/components/CtModal.mjs) from this hidden template. The <h2> title is
+     supplied via jbcModal's `title` option, so it is not repeated here. -->
+<template id="help-body">
+  <p>Everything runs locally in your browser — nothing you type or drop here is ever uploaded. Every hash is computed by hand-rolled JavaScript, so it works the same over <code>file://</code>, plain LAN HTTP, or HTTPS.</p>
+  <ul>
+    <li><strong>Text or File.</strong> Switch modes with the toggle. Text is hashed as its UTF-8 bytes; a file is read locally and hashed as its raw bytes (name and size are shown).</li>
+    <li><strong>Every algorithm at once.</strong> <strong>MD5</strong>, <strong>SHA-1</strong>, <strong>SHA-256</strong>, <strong>SHA-512</strong>, and <strong>CRC32</strong> are all shown together as lowercase hex — each in its own field with a copy button.</li>
+    <li><strong>Base64.</strong> Turn on <em>Also show Base64</em> to add a Base64 field to the SHA-family digests.</li>
+    <li><strong>HMAC.</strong> Type a key in the <strong>HMAC</strong> section and the keyed HMAC-MD5/SHA-1/SHA-256/SHA-512 digests fill in live. The key is held in memory only and is <strong>never</strong> saved to your device.</li>
+    <li><strong>Copy.</strong> Each field has its own copy button (📋); <strong>Copy all</strong> copies every shown digest as <code>LABEL: value</code> lines.</li>
+  </ul>
+  <p class="help-note">Your input text and the Base64 toggle are remembered on this device. The HMAC key and any file contents are not.</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

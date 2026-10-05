@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markdown Previewer</title>
+<meta property="og:title"       content="Markdown Previewer">
+<meta property="og:description" content="Live split-pane Markdown editor and preview — hand-rolled Markdown to HTML, entirely in your browser.">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="claude-tools">
+<meta property="og:image"       content="preview.png">
+<meta name="twitter:card"       content="summary_large_image">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --panel-2: #fafafb;
+    --border: #d7d7dc;
+    --border-strong: #b6b6bd;
+    --text: #1c1c1f;
+    --text-muted: #6b6b74;
+    --accent: #7a3ff2;
+    --accent-contrast: #ffffff;
+    --code-bg: #f0f0f4;
+    --code-text: #383842;
+    --quote-bar: #cdb8f7;
+    --focus: #7a3ff2;
+    --radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* confirmDialog dialog theming (docs/conventions.md § Destructive actions) */
+    --ctc-accent: var(--accent);
+    --ctc-accent-fg: var(--accent-contrast);
+
+    /* jbcModal (Help dialog) theming — reuse this tool's tokens (they redefine
+       per theme, so this one block covers light + dark). */
+    --jbcm-bg: var(--panel);
+    --jbcm-fg: var(--text);
+    --jbcm-border: var(--border);
+    --jbcm-radius: var(--radius);
+    --jbcm-focus: var(--focus);
+    --jbcm-max-width: 34rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #17171a;
+      --panel: #202024;
+      --panel-2: #26262b;
+      --border: #34343a;
+      --border-strong: #46464d;
+      --text: #eceef1;
+      --text-muted: #9a9aa2;
+      --accent: #b18bff;
+      --accent-contrast: #1a1030;
+      --code-bg: #2a2a31;
+      --code-text: #d7d7e0;
+      --quote-bar: #5a4a86;
+      --focus: #b18bff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  <<ct:lib components/styles/base.css>><<ct:lib components/styles/controls.css>><<ct:inline styles.css>></style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="app-header-row">
+      <div class="header-titles">
+        <h1>Markdown Previewer</h1>
+        <p class="subtitle">A live split-pane Markdown editor &amp; preview — hand-rolled Markdown&nbsp;→&nbsp;HTML, all local.</p>
+      </div>
+      <button
+        id="help-button"
+        type="button"
+        class="help-button"
+        data-testid="help-button"
+        title="How it works"
+        aria-label="How it works"
+      >?</button>
+    </div>
+  </header>
+
+  <div class="toolbar" role="toolbar" aria-label="Actions">
+    <button type="button" id="viewToggleBtn" data-testid="view-toggle" class="toggle" aria-pressed="true" title="Toggle side-by-side / top-and-bottom layout">Side by side</button>
+    <button type="button" id="syncToggleBtn" data-testid="sync-toggle" class="toggle" aria-pressed="false" title="Sync editor and preview scrolling">Sync scroll</button>
+    <button type="button" id="copyHtmlBtn" data-testid="copy-html-btn" title="Copy the rendered HTML to the clipboard">Copy HTML</button>
+    <button type="button" id="clearBtn" data-testid="clear-btn" title="Clear the editor">Clear</button>
+    <button type="button" id="loadSampleBtn" data-testid="load-sample-btn" title="Fill the editor with a Markdown cheat-sheet">Load sample</button>
+  </div>
+
+  <div class="split">
+    <section class="pane editor-pane">
+      <label class="pane-label" for="editor">Markdown</label>
+      <div class="ct-field ct-field--multiline editor-field">
+        <textarea id="editor" data-testid="editor" spellcheck="false"
+          placeholder="Type Markdown here…  (or press “Load sample”)"
+          aria-label="Markdown editor"></textarea>
+        <button type="button" id="copyMdBtn" class="ct-copy-btn" data-testid="editor-copy-btn"
+          title="Copy the Markdown source" aria-label="Copy the Markdown source" hidden>📋</button>
+      </div>
+    </section>
+
+    <section class="pane preview-pane">
+      <div class="pane-label" id="preview-label">Preview</div>
+      <div id="preview" data-testid="preview" class="markdown-body" tabindex="0"
+        role="region" aria-label="Rendered preview" aria-live="off"></div>
+    </section>
+  </div>
+</div>
+
+<!-- Help modal built at runtime by the shared jbcModal primitive
+     (CtModal in the shared lib) from this hidden template. The <h2> title comes
+     from jbcModal's `title` option, so it is not repeated here. -->
+<template id="help-body">
+    <p>Type Markdown on the left; the rendered HTML appears live on the right. Everything runs locally in your browser — nothing you type is ever sent anywhere.</p>
+    <ul>
+      <li><strong>Live preview.</strong> The preview updates as you type (briefly debounced). On narrow screens the two panes stack vertically.</li>
+      <li><strong>Side by side.</strong> Toggles the layout between side-by-side columns (the default) and a stacked top/bottom view where the editor is a smaller pane above a taller preview.</li>
+      <li><strong>Sync scroll.</strong> When on, scrolling one pane scrolls the other proportionally.</li>
+      <li><strong>Copy HTML.</strong> Copies the rendered HTML source to your clipboard.</li>
+      <li><strong>Clear.</strong> Empties the editor (asks first, since that can be a lot of writing).</li>
+      <li><strong>Load sample.</strong> Fills the editor with a cheat-sheet that exercises every supported construct.</li>
+    </ul>
+    <p><strong>Supported syntax:</strong> headings (<code>#</code>…<code>######</code> and setext), <strong>bold</strong>, <em>italic</em>, <del>strikethrough</del>, <code>inline code</code>, fenced &amp; indented code blocks, blockquotes (nestable), ordered/unordered/nested lists, task lists (<code>- [ ]</code>/<code>- [x]</code>), links, images, autolinks, reference links, horizontal rules, and pipe tables with alignment.</p>
+    <p class="help-note">Raw HTML is escaped by default and dangerous URLs (like <code>javascript:</code>) are neutralized, so the preview can safely render anything you paste. Your editor text is remembered on this device.</p>
+</template>
+
+<<ct:lib components/footer.html>>
+
+
+
+
+<script type="module"><<ct:inline app.mjs>></script>
+</body>
+</html>

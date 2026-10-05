@@ -1,0 +1,6 @@
+# Batch Watermark - design
+- `source/logic.mjs` (DOM-free): `layoutWatermark`, local font helpers (meme-maker pattern, Arial default), `textBlockMetrics` (injected `measure`), format mapping, `uniqueName`, `buildZip` (-> shared `storeZip`). It owns every jbc util import; `app.mjs` imports only component modules and redeclares nothing (importing a util module in app.mjs re-inlines it and double-declares).
+- `layoutWatermark` returns `[{x,y,w,h,rot}]`: `scalePct` sizes the watermark's longer side as a % of the target's short side; margin/offset/gap are also % of the short side. Tiling scans a grid wide enough to cover the image at any rotation, staggers odd rows by half a step, drops boxes wholly off-canvas, and caps at 2000 (the scan step widens for tiny marks so the loop stays bounded).
+- Text is pre-rendered once per target size to an offscreen canvas (stroke before fill, round joins, optional shadow; stroke/shadow scale with font size), then placed with `drawImage` (+ `globalAlpha`), so tiling never re-lays-out text. Logo mode is the same `drawImage` path.
+- One `compose()` serves the preview (downscaled to <= 1200 px) and the export (natural size), so preview == output.
+- Export is sequential on one reused canvas with a macrotask yield per file; each file is decoded lazily with `revoke:true`.

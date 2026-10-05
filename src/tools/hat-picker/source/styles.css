@@ -1,0 +1,416 @@
+
+
+  /* ---- Custom properties: palette / sizing ---- */
+  :root {
+    --bg: #fdf6ec;
+    --bg-alt: #ffffff;
+    --ink: #2c2a4a;
+    --ink-soft: #6b6890;
+    --brand: #ff6f59;
+    --brand-dark: #e0553f;
+    --accent: #4ecdc4;
+    --accent-dark: #33a89f;
+    --amber: #e0a800;
+    --danger: #e0553f;
+    --danger-dark: #c23f2c;
+    --border: #ecd9c2;
+    --shadow: 0 6px 18px rgba(44, 42, 74, 0.12);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --focus-ring: #2c2a4a;
+    font-size: 16px;
+
+    /* confirmDialog theming — reuse this tool's tokens */
+    --ctc-accent: var(--brand);
+    --ctc-accent-fg: #ffffff;
+    --ctc-bg: var(--bg-alt);
+    --ctc-fg: var(--ink);
+    --ctc-radius: var(--radius);
+    --ctc-btn-radius: var(--radius-sm);
+    --ctc-focus: var(--focus-ring);
+    --ctc-cancel-border: var(--border);
+
+    /* jbcModal (Help dialog) theming — reuse this tool's tokens */
+    --jbcm-bg: var(--bg-alt);
+    --jbcm-fg: var(--ink);
+    --jbcm-border: var(--border);
+    --jbcm-radius: var(--radius);
+    --jbcm-shadow: var(--shadow);
+    --jbcm-backdrop: rgba(44, 42, 74, 0.55);
+    --jbcm-focus: var(--focus-ring);
+    --jbcm-max-width: 30rem;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow-x: hidden;
+  }
+
+  body {
+    min-height: 100vh;
+    padding: 24px 16px 64px;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ---- Focus visibility (never remove outline outright) ---- */
+  button:focus-visible,
+  input:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* ---- Header ---- */
+  header.app-header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  header.app-header h1 {
+    margin: 0;
+    font-size: 2.1rem;
+    letter-spacing: -0.02em;
+  }
+  header.app-header p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+  }
+  /* A spacer that mirrors the help button's width keeps the title block
+     visually centered instead of the button pulling it off-center. */
+  .app-header-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .header-spacer,
+  .help-button {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+  }
+  .header-titles {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .help-button {
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bg-alt);
+    color: var(--ink);
+    font-size: 1.2rem;
+    font-weight: 800;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .help-button:hover:not(:disabled) {
+    background: var(--bg);
+  }
+
+  /* ---- Shared card look ---- */
+  section.card {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+
+  /* ---- Add row ---- */
+  .add-row form {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .add-row .field-wrap {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+  /* .visually-hidden now comes from the pasted ct-base include above. */
+  #entry-input {
+    width: 100%;
+    font-size: 1.05rem;
+    /* Vertical padding matches the buttons so the shared --control-h (44px,
+       via controls.css) resolves to the same rendered height across the row. */
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border);
+    background: var(--bg);
+    color: var(--ink);
+    /* Height is standardized by controls.css (--control-h: 44px); no per-tool
+       min-height here. */
+    /* Removes the mobile browser's tap-to-zoom gesture ambiguity/delay on
+       this control — matches the button rule below. No effect on desktop
+       mouse input. */
+    touch-action: manipulation;
+  }
+  #entry-input.shake {
+    animation: shake 320ms ease-in-out;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(7px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(3px); }
+  }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    /* Height is standardized by controls.css (--control-h: 44px). */
+    padding: 10px 18px;
+    transition: transform 120ms ease, opacity 120ms ease, filter 120ms ease;
+    /* Tells mobile browsers this control only needs tap/pan-through, not
+       double-tap-to-zoom — removes any residual gesture-recognition delay
+       or ambiguity on a real touch device before the click is dispatched.
+       No visible/behavioral effect on desktop (mouse) input. */
+    touch-action: manipulation;
+  }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  #add-button {
+    background: var(--accent);
+    color: #04302c;
+    font-size: 1.05rem;
+    padding: 10px 22px;
+  }
+  #add-button:hover:not(:disabled) { filter: brightness(1.05); }
+
+  .add-row-meta {
+    margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  #char-counter {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+  #char-counter.near-limit {
+    color: var(--amber);
+    font-weight: 700;
+  }
+
+  /* ---- Entries ---- */
+  .entries-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .entries-head h2 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+  #entry-count {
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+  #entry-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  li[data-testid="entry-row"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  li[data-testid="entry-row"] .entry-text {
+    word-break: break-word;
+    font-size: 1rem;
+  }
+  button[data-testid="entry-remove"] {
+    background: transparent;
+    color: var(--danger);
+    font-size: 1.2rem;
+    line-height: 1;
+    /* min-height comes from controls.css (--control-h: 44px). */
+    min-width: 44px;
+    padding: 0;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  button[data-testid="entry-remove"]:hover:not(:disabled) {
+    background: #fbe4e0;
+  }
+  #empty-state {
+    text-align: center;
+    color: var(--ink-soft);
+    padding: 24px 8px;
+    font-size: 1rem;
+  }
+
+  /* ---- Draw area ---- */
+  .draw-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+  }
+  #pull-button, #draw-again-button {
+    font-size: 1.35rem;
+    padding: 18px 32px;
+    border-radius: 999px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+    box-shadow: 0 8px 20px rgba(224, 85, 63, 0.35);
+    width: 100%;
+    max-width: 380px;
+  }
+  #pull-button:hover:not(:disabled), #draw-again-button:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+  #pull-button:disabled, #draw-again-button:disabled {
+    box-shadow: none;
+  }
+
+  .draw-controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    min-height: 44px;
+  }
+  .toggle-row input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    accent-color: var(--accent-dark);
+  }
+  .toggle-row label {
+    /* Vertical padding widens the tappable area around the checkbox's text
+       label toward the ~44px guideline without inflating the checkbox
+       itself (a native checkbox rendered oversized looks odd). */
+    padding: 12px 0;
+    cursor: pointer;
+  }
+
+  #clear-all {
+    background: transparent;
+    color: var(--danger);
+    border: 2px solid var(--danger);
+    padding: 8px 16px;
+    /* min-height comes from controls.css (--control-h: 44px). */
+  }
+  #clear-all:hover:not(:disabled) {
+    background: #fbe4e0;
+  }
+
+  /* ---- Winner card ---- */
+  .winner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-height: 140px;
+    justify-content: center;
+  }
+  /* In-field copy button lives inside this wrapper (controls.css supplies the
+     .ct-field / .ct-copy-btn base; --multiline pins the button to the top-right).
+     The winner value is copy-worthy, so the button reveals once a winner is
+     shown (app.mjs toggles [hidden]); it's hidden in the idle placeholder
+     state. Reserve top-right room so a long revealed value can't run under the
+     icon. */
+  .winner-field {
+    width: 100%;
+  }
+  .winner-card {
+    width: 100%;
+    background: linear-gradient(135deg, #fff7ea, #fff0dc);
+    border: 2px dashed var(--brand);
+    border-radius: var(--radius);
+    padding: 24px 16px;
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  .winner-card.bounce {
+    animation: winner-bounce 420ms ease-out;
+  }
+  @keyframes winner-bounce {
+    0%   { transform: scale(0.8); }
+    50%  { transform: scale(1.12); }
+    75%  { transform: scale(0.96); }
+    100% { transform: scale(1); }
+  }
+  .winner-hint {
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+  }
+
+  /* ---- Confetti canvas ---- */
+  #confetti-canvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* ---- Help modal content ----
+     The dialog chrome (overlay, surface, ✕, fade, focus-trap) is the shared
+     jbcModal primitive (CtModal.mjs), themed via the --jbcm-* tokens
+     declared in :root above. Only the Help body's own typography is styled
+     here (it renders inside jbcModal's .jbcm-body). */
+  .jbcm-body p { margin: 0 0 0.7rem; line-height: 1.5; }
+  .jbcm-body ul { margin: 0 0 0.9rem; padding-left: 1.2rem; line-height: 1.5; }
+  .jbcm-body li { margin-bottom: 0.35rem; }
+  .help-note {
+    margin-top: 0.9rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+    color: var(--ink-soft);
+    font-size: 0.88rem;
+  }
+
+  @media (max-width: 420px) {
+    header.app-header h1 { font-size: 1.7rem; }
+    .winner-card { font-size: 1.3rem; }
+    #pull-button, #draw-again-button { font-size: 1.15rem; padding: 16px 24px; }
+  }

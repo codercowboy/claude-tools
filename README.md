@@ -16,21 +16,34 @@ If you'd rather have these as a CLI, a browser extension, or a polished hosted a
 
 | Tool | What it does |
 | --- | --- |
+| [ascii-art](src/tools/ascii-art/) | Turn an image into text art in four modes - ASCII ramp, Unicode half-block, Braille, and colored ANSI - and export as plain text, colored HTML, or ANSI. Everything runs in the browser through the canvas; nothing is uploaded. |
+| [barcode-generator](src/tools/barcode-generator/) | Generate Code 128, EAN-13, UPC-A, and Code 39 barcodes with a live preview. Check digits are computed or verified, and the result exports as SVG or PNG. Nothing leaves the browser. |
 | [base64-tool](src/tools/base64-tool/) | Base64 / data-URI encoder and decoder. Text or a file in; Base64, Base64URL, a `data:` URI, or a JS snippet out, and decode back. |
+| [batch-watermark](src/tools/batch-watermark/) | Stamp a text or logo watermark on many images at once, preview it on one, and export the batch as a zip. Size, margin, and spacing are percentages of each image's short side, with a nine-point anchor grid, opacity, rotation, and tiling. Output is PNG, JPEG, or WebP, and nothing leaves the browser. |
 | [color-converter](src/tools/color-converter/) | Batch-convert a pile of mixed `rgba()`/hex colors into one format. Paste them, see a swatch of each, copy them out. |
 | [color-designer](src/tools/color-designer/) | Color-scheme generator from HSL harmonies, optionally flavored by a mood. Roll five schemes, expand into a live demo, copy them out. |
 | [color-picker](src/tools/color-picker/) | Sample exact pixel colors out of an image. Load it, pan and zoom, eyedrop the pixel as `rgba()` and hex. |
 | [cron-builder](src/tools/cron-builder/) | Build, parse, and understand a cron expression. Synced field pickers and raw editor, a plain-English explanation, and the next 5 fire times. |
+| [diff-viewer](src/tools/diff-viewer/) | Visual diff of two texts. A hand-rolled Myers diff shows changes side-by-side or inline with word-level highlighting, plus a copyable unified diff. Nothing leaves the browser. |
+| [dither-studio](src/tools/dither-studio/) | Reduce an image to a limited color palette with optional dithering and chunky pixels, compare against the original with a before/after wipe, and export a PNG, an indexed PNG-8, or the palette. Everything runs in the browser through the canvas; nothing is uploaded. |
+| [format-converter](src/tools/format-converter/) | Convert a document between JSON, CSV, TSV, YAML, `.properties`, and XML, with auto-detect of the source format. Every parser and emitter is hand-rolled, and nothing you paste leaves the browser. |
+| [hasher](src/tools/hasher/) | Hash text or a file - MD5, SHA-1, SHA-256, SHA-512, and CRC32 all at once, plus keyed HMAC, with optional Base64 output. Everything runs in the browser; nothing is uploaded. |
+| [hat-picker](src/tools/hat-picker/) | Random picker for game night. Add entries, pull a winner from the hat with a slot-machine reveal and confetti, optionally removing each winner after the draw. |
+| [http-headers](src/tools/http-headers/) | Explain, lint, and build HTTP headers. Paste a raw request or response and get each header explained and checked against a security checklist with ready-to-paste fixes, or build a recommended set as plain text or an nginx, Apache, or Express snippet. Nothing is sent anywhere. |
 | [inflation-calculator](src/tools/inflation-calculator/) | What a US dollar amount from one year is worth in another, using bundled [BLS](https://www.bls.gov/cpi/) CPI-U annual data. |
+| [invisible-chars](src/tools/invisible-chars/) | Detect, reveal, and strip invisible, zero-width, bidi, and look-alike Unicode in pasted text. Flagged characters become colored chips with a per-character inspector, and a clean step normalizes and removes chosen categories. Nothing leaves the browser. |
+| [markdown-previewer](src/tools/markdown-previewer/) | Live Markdown previewer. Type Markdown on the left and see the rendered HTML on the right. The converter is hand-rolled, sanitizes links and raw HTML, and nothing you type leaves the browser. |
 | [network-toolkit](src/tools/network-toolkit/) | Transfer-time math, CIDR/subnet math, IPv4/IPv6 conversion, and netmask ⇄ prefix. No DNS, no network calls. |
+| [pretty-printer](src/tools/pretty-printer/) | Pretty-print or minify JSON, YAML, HTML, CSS, SQL, and JavaScript. Every formatter is hand-rolled in vanilla JS, and nothing you paste leaves the browser. |
 | [qr-generator](src/tools/qr-generator/) | Generate a QR code from text or a URL with a QR encoder hand-rolled in vanilla JS. Download it as PNG or SVG. |
+| [social-card-maker](src/tools/social-card-maker/) | Compose a social share image (Open Graph / Twitter card) from a title, subtitle, and solid, gradient, or photo background, with an optional logo. Export PNG, JPEG, or WebP and copy the matching meta tags. Everything runs in the browser through the canvas; nothing is uploaded. |
 | [uuid-generator](src/tools/uuid-generator/) | Generate and inspect identifiers - UUID v4/v7, ULID, nanoid, and random tokens - bulk generate and copy, plus an inspector. |
 
-The whole set also has a little landing gallery at [`src/tools/index.html`](src/tools/index.html).
+The whole set also has a little landing gallery at [`src/gallery/index.html`](src/gallery/index.html).
 
 ## 60-second quickstart
 
-Simply download this project's source code from github, and open [`src/tools/index.html`](src/tools/index.html) in your browser by double clicking on it in your file explorer (or `finder`), or drag it onto your browser window. If you have Node installed, `npx ct run` opens that gallery for you.
+Simply download this project's source code from github, and open [`src/gallery/index.html`](src/gallery/index.html) in your browser by double clicking on it in your file explorer (or `finder`), or drag it onto your browser window. If you have Node installed, `npx ct run` opens that gallery for you.
 
 ## Development
 
